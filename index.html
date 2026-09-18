@@ -71,12 +71,18 @@
                 </div>
             </nav>
         </aside>
+        
+        <!-- Mobile Sidebar Overlay Backdrop -->
+        <div id="mms-sidebar-overlay" onclick="app.toggleSidebar(false)"></div>
 
         <!-- Main Content -->
         <main id="mms-main">
             <header id="mms-topbar">
-                <div class="mms-header-left">
-                    <h3 id="mms-view-title">ڈیش بورڈ</h3>
+                <div class="mms-header-left" style="display:flex; align-items:center; gap:0.8rem;">
+                    <button id="mms-sidebar-toggle" class="sidebar-toggle-btn" onclick="app.toggleSidebar()" title="مینو کھولیں / بند کریں">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h3 id="mms-view-title" style="margin:0;">ڈیش بورڈ</h3>
                     <div id="mms-section-badge" class="mms-section-badge"></div>
                 </div>
                 <div class="mms-header-right" style="display:flex; align-items:center; gap:10px; flex-direction:row-reverse;">

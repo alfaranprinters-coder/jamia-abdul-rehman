@@ -171,11 +171,60 @@ const MadrassahDB = {
     },
 
     // Existing methods kept...
-    saveStudent(data) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readwrite'); const store = transaction.objectStore('students'); const request = data.id ? store.put(data) : store.add(data); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
+    saveStudent(data) { 
+        return new Promise((resolve, reject) => { 
+            const transaction = this.db.transaction(['students'], 'readwrite'); 
+            const store = transaction.objectStore('students'); 
+            if (data.id && !data.uniqueCode) {
+                data.uniqueCode = 'STU-' + (1000 + parseInt(data.id));
+            }
+            const request = data.id ? store.put(data) : store.add(data); 
+            request.onsuccess = () => {
+                const insertedId = request.result;
+                if (!data.id && insertedId) {
+                    data.id = insertedId;
+                    if (!data.uniqueCode) {
+                        data.uniqueCode = 'STU-' + (1000 + parseInt(insertedId));
+                        try {
+                            const updateTx = this.db.transaction(['students'], 'readwrite');
+                            updateTx.objectStore('students').put(data);
+                        } catch(err) { console.warn('Could not update student uniqueCode immediately', err); }
+                    }
+                }
+                resolve(insertedId);
+            }; 
+            request.onerror = () => reject(request.target.error); 
+        }); 
+    },
     getAllStudents(section) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readonly'); const store = transaction.objectStore('students'); const request = store.getAll(); request.onsuccess = () => { const students = request.result.filter(s => s.section === section); resolve(students); }; request.onerror = () => reject(request.target.error); }); },
+    getAllStudentsAllSections() { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readonly'); const store = transaction.objectStore('students'); const request = store.getAll(); request.onsuccess = () => resolve(request.result || []); request.onerror = () => reject(request.target.error); }); },
     getStudentById(id) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readonly'); const store = transaction.objectStore('students'); const request = store.get(parseInt(id)); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
     deleteStudent(id) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readwrite'); const store = transaction.objectStore('students'); const request = store.delete(parseInt(id)); request.onsuccess = () => resolve(); request.onerror = () => reject(request.target.error); }); },
-    saveTeacher(data) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['teachers'], 'readwrite'); const store = transaction.objectStore('teachers'); const request = data.id ? store.put(data) : store.add(data); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
+    saveTeacher(data) { 
+        return new Promise((resolve, reject) => { 
+            const transaction = this.db.transaction(['teachers'], 'readwrite'); 
+            const store = transaction.objectStore('teachers'); 
+            if (data.id && !data.uniqueCode) {
+                data.uniqueCode = 'EMP-' + (100 + parseInt(data.id));
+            }
+            const request = data.id ? store.put(data) : store.add(data); 
+            request.onsuccess = () => {
+                const insertedId = request.result;
+                if (!data.id && insertedId) {
+                    data.id = insertedId;
+                    if (!data.uniqueCode) {
+                        data.uniqueCode = 'EMP-' + (100 + parseInt(insertedId));
+                        try {
+                            const updateTx = this.db.transaction(['teachers'], 'readwrite');
+                            updateTx.objectStore('teachers').put(data);
+                        } catch(err) { console.warn('Could not update teacher uniqueCode immediately', err); }
+                    }
+                }
+                resolve(insertedId);
+            }; 
+            request.onerror = () => reject(request.target.error); 
+        }); 
+    },
     getAllTeachers() { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['teachers'], 'readonly'); const store = transaction.objectStore('teachers'); const request = store.getAll(); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
     getTeacherById(id) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['teachers'], 'readonly'); const store = transaction.objectStore('teachers'); const request = store.get(parseInt(id)); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
     deleteTeacher(id) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['teachers'], 'readwrite'); const store = transaction.objectStore('teachers'); const request = store.delete(parseInt(id)); request.onsuccess = () => resolve(); request.onerror = () => reject(request.target.error); }); },
@@ -331,6 +380,58 @@ const MadrassahDB = {
             };
             request.onerror = () => reject(request.target.error);
         });
+    },
+
+    getPersonAttendance(personId, type) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['attendance'], 'readonly');
+            const store = transaction.objectStore('attendance');
+            const request = store.getAll();
+            request.onsuccess = () => {
+                const pid = parseInt(personId);
+                let results = request.result.filter(r => 
+                    parseInt(r.personId) === pid && 
+                    (!type || r.type === type)
+                );
+                results.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+                resolve(results);
+            };
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    async ensureUniqueCodes() {
+        try {
+            const allStudents = await this.getAllStudentsAllSections();
+            if (allStudents && allStudents.length > 0) {
+                const tx = this.db.transaction(['students'], 'readwrite');
+                const store = tx.objectStore('students');
+                for (const s of allStudents) {
+                    if (!s.uniqueCode && s.id) {
+                        s.uniqueCode = 'STU-' + (1000 + parseInt(s.id));
+                        store.put(s);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('ensureUniqueCodes students error:', e);
+        }
+
+        try {
+            const allTeachers = await this.getAllTeachers();
+            if (allTeachers && allTeachers.length > 0) {
+                const tx = this.db.transaction(['teachers'], 'readwrite');
+                const store = tx.objectStore('teachers');
+                for (const t of allTeachers) {
+                    if (!t.uniqueCode && t.id) {
+                        t.uniqueCode = 'EMP-' + (100 + parseInt(t.id));
+                        store.put(t);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('ensureUniqueCodes teachers error:', e);
+        }
     },
 
     // --- Exam & Results Methods ---

@@ -822,4 +822,182 @@ body[data-section="banat"] .card {
     }
 }
 
+/* ==========================================================================
+   Mobile & Tablet Responsiveness (Drawer Navigation & Adaptive Layout)
+   ========================================================================== */
+
+/* Toggle Button (Hidden on Desktop, Visible on Mobile/Tablet) */
+.sidebar-toggle-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    border: 1.5px solid var(--primary-border);
+    background: var(--primary-subtle);
+    color: var(--primary);
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    flex-shrink: 0;
+}
+
+.sidebar-toggle-btn:hover,
+.sidebar-toggle-btn:active {
+    background: var(--primary);
+    color: #ffffff;
+    transform: scale(1.05);
+}
+
+/* Mobile Sidebar Backdrop Overlay */
+#mms-sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 998;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+#mms-sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+/* Tablets and Mobile Phones (<= 992px) */
+@media (max-width: 992px) {
+    .sidebar-toggle-btn {
+        display: inline-flex;
+    }
+
+    /* Off-canvas mobile drawer (RTL slides in smoothly from the right) */
+    aside#mms-sidebar {
+        position: fixed;
+        top: 0;
+        right: -330px;
+        width: 290px;
+        max-width: 82vw;
+        height: 100vh;
+        z-index: 999;
+        box-shadow: -8px 0 25px rgba(0, 0, 0, 0.25);
+        transition: right 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        border-left: 2px solid var(--sidebar-border);
+    }
+
+    aside#mms-sidebar.open {
+        right: 0;
+    }
+
+    #mms-topbar {
+        padding: 0 1rem;
+        height: 64px;
+    }
+
+    #mms-view-title {
+        font-size: 1.25rem;
+    }
+
+    .mms-section-badge {
+        padding: 4px 12px;
+        font-size: 0.9rem;
+    }
+
+    #main-content {
+        padding: 1rem 0.8rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 0.8rem;
+    }
+
+    .stat-card {
+        padding: 1rem;
+        gap: 1rem;
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        font-size: 1.4rem;
+        border-radius: 12px;
+    }
+
+    .stat-info p {
+        font-size: 1.4rem;
+    }
+}
+
+/* Small Mobile Phones (<= 640px) */
+@media (max-width: 640px) {
+    #mms-topbar {
+        padding: 0 0.75rem;
+        height: 60px;
+    }
+
+    .mms-header-left {
+        gap: 0.5rem;
+    }
+
+    .mms-header-right span.mms-user-name {
+        display: none;
+    }
+
+    #main-content {
+        padding: 0.8rem 0.5rem;
+    }
+
+    .card {
+        padding: 1rem 0.85rem;
+        border-radius: 14px;
+    }
+
+    .dash-hero {
+        padding: 1.5rem 1rem;
+        border-radius: 16px;
+    }
+
+    .madrsa-name {
+        font-size: 2.2rem;
+    }
+
+    div[style*="grid-template-columns: repeat(auto-fit"],
+    div[style*="grid-template-columns:repeat(auto-fit"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    div[style*="display: flex; gap: 1rem; flex-wrap: wrap"] {
+        flex-direction: column;
+    }
+
+    .table-container,
+    div[style*="overflow-x: auto"],
+    div[style*="overflow-x:auto"] {
+        -webkit-overflow-scrolling: touch;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+
+    table {
+        font-size: 0.95rem;
+        min-width: 520px;
+    }
+
+    th, td {
+        padding: 0.65rem 0.5rem;
+    }
+
+    .btn {
+        padding: 0.65rem 1.25rem;
+        font-size: 1rem;
+    }
+}
+
 
