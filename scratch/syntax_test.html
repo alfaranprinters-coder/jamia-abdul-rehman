@@ -1,0 +1,29 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <script src="db.js"></script>
+    <script src="assets/js/address-data.js"></script>
+    <script src="assets/js/quran-data.js"></script>
+    <script src="hifz.js"></script>
+    <script src="app.js"></script>
+</head>
+<body>
+    <div id="main-content"></div>
+    <div id="mms-view-title"></div>
+    <div id="mms-section-badge"></div>
+    <div id="app"></div>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const testApp = new MadrassahApp();
+                await testApp.init();
+                console.log('SUCCESS: MadrassahApp initialized!');
+                document.title = 'APP_INIT_SUCCESS';
+            } catch (err) {
+                console.error('ERROR: ' + err.message);
+                document.title = 'APP_INIT_ERROR: ' + err.message;
+            }
+        });
+    </script>
+</body>
+</html>

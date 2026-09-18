@@ -1,0 +1,34 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Settings Module Test</title>
+    <script src="../db.js"></script>
+    <script src="../assets/js/address-data.js"></script>
+    <script src="../assets/js/quran-data.js"></script>
+    <script src="../hifz.js"></script>
+    <script src="../app.js"></script>
+</head>
+<body>
+    <div id="main-content"></div>
+    <div id="mms-view-title"></div>
+    <div id="mms-section-badge"></div>
+    <div id="app"></div>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const testApp = new MadrassahApp();
+                await testApp.init();
+                const container = document.getElementById('main-content');
+                await testApp.renderSettingsModule(container);
+                const hasFolder = container.innerHTML.includes('selectCustomBackupFolder');
+                const hasInterval = container.innerHTML.includes('updateAutoBackupInterval');
+                const hasRestore = container.innerHTML.includes('backupRestoreFileInput');
+                document.body.innerHTML += '<div id="test-status">SETTINGS_TEST_RESULT: ' + (hasFolder && hasInterval && hasRestore ? 'SUCCESS' : 'FAILED') + '</div>';
+            } catch(e) {
+                document.body.innerHTML += '<div id="test-status">ERROR: ' + e.message + '</div>';
+            }
+        });
+    </script>
+</body>
+</html>

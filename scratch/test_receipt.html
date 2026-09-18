@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>فیس وصولی کی رسید - REC-854912</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+    <style>
+        @page {
+            size: A5 landscape;
+            margin: 0;
+        }
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        body {
+            font-family: 'Jameel Noori Nastaleeq', 'Amiri', 'Noto Nastaliq Urdu', serif;
+            margin: 0;
+            padding: 20px;
+            background: #f1f5f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            direction: rtl;
+        }
+        .receipt-container {
+            position: relative;
+            width: 8.4in;
+            height: 4.77in;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.22);
+            border-radius: 4px;
+            overflow: hidden;
+            background: #fbf8f0;
+        }
+        .receipt-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: fill;
+            z-index: 1;
+        }
+        .field-overlay {
+            position: absolute;
+            font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif;
+            color: #0f172a;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            z-index: 10;
+        }
+        
+        /* 1. حوالہ نمبر (Receipt No) */
+        .val-hawala {
+            top: 29.5%;
+            left: 74.5%;
+            width: 13.5%;
+            text-align: center;
+            font-size: 1.15rem;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-weight: bold;
+            color: #1e3a8a;
+            direction: ltr;
+        }
+        
+        /* 2. تاریخ (Date) */
+        .val-date {
+            top: 30.5%;
+            left: 5.5%;
+            width: 15.0%;
+            text-align: center;
+            font-size: 1.15rem;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-weight: bold;
+            color: #0f172a;
+            direction: ltr;
+        }
+        
+        /* 3. اسم گرامی (Payee Name) */
+        .val-name {
+            top: 41.0%;
+            left: 4.5%;
+            width: 62.5%;
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #065f46;
+            text-align: right;
+            padding-right: 5px;
+            line-height: 1.2;
+        }
+        
+        /* 4. پتہ (Address) */
+        .val-address {
+            top: 50.0%;
+            left: 4.5%;
+            width: 67.0%;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #1e293b;
+            text-align: right;
+            padding-right: 5px;
+            line-height: 1.2;
+        }
+        
+        /* 5. بمد (Purpose / On Account Of) */
+        .val-purpose {
+            top: 58.5%;
+            left: 4.5%;
+            width: 67.0%;
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #1e293b;
+            text-align: right;
+            padding-right: 5px;
+            line-height: 1.2;
+        }
+        
+        /* 6. جنس لفظوں میں (Amount in Words) */
+        .val-words {
+            top: 67.0%;
+            left: 22.5%;
+            width: 40.5%;
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #0f172a;
+            text-align: right;
+            padding-right: 5px;
+            line-height: 1.2;
+        }
+        
+        /* 7. رقم / مبلغ (Amount Medallion) */
+        .val-amount-medallion {
+            position: absolute;
+            top: 44.0%;
+            left: 78.5%;
+            width: 17.5%;
+            height: 30.5%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            z-index: 15;
+            pointer-events: none;
+        }
+        .medallion-mublagh-text {
+            font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif;
+            font-size: 1.5rem;
+            color: #4a3b1e;
+            font-weight: bold;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+        .medallion-amount-text {
+            font-family: 'Impact', 'Arial Black', sans-serif;
+            font-size: 2.45rem;
+            color: #4a3b1e;
+            line-height: 1;
+            letter-spacing: 0.5px;
+        }
+        
+        /* 8. وصول کنندہ کا نام (Receiver Name) */
+        .val-receiver {
+            top: 83.0%;
+            left: 59.0%;
+            width: 25.0%;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #0f172a;
+            text-align: right;
+            line-height: 1.2;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+                min-height: auto;
+            }
+            .receipt-container {
+                box-shadow: none;
+                border-radius: 0;
+                page-break-inside: avoid;
+                width: 8.2in;
+                height: 4.66in;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-container">
+        <!-- High-res background image template matching user uploaded design -->
+        <img src="../assets/receipt_blank.jpg" class="receipt-bg" alt="رسید بک">
+
+        <!-- Dynamic Overlay Fields -->
+        <div class="field-overlay val-hawala">RF-854912</div>
+        <div class="field-overlay val-date">16 / 09 / 2026</div>
+        <div class="field-overlay val-name">محمد احمد ولد عبد الغفور (درجہ: اول)</div>
+        <div class="field-overlay val-address">چک نمبر 10-28/R بوسال کالونی ضلع خانیوال</div>
+        <div class="field-overlay val-purpose">ماہانہ تعلیمی فیس بابت ماہ ستمبر 2026ء</div>
+        <div class="field-overlay val-words">دس ہزار روپے صرف</div>
+        
+        <div class="val-amount-medallion">
+            <div class="medallion-mublagh-text">(مبلغ)</div>
+            <div class="medallion-amount-text">10,000</div>
+        </div>
+
+        <div class="field-overlay val-receiver">ناظم مالیات / سیکرٹری</div>
+    </div>
+
+    <div class="no-print" style="position:fixed; bottom:25px; left:0; right:0; text-align:center; z-index:999;">
+        <button onclick="window.print()" style="padding:12px 45px; background:#065f46; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.25rem; font-family:'Jameel Noori Nastaleeq', 'Noto Sans Urdu', sans-serif; font-weight:bold; box-shadow:0 6px 18px rgba(0,0,0,0.35); display:inline-flex; align-items:center; gap:10px;">
+            <i class="fas fa-print"></i> رسید پرنٹ کریں (Print Receipt)
+        </button>
+    </div>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html><head>
+    <script src="db.js"></script>
+    <script src="assets/js/address-data.js"></script>
+    <script src="assets/js/quran-data.js"></script>
+    <script src="hifz.js"></script>
+    <script src="app.js"></script>
+</head>
+<body>
+    <div id="main-content"></div>
+    <div id="mms-view-title"></div>
+    <div id="mms-section-badge"></div>
+    <div id="app"></div>
+    <div id="debug-log"><div>Initializing app...</div></div>
+    <script>
+    window.addEventListener('DOMContentLoaded', async () => {
+        const log = document.getElementById('debug-log');
+        try {
+            log.innerHTML += '<div>Initializing app...</div>';
+            await window.app.init();
+            log.innerHTML += '<div>App initialized. Navigating to settings...</div>';
+            const container = document.getElementById('main-content');
+            await window.app.renderSettingsModule(container);
+            log.innerHTML += '<div>RenderSettingsModule finished successfully! HTML length: ' + container.innerHTML.length + '</div>';
+            document.title = 'SETTINGS_OK_' + container.innerHTML.length;
+        } catch (e) {
+            log.innerHTML += '<div style="color:red;">ERROR: ' + e.message + ' | Stack: ' + e.stack + '</div>';
+            document.title = 'SETTINGS_ERROR: ' + e.message;
+        }
+    });
+    </script>
+
+</body></html>

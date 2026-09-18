@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="../db.js"></script>
+</head>
+<body>
+    <div id="debug-out">PENDING</div>
+    <script>
+    async function testOldDbUpgrade() {
+        const logs = [];
+        try {
+            // Delete DB first
+            indexedDB.deleteDatabase('MadrassahProDB');
+            
+            // Create DB version 12 with hifz_enrollments object store BUT NO INDEXES
+            await new Promise((resolve, reject) => {
+                const req = indexedDB.open('MadrassahProDB', 12);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    db.createObjectStore('hifz_enrollments', { keyPath: 'id', autoIncrement: true });
+                    db.createObjectStore('hifz_daily_records', { keyPath: 'id', autoIncrement: true });
+                    db.createObjectStore('hifz_juz_progress', { keyPath: 'id', autoIncrement: true });
+                };
+                req.onsuccess = () => {
+                    req.result.close();
+                    resolve();
+                };
+                req.onerror = () => reject(req.error);
+            });
+            logs.push('Created DB v12 with stores missing indexes');
+
+            // Now initialize DB with MadrassahDB (v13)
+            logs.push('Opening DB with MadrassahDB.initDB()...');
+            await MadrassahDB.initDB();
+            logs.push('MadrassahDB Initialized.');
+
+            // Try saving enrollment
+            logs.push('Trying saveHifzEnrollment...');
+            const res = await MadrassahDB.saveHifzEnrollment({
+                studentId: 1,
+                teacherId: 1,
+                halaqa: 'حلقہ اول',
+                startDate: '2026-09-16'
+            });
+            logs.push('Save enrollment succeeded: ' + res);
+
+            document.getElementById('debug-out').textContent = JSON.stringify({ success: true, logs }, null, 2);
+        } catch (err) {
+            logs.push('EXCEPTION: ' + err.toString() + ' | Stack: ' + (err.stack || ''));
+            document.getElementById('debug-out').textContent = JSON.stringify({ success: false, logs, error: err.toString(), stack: err.stack }, null, 2);
+        }
+    }
+
+    testOldDbUpgrade();
+    </script>
+</body>
+</html>

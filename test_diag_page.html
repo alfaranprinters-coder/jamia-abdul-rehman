@@ -1,0 +1,36 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <script>
+        window.capturedErrors = [];
+        window.onerror = function(msg, url, line, col, error) {
+            window.capturedErrors.push("ERR: " + msg + " at " + line + ":" + col);
+        };
+        console.error = function() {
+            window.capturedErrors.push("CONSOLE_ERR: " + Array.from(arguments).join(" "));
+        };
+    </script>
+</head>
+<body>
+    <iframe id="target" src="index.html" style="width:1000px; height:800px;"></iframe>
+    <div id="diag-out"></div>
+    <script>
+        setTimeout(async function() {
+            var iframeWin = document.getElementById('target').contentWindow;
+            var out = [];
+            out.push("App defined: " + (typeof iframeWin.app));
+            if (iframeWin.app) {
+                out.push("Current View: " + iframeWin.app.currentView);
+                var mainContent = iframeWin.document.getElementById('main-content');
+                out.push("Main Content HTML length: " + (mainContent ? mainContent.innerHTML.length : 0));
+                out.push("Main Content HTML preview: " + (mainContent ? mainContent.innerHTML.substring(0, 300) : "NULL"));
+            }
+            out.push("Captured Errors:\n" + window.capturedErrors.join("\n"));
+            if (iframeWin.window.capturedErrors) {
+                out.push("Iframe Errors:\n" + iframeWin.window.capturedErrors.join("\n"));
+            }
+            document.getElementById('diag-out').innerText = out.join("\n---\n");
+        }, 3000);
+    </script>
+</body>
+</html>

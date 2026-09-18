@@ -1,0 +1,127 @@
+﻿<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مدرسہ عبد الرحمن بن عوف - Madrassah Pro Manager</title>
+    <!-- Fonts & Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Amiri:wght@400;700&family=Katibeh&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Identity Services for Drive Backup -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body class="mms-dashboard-body">
+    <div id="app">
+        <!-- Sidebar -->
+        <aside id="mms-sidebar">
+            <div class="mms-logo-area">
+                <img src="logo.jpg" alt="مدرسہ عبد الرحمن بن عوف" class="mms-logo-img">
+                <img src="madrsa-title.png" alt="مدرسہ عبد الرحمن بن عوف غفوریہ" style="max-width:100%; max-height:48px; object-fit:contain; margin-top:8px; mix-blend-mode:multiply; display:block; margin-left:auto; margin-right:auto;">
+            </div>
+            
+            <div class="section-tabs">
+                <div class="tab active" data-section="banin" onclick="app.switchSection('banin')"><i class="fas fa-mars"></i> <span>بنین</span></div>
+                <div class="tab" data-section="banat" onclick="app.switchSection('banat')"><i class="fas fa-venus"></i> <span>بنات</span></div>
+            </div>
+
+            <nav class="mms-nav">
+                <div class="nav-link active" onclick="app.navigate('dashboard')">
+                    <i class="fas fa-chart-line"></i> <span>ڈیش بورڈ</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('admission')">
+                    <i class="fas fa-user-plus"></i> <span id="nav-admission-label">نیا داخلہ</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('students')">
+                    <i class="fas fa-user-graduate"></i> <span id="nav-students-label">طلباء کی فہرست</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('staff_list')">
+                    <i class="fas fa-chalkboard-teacher"></i> <span>عملہ کی فہرست</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('salary_management')">
+                    <i class="fas fa-hand-holding-dollar"></i> <span>تنخواہوں کا نظام</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('syllabus')">
+                    <i class="fas fa-list-check"></i> <span>نصابِ تعلیم</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('timetable')">
+                    <i class="fas fa-calendar-alt"></i> <span>جدول الاوقات</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('attendance')">
+                    <i class="fas fa-calendar-check"></i> <span>حاضری ریکارڈ</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('hifz')">
+                    <i class="fas fa-book-quran"></i> <span>حفظ القرآن</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('fees')">
+                    <i class="fas fa-money-bill-wave"></i> <span>فیس وصولی</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('accounts')">
+                    <i class="fas fa-wallet"></i> <span>بیت المال</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('exams')">
+                    <i class="fas fa-file-signature"></i> <span>امتحانات</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('reports')">
+                    <i class="fas fa-file-invoice"></i> <span>رپورٹس</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('settings')">
+                    <i class="fas fa-cog"></i> <span>ترتیبات</span>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main id="mms-main">
+            <header id="mms-topbar">
+                <div class="mms-header-left">
+                    <h3 id="mms-view-title">ڈیش بورڈ</h3>
+                    <div id="mms-section-badge" class="mms-section-badge"></div>
+                </div>
+                <div class="mms-header-right">
+                    <span class="mms-user-name">کشمیر ڈیجیٹل اکیڈمی</span>
+                    <i class="fas fa-user-circle" style="font-size: 2rem; color: var(--primary);"></i>
+                </div>
+            </header>
+
+            <div id="main-content">
+                <!-- Content injected by app.js -->
+            </div>
+
+            <footer id="mms-footer">
+                Designed and Developed by Sikandar Hayat Baba
+            </footer>
+        </main>
+    </div>
+
+    <!-- Camera Modal -->
+    <div id="camera-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:9999; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+        <div style="background:white; padding:1.5rem; border-radius:20px; text-align:center; max-width:480px; width:92%; box-shadow:0 20px 40px rgba(0,0,0,0.3); border:2px solid var(--primary);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid #e2e8f0; padding-bottom:0.5rem;">
+                <h3 style="color:var(--primary); font-family:'Aref Ruqaa', serif; font-size:1.6rem; margin:0;"><i class="fas fa-camera"></i> تصویر کھینچیں</h3>
+                <button type="button" onclick="app.closeCamera()" style="background:none; border:none; font-size:1.4rem; color:#94a3b8; cursor:pointer;"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="border-radius:12px; overflow:hidden; background:#000; position:relative; line-height:0;">
+                <video id="video" autoplay playsinline style="width:100%; height:260px; object-fit:cover;"></video>
+            </div>
+            <canvas id="canvas" style="display:none;"></canvas>
+            <div style="margin-top:1.2rem; display:flex; justify-content:center; gap:1rem;">
+                <button type="button" class="btn btn-primary" onclick="app.capturePhoto()" style="display:flex; align-items:center; gap:0.5rem; font-size:1.1rem;">
+                    <i class="fas fa-camera"></i> تصویر محفوظ کریں
+                </button>
+                <button type="button" class="btn" style="background:#f1f5f9; color:#475569;" onclick="app.closeCamera()">
+                    منسوخ کریں
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DB and App Scripts -->
+    <script src="db.js"></script>
+    <script src="assets/js/address-data.js"></script>
+    <script src="assets/js/quran-data.js"></script>
+    <script src="hifz.js"></script>
+    <script src="app.js"></script><script>setTimeout(async () => { if (window.app) { await window.app.navigate('settings'); document.title = 'SETTINGS_NAV_DONE'; } }, 300);</script>
+</body>
+</html>

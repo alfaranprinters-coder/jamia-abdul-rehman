@@ -1,0 +1,211 @@
+/* Madrassah Pro Manager - Glassmorphism UI */
+:root {
+    --primary: #065f46;
+    --primary-light: #10b981;
+    --bg-gradient: linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%);
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --sidebar-width: 260px;
+    --text-main: #1e293b;
+    --text-muted: #64748b;
+    --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+}
+
+body.mms-dashboard-body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-gradient);
+    font-family: 'Inter', 'Noto Sans Urdu', sans-serif;
+    color: var(--text-main);
+    direction: rtl;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+#mms-wrapper {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar */
+#mms-sidebar {
+    width: var(--sidebar-width);
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-left: 1px solid var(--glass-border);
+    padding: 2rem 1rem;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    box-shadow: 4px 0 15px rgba(0,0,0,0.02);
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.mms-logo-area {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.mms-logo-area h2 {
+    font-family: 'Amiri', serif;
+    color: var(--primary);
+    font-size: 1.8rem;
+    margin: 0;
+}
+
+.mms-logo-area p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 5px;
+}
+
+.mms-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.mms-nav-link {
+    display: flex;
+    align-items: center;
+    padding: 0.85rem 1.25rem;
+    border-radius: 12px;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.mms-nav-link i {
+    margin-left: 1rem;
+    font-size: 1.1rem;
+    width: 24px;
+    text-align: center;
+}
+
+.mms-nav-link:hover {
+    background: rgba(6, 95, 70, 0.05);
+    color: var(--primary);
+}
+
+.mms-nav-link.active {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 4px 15px rgba(6, 95, 70, 0.2);
+}
+
+/* Main Content Area */
+#mms-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 60px; /* Space for footer */
+}
+
+#mms-topbar {
+    height: 70px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(5px);
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 90;
+}
+
+.mms-header-left {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+#mms-sidebar-toggle {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: none;
+}
+
+.mms-header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.mms-user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+#mms-content-root {
+    padding: 2.5rem;
+    flex: 1;
+}
+
+/* Loader */
+.mms-loader-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 300px;
+}
+
+.mms-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(6, 95, 70, 0.1);
+    border-top: 3px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Footer */
+#mms-footer {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: calc(100% - var(--sidebar-width));
+    height: 50px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    z-index: 80;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    #mms-sidebar {
+        position: fixed;
+        right: -100%;
+        transition: right 0.3s ease;
+    }
+    #mms-sidebar.open {
+        right: 0;
+    }
+    #mms-sidebar-toggle {
+        display: block;
+    }
+    #mms-footer {
+        width: 100%;
+    }
+}

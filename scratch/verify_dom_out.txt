@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html><head>
+    <title>VERIFY_ERROR: MadrassahApp is not defined</title>
+    <script src="db.js"></script>
+    <script src="assets/js/address-data.js"></script>
+    <script src="assets/js/quran-data.js"></script>
+    <script src="hifz.js"></script>
+    <script src="app.js"></script>
+</head>
+<body>
+    <div id="main-content"></div>
+    <div id="mms-view-title"></div>
+    <div id="mms-section-badge"></div>
+    <div id="app"></div>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const myApp = new MadrassahApp();
+                await myApp.init();
+                const container = document.getElementById('main-content');
+                await myApp.renderSettingsModule(container);
+                const hasFolder = container.innerHTML.includes('selectCustomBackupFolder');
+                const hasInterval = container.innerHTML.includes('updateAutoBackupInterval');
+                const hasManual = container.innerHTML.includes('manualSaveToSelectedFolder');
+                if (hasFolder && hasInterval && hasManual) {
+                    document.title = 'AUTO_BACKUP_MODULE_VERIFIED_SUCCESS';
+                } else {
+                    document.title = 'VERIFY_FAILED: ' + JSON.stringify({hasFolder, hasInterval, hasManual});
+                }
+            } catch (err) {
+                document.title = 'VERIFY_ERROR: ' + err.message;
+            }
+        });
+    </script>
+
+</body></html>
