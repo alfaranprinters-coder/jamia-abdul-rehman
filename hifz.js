@@ -2267,7 +2267,7 @@ const HifzModule = {
                     </button>
                 </div>
             </body>
-            </html>`;
+            </html>
         `);
         printWin.document.close();
     },
@@ -2501,7 +2501,7 @@ const HifzModule = {
                     </button>
                 </div>
             </body>
-            </html>`;
+            </html>
         `);
         printWin.document.close();
     },
@@ -2954,7 +2954,7 @@ const HifzModule = {
                     </button>
                 </div>
             </body>
-            </html>`;
+            </html>
         `);
         printWin.document.close();
     },

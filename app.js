@@ -2929,7 +2929,7 @@ class MadrassahApp {
                     <button onclick="downloadDoc('تنخواہ_سلپ_${salary.staffName ? salary.staffName.replace(/['&quot;\s]+/g, '_') : 'Staff'}')" style="padding:10px 40px; background:#0284c7; color:white; border:none; border-radius:25px; cursor:pointer; font-size:1.1rem; color:white;"><i class="fas fa-download"></i> ڈاؤن لوڈ کریں</button>
                 </div>
             </body>
-            </html>`;
+            </html>
         `);
         printWindow.document.close();
     }
@@ -4645,7 +4645,7 @@ class MadrassahApp {
                     <button onclick="downloadDoc('رزلٹ_کارڈ_${student.name ? student.name.replace(/['&quot;\s]+/g, '_') : 'ResultCard'}')" style="padding:12px 40px; background:#0284c7; color:white; border:none; border-radius:30px; font-size:1.3rem; cursor:pointer;"><i class="fas fa-download"></i> ڈاؤن لوڈ کریں</button>
                 </div>
             </body>
-            </html>`;
+            </html>
         `);
         printWindow.document.close();
     }
