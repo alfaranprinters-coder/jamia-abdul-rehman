@@ -1,0 +1,312 @@
+    async renderAttendanceModule(container) {
+        const type = this.attendanceType;
+        const section = this.currentSection;
+        const isBanat = type === 'student' && section === 'banat';
+        const isBanin = type === 'student' && section === 'banin';
+        const isStaff = type === 'staff';
+        const date = this.attendanceDate;
+
+        let people = [];
+        let currentAtt = [];
+
+        if (type === 'student') {
+            const allStudents = await MadrassahDB.getAllStudents(this.currentSection);
+            people = allStudents.filter(s => s.className === this.attendanceClass || s.class === this.attendanceClass || s.department === this.attendanceClass);
+            currentAtt = await MadrassahDB.getAttendance('student', date, this.currentSection);
+        } else {
+            people = await MadrassahDB.getAllTeachers();
+            currentAtt = await MadrassahDB.getAttendance('staff', date);
+        }
+
+        const presentCount = people.filter(p => currentAtt.find(a => a.personId === p.id && a.status === 'Present')).length;
+        const absentCount = people.filter(p => currentAtt.find(a => a.personId === p.id && a.status === 'Absent')).length;
+        const leaveCount = people.filter(p => currentAtt.find(a => a.personId === p.id && a.status === 'Leave')).length;
+        const unmarkedCount = people.length - (presentCount + absentCount + leaveCount);
+        const percentage = people.length > 0 ? Math.round((presentCount / people.length) * 100) : 0;
+
+        const sectionBadge = isBanat 
+            ? '<span style="background:linear-gradient(135deg, #9d174d, #be185d); color:white; padding:4px 14px; border-radius:20px; font-size:0.9rem; font-weight:bold;"><i class="fas fa-female"></i> شعبہ بنات (طالبات)</span>'
+            : (isBanin 
+                ? '<span style="background:linear-gradient(135deg, #065f46, #047857); color:white; padding:4px 14px; border-radius:20px; font-size:0.9rem; font-weight:bold;"><i class="fas fa-male"></i> شعبہ بنین (طلباء)</span>'
+                : '<span style="background:linear-gradient(135deg, #1e40af, #2563eb); color:white; padding:4px 14px; border-radius:20px; font-size:0.9rem; font-weight:bold;"><i class="fas fa-chalkboard-teacher"></i> عملہ و ملازمین</span>');
+
+        container.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                <div>
+                    <h2 style="color:var(--primary); margin:0 0 5px 0;"><i class="fas fa-calendar-check"></i> حاضری کا نظام (Attendance System)</h2>
+                    <div>${sectionBadge}</div>
+                </div>
+                
+                <div style="display:flex; gap:0.8rem; align-items:center; flex-wrap:wrap;">
+                    <!-- 3-Way Target Tabs: Banin Students, Banat Students, Staff -->
+                    <div class="attendance-tabs" style="display:flex; background:#f1f5f9; padding:4px; border-radius:14px; border:1px solid #e2e8f0; gap:4px;">
+                        <button type="button" onclick="app.switchAttendanceTarget('student', 'banin')" class="tab-btn ${isBanin ? 'active' : ''}" style="padding:7px 16px; border-radius:10px; border:none; cursor:pointer; font-family:inherit; background:${isBanin ? '#065f46' : 'transparent'}; color:${isBanin ? 'white' : '#475569'}; box-shadow:${isBanin ? '0 4px 8px rgba(6,95,70,0.25)' : 'none'}; font-weight:bold; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-male"></i> طلباء (بنین)
+                        </button>
+                        <button type="button" onclick="app.switchAttendanceTarget('student', 'banat')" class="tab-btn ${isBanat ? 'active' : ''}" style="padding:7px 16px; border-radius:10px; border:none; cursor:pointer; font-family:inherit; background:${isBanat ? '#be185d' : 'transparent'}; color:${isBanat ? 'white' : '#475569'}; box-shadow:${isBanat ? '0 4px 8px rgba(190,24,93,0.25)' : 'none'}; font-weight:bold; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-female"></i> طالبات (بنات)
+                        </button>
+                        <button type="button" onclick="app.switchAttendanceTarget('staff')" class="tab-btn ${isStaff ? 'active' : ''}" style="padding:7px 16px; border-radius:10px; border:none; cursor:pointer; font-family:inherit; background:${isStaff ? '#1e40af' : 'transparent'}; color:${isStaff ? 'white' : '#475569'}; box-shadow:${isStaff ? '0 4px 8px rgba(30,64,175,0.25)' : 'none'}; font-weight:bold; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-chalkboard-teacher"></i> عملہ و اساتذہ
+                        </button>
+                    </div>
+
+                    <input type="date" id="att_date" class="mms-select" value="${date}" onchange="app.updateAttendanceDate(this.value)" style="min-width:140px;">
+                    <button class="btn btn-sm" onclick="app.showAttendanceReport()" style="background:#6366f1; color:white; padding:7px 15px; border-radius:10px; display:flex; align-items:center; gap:6px;" title="ماہانہ رجسٹر رپورٹ کھولیں">
+                        <i class="fas fa-file-contract"></i> ماہانہ رجسٹر
+                    </button>
+                </div>
+            </div>
+
+            <!-- Attendance Stats Cards -->
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="stat-card" style="padding:1rem; border-right:4px solid #6366f1;">
+                    <div class="stat-info"><h3 style="font-size:0.85rem;">کل تعداد</h3><p style="font-size:1.5rem; margin:0;">${people.length}</p></div>
+                </div>
+                <div class="stat-card" style="padding:1rem; border-right:4px solid #059669;">
+                    <div class="stat-info"><h3 style="font-size:0.85rem; color:#059669;">حاضر (P)</h3><p style="font-size:1.5rem; margin:0; color:#059669;">${presentCount}</p></div>
+                </div>
+                <div class="stat-card" style="padding:1rem; border-right:4px solid #dc2626;">
+                    <div class="stat-info"><h3 style="font-size:0.85rem; color:#dc2626;">غیر حاضر (A)</h3><p style="font-size:1.5rem; margin:0; color:#dc2626;">${absentCount}</p></div>
+                </div>
+                <div class="stat-card" style="padding:1rem; border-right:4px solid #d97706;">
+                    <div class="stat-info"><h3 style="font-size:0.85rem; color:#d97706;">رخصت (L)</h3><p style="font-size:1.5rem; margin:0; color:#d97706;">${leaveCount}</p></div>
+                </div>
+                <div class="stat-card" style="padding:1rem; border-right:4px solid #0284c7;">
+                    <div class="stat-info"><h3 style="font-size:0.85rem; color:#0284c7;">شرحِ حاضری</h3><p style="font-size:1.5rem; margin:0; color:#0284c7;">${percentage}%</p></div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom:1.5rem; padding:1.2rem; display:flex; justify-content:space-between; align-items:center; background:linear-gradient(135deg, #f8fafc, #ffffff); flex-wrap:wrap; gap:1rem;">
+                <div style="display:flex; gap:1.2rem; align-items:center;">
+                    ${type === 'student' ? `
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <label style="font-weight:bold; color:var(--primary); font-size:1rem;">کلاس / شعبہ:</label>
+                            <select onchange="app.switchAttendanceClass(this.value)" class="mms-select" style="min-width:200px;">
+                                ${Object.entries(this.madrsaDepartments).map(([dept, classes]) => {
+                                    if (classes.length === 0) {
+                                        return `<option value="${dept}" ${this.attendanceClass === dept ? 'selected' : ''}>${dept}</option>`;
+                                    } else {
+                                        return `
+                                            <optgroup label="${dept}">
+                                                ${classes.map(c => `<option value="${c}" ${this.attendanceClass === c ? 'selected' : ''}>${dept === 'درس نظامی' ? 'درجہ ' : ''}${c}</option>`).join('')}
+                                            </optgroup>
+                                        `;
+                                    }
+                                }).join('')}
+                            </select>
+                        </div>
+                    ` : '<div style="font-weight:bold; color:var(--primary); font-size:1.1rem;"><i class="fas fa-users"></i> تمام تدریسی و غیر تدریسی عملہ</div>'}
+                    <div style="color:#64748b; font-size:0.95rem;">
+                        منتخب شدہ فہرست: <b>${people.length}</b> ${type === 'student' ? (isBanat ? 'طالبات' : 'طلباء') : 'افراد'}
+                    </div>
+                </div>
+                
+                <div style="display:flex; gap:0.6rem;">
+                    <button class="btn btn-sm" onclick="app.bulkAttendance('Present')" style="background:#ecfdf5; color:#059669; border:1px solid #059669; border-radius:8px;">
+                        <i class="fas fa-check-double"></i> سب حاضر
+                    </button>
+                    <button class="btn btn-sm" onclick="app.bulkAttendance('Absent')" style="background:#fef2f2; color:#dc2626; border:1px solid #dc2626; border-radius:8px;">
+                        <i class="fas fa-user-xmark"></i> سب غیر حاضر
+                    </button>
+                </div>
+            </div>
+
+            <div class="card" style="padding:0; overflow:hidden;">
+                <table style="width:100%;">
+                    <thead>
+                        <tr>
+                            <th style="width:90px;">${type === 'student' ? 'رجسٹریشن' : 'شناختی نمبر'}</th>
+                            <th>${type === 'student' ? (isBanat ? 'نام طالبہ' : 'نام طالب علم') : 'نامِ اسٹاف'}</th>
+                            ${type === 'student' ? '<th>ولدیت</th>' : '<th>عہدہ / شعبہ</th>'}
+                            ${type === 'student' ? '<th>کلاس</th>' : ''}
+                            <th style="text-align:center; width:180px;">حاضری کی صورتحال</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${people.map(p => {
+                            const att = currentAtt.find(a => a.personId === p.id);
+                            const status = att ? att.status : null;
+                            return `
+                                <tr style="${status === 'Absent' ? 'background:#fff8f8;' : ''}">
+                                    <td style="font-weight:bold; color:var(--primary);">#${p.id}</td>
+                                    <td><b style="color:${isBanat ? '#9d174d' : 'var(--primary)'}; font-size:1.05rem;">${p.name}</b></td>
+                                    <td>${type === 'student' ? (p.fatherName || '---') : (p.designation || p.staffType || 'استاد')}</td>
+                                    ${type === 'student' ? `<td><span style="background:#f1f5f9; padding:2px 8px; border-radius:6px; font-size:0.85rem; color:#475569;">${p.className || p.class || p.department || '---'}</span></td>` : ''}
+                                    <td>
+                                        <div style="display:flex; justify-content:center; gap:0.5rem;">
+                                            <button onclick="app.markAttendance(${p.id}, 'Present')" class="btn-att ${status === 'Present' ? 'p-active' : ''}" title="حاضر (Present)">P</button>
+                                            <button onclick="app.markAttendance(${p.id}, 'Absent')" class="btn-att ${status === 'Absent' ? 'a-active' : ''}" title="غیر حاضر (Absent)">A</button>
+                                            <button onclick="app.markAttendance(${p.id}, 'Leave')" class="btn-att ${status === 'Leave' ? 'l-active' : ''}" title="رخصت (Leave)">L</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('') || `<tr><td colspan="${type === 'student' ? 5 : 4}" style="text-align:center; padding:3rem; color:#94a3b8;">اس کلاس / سیکشن میں کوئی ریکارڈ نہیں ملا</td></tr>`}
+                    </tbody>
+                </table>
+            </div>
+
+            <style>
+                .btn-att { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #e2e8f0; background: white; cursor: pointer; font-weight: bold; font-family: sans-serif; transition: all 0.2s; color: #94a3b8; font-size:0.85rem; }
+                .btn-att:hover { border-color: var(--primary); color: var(--primary); }
+                .p-active { background: #059669 !important; border-color: #059669 !important; color: white !important; box-shadow: 0 4px 10px rgba(5,150,105,0.3); }
+                .a-active { background: #dc2626 !important; border-color: #dc2626 !important; color: white !important; box-shadow: 0 4px 10px rgba(220,38,38,0.3); }
+                .l-active { background: #d97706 !important; border-color: #d97706 !important; color: white !important; box-shadow: 0 4px 10px rgba(217,119,6,0.3); }
+            </style>
+        `;
+    }
+
+    switchAttendanceTarget(type, section) {
+        this.attendanceType = type;
+        if (section) {
+            this.applySectionTheme(section);
+        }
+        this.render();
+    }
+
+    switchAttendanceType(type) { this.attendanceType = type; this.render(); }
+    switchAttendanceClass(className) { this.attendanceClass = className; this.render(); }
+    updateAttendanceDate(date) { this.attendanceDate = date; this.render(); }
+
+    async markAttendance(personId, status) {
+        await MadrassahDB.saveAttendance({
+            type: this.attendanceType,
+            section: this.attendanceType === 'student' ? this.currentSection : null,
+            personId: personId,
+            date: this.attendanceDate,
+            status: status,
+            timestamp: Date.now()
+        });
+        this.render();
+    }
+
+    async bulkAttendance(status) {
+        let people = [];
+        if (this.attendanceType === 'student') {
+            const allStudents = await MadrassahDB.getAllStudents(this.currentSection);
+            people = allStudents.filter(s => s.className === this.attendanceClass || s.class === this.attendanceClass || s.department === this.attendanceClass);
+        } else {
+            people = await MadrassahDB.getAllTeachers();
+        }
+
+        const promises = people.map(p => MadrassahDB.saveAttendance({
+            type: this.attendanceType,
+            section: this.attendanceType === 'student' ? this.currentSection : null,
+            personId: p.id,
+            date: this.attendanceDate,
+            status: status,
+            timestamp: Date.now()
+        }));
+
+        await Promise.all(promises);
+        this.render();
+    }
+
+    async showAttendanceReport(customMonth = null) {
+        const month = customMonth || this.attendanceDate.substring(0, 7); // e.g. "2026-09"
+        const type = this.attendanceType;
+        const section = this.currentSection;
+        const isBanat = type === 'student' && section === 'banat';
+        const isBanin = type === 'student' && section === 'banin';
+        
+        let people = [];
+        if (type === 'student') {
+            const allStudents = await MadrassahDB.getAllStudents(this.currentSection);
+            people = allStudents.filter(s => s.className === this.attendanceClass || s.class === this.attendanceClass || s.department === this.attendanceClass);
+        } else {
+            people = await MadrassahDB.getAllTeachers();
+        }
+
+        const monthAtt = await MadrassahDB.getAttendanceByMonth(type, month, this.currentSection);
+        
+        // Days in month
+        const [yearStr, monthStr] = month.split('-');
+        const daysInMonth = new Date(parseInt(yearStr), parseInt(monthStr), 0).getDate();
+        const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+        const printWindow = window.open('', '_blank');
+        const sectionName = isBanat ? 'شعبہ بنات (طالبات)' : (isBanin ? 'شعبہ بنین (طلباء)' : 'اساتذہ و عملہ');
+        const className = type === 'student' ? `درجہ / شعبہ: ${this.attendanceClass}` : 'تمام اسٹاف';
+
+        printWindow.document.write(`
+            <html lang="ur" dir="rtl">
+            <head>
+                <title>ماہانہ رجسٹر حاضری - ${sectionName} (${month})</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+                <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+                <style>
+                    @page { size: A4 landscape; margin: 8mm; }
+                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+                    body { font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif; margin: 0; padding: 10px; direction: rtl; }
+                    .madrsa-title { text-align: center; color: #065f46; margin-bottom: 5px; font-size: 1.8rem; font-weight: bold; }
+                    .report-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #065f46; padding-bottom: 5px; margin-bottom: 12px; font-size: 1rem; }
+                    table { width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: center; }
+                    th, td { border: 1px solid #94a3b8; padding: 4px 2px; }
+                    th { background: #f1f5f9; color: #0f172a; font-weight: bold; }
+                    .p-cell { color: #059669; font-weight: bold; background: #ecfdf5; }
+                    .a-cell { color: #dc2626; font-weight: bold; background: #fef2f2; }
+                    .l-cell { color: #d97706; font-weight: bold; background: #fffbeb; }
+                    .name-cell { text-align: right; padding-right: 6px; white-space: nowrap; font-weight: 600; }
+                    .stats-col { font-weight: bold; font-size: 0.72rem; }
+                    .footer-signs { display: flex; justify-content: space-between; margin-top: 25px; padding: 0 40px; font-size: 0.95rem; }
+                    @media print { .no-print { display: none !important; } }
+                </style>
+            </head>
+            <body>
+                <div class="madrsa-title">مدرسہ عبد الرحمن بن عوف للبنین والبنات</div>
+                <div class="report-header">
+                    <div><strong>${sectionName}</strong> (${className})</div>
+                    <div><strong>ماہ:</strong> ${month}</div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:30px;">#</th>
+                            <th style="width:140px;">نام طالب علم / فرد</th>
+                            ${daysArray.map(d => `<th style="width:18px;">${d}</th>`).join('')}
+                            <th class="stats-col" style="width:25px;">ح</th>
+                            <th class="stats-col" style="width:25px;">غ</th>
+                            <th class="stats-col" style="width:25px;">ر</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${people.map((p, idx) => {
+                            let pCount = 0, aCount = 0, lCount = 0;
+                            const daysCells = daysArray.map(d => {
+                                const dayStr = `${month}-${String(d).padStart(2, '0')}`;
+                                const rec = monthAtt.find(a => (a.personId === p.id || a.studentId === p.id) && a.date === dayStr);
+                                const st = rec ? rec.status : '-';
+                                let cellClass = '';
+                                if (st === 'present' || st === 'حاضر') { cellClass = 'p-cell'; pCount++; }
+                                else if (st === 'absent' || st === 'غیر حاضر') { cellClass = 'a-cell'; aCount++; }
+                                else if (st === 'leave' || st === 'رخصت') { cellClass = 'l-cell'; lCount++; }
+                                const sym = (st === 'present' || st === 'حاضر') ? 'P' : (st === 'absent' || st === 'غیر حاضر') ? 'A' : (st === 'leave' || st === 'رخصت') ? 'L' : '-';
+                                return `<td class="${cellClass}">${sym}</td>`;
+                            }).join('');
+                            return `
+                                <tr>
+                                    <td>${idx + 1}</td>
+                                    <td class="name-cell">${p.name || ''}</td>
+                                    ${daysCells}
+                                    <td class="p-cell stats-col">${pCount}</td>
+                                    <td class="a-cell stats-col">${aCount}</td>
+                                    <td class="l-cell stats-col">${lCount}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+                <div class="footer-signs">
+                    <div>دستخط استاد / نگران</div>
+                    <div>دستخط ناظم تعلیمات</div>
+                    <div>دستخط مہتمم</div>
+                </div>
+                <div class="no-print" style="text-align:center; margin-top:20px;">
+                    <button onclick="window.print()" style="padding:8px 25px; background:#065f46; color:white; border:none; border-radius:15px; cursor:pointer; font-weight:bold;">پرنٹ کریں</button>
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    }

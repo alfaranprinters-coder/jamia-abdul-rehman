@@ -1,0 +1,661 @@
+    generateOfficialReceiptHtml(options) {
+        const isBlank = !!options.isBlank;
+        const numAmount = options.amount ? Number(options.amount).toLocaleString('en-US') : '';
+        let dateVal = '';
+        if (!isBlank) {
+            let raw = options.dateStr;
+            let d = null;
+            if (raw) {
+                if (raw instanceof Date) {
+                    d = raw;
+                } else if (typeof raw === 'number') {
+                    d = new Date(raw);
+                } else if (typeof raw === 'string') {
+                    const m = raw.match(/^(\d{1,4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,4})$/);
+                    if (m) {
+                        let p1 = m[1], p2 = m[2], p3 = m[3];
+                        if (p1.length === 4) {
+                            dateVal = `${p3.padStart(2, '0')} / ${p2.padStart(2, '0')} / ${p1}`;
+                        } else {
+                            let yr = p3.length === 2 ? '20' + p3 : p3;
+                            dateVal = `${p1.padStart(2, '0')} / ${p2.padStart(2, '0')} / ${yr}`;
+                        }
+                    } else {
+                        const parsed = new Date(raw);
+                        if (!isNaN(parsed.getTime())) d = parsed;
+                        else dateVal = raw;
+                    }
+                }
+            }
+            if (!dateVal) {
+                if (!d || isNaN(d.getTime())) d = new Date();
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const yyyy = d.getFullYear();
+                dateVal = `${dd} / ${mm} / ${yyyy}`;
+            }
+        }
+        const safeJsBaseName = (options.payeeName ? options.payeeName.replace(/['"\\\s]+/g, '_') : 'رسید') + (options.receiptNo ? '_' + options.receiptNo : '');
+
+        return `<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <base href="${window.location.href}">
+    <title>${options.receiptTitle || 'رسید'} - ${options.receiptNo || ''}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+    <style>
+        @page {
+            size: A5 landscape;
+            margin: 0;
+        }
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        body {
+            font-family: 'Jameel Noori Nastaleeq', 'Amiri', 'Noto Nastaliq Urdu', serif;
+            margin: 0;
+            padding: 20px;
+            background: #f1f5f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            direction: rtl;
+        }
+        .receipt-container {
+            position: relative;
+            width: 8.4in;
+            height: 4.77in;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.22);
+            border-radius: 4px;
+            overflow: hidden;
+            background: #fbf8f0;
+        }
+        .receipt-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: fill;
+            z-index: 1;
+        }
+        .field-overlay {
+            position: absolute;
+            font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif;
+            color: #0f172a;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            z-index: 10;
+        }
+        
+        /* 1. حوالہ نمبر (Receipt No) */
+        .val-hawala {
+            top: 29.2%;
+            left: 74.0%;
+            width: 14.5%;
+            height: 5.6%;
+            background: ${isBlank ? 'transparent' : '#faf8f2'};
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.22rem;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-weight: 700;
+            color: #1e3a8a;
+            direction: ltr;
+            letter-spacing: 0.5px;
+            z-index: 10;
+        }
+        
+        /* 2. تاریخ (Date) */
+        .val-date {
+            top: 28.5%;
+            left: 3.5%;
+            width: 23.5%;
+            height: 6.2%;
+            background: ${isBlank ? 'transparent' : '#faf8f2'};
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            direction: rtl;
+            z-index: 10;
+            padding: 0 10px 0 6px;
+            overflow: visible !important;
+            text-overflow: clip !important;
+        }
+        .val-date .date-label {
+            font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', 'Amiri', 'Segoe UI', Tahoma, sans-serif;
+            font-size: 1.35rem;
+            font-weight: bold;
+            color: #065f46;
+            line-height: 1;
+            margin: 0;
+            padding-right: 4px;
+            white-space: nowrap;
+            display: inline-block;
+        }
+        .val-date .date-digits {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #0f172a;
+            direction: ltr;
+            letter-spacing: 0.5px;
+            line-height: 1;
+            white-space: nowrap;
+            display: inline-block;
+        }
+        
+        /* 3. اسم گرامی (Payee Name) */
+        .val-name {
+            top: 39.5%;
+            left: 4.5%;
+            width: 63.0%;
+            font-size: 1.35rem;
+            font-weight: bold;
+            color: #065f46;
+            text-align: right;
+            padding-right: 5px;
+            line-height: 1.2;
+        }
+        
+        /* 4. پتہ (Address) */
+        .val-address {
+            top: 48.5%;
+            left: 4.5%;
+            width: 67.0%;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #1e293b;
+            text-align: right;
+            padding-right: 5px;
+            line-height: 1.2;
+        }
+        
+        /* 5. بمد (Purpose / On Account Of) */
+        .val-purpose {
+            top: 57.0%;
+            left: 4.5%;
+            width: 67.0%;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #1e293b;
+            text-align: right;
+            padding-right: 5px;
+            line-height: 1.2;
+        }
+        
+        /* 6. جنس لفظوں میں (Amount in Words) */
+        .val-words {
+            top: 65.5%;
+            left: 22.5%;
+            width: 41.0%;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #0f172a;
+            text-align: right;
+            padding-right: 5px;
+            line-height: 1.2;
+        }
+        
+        /* 7. رقم / مبلغ (Amount Medallion) */
+        .val-amount-medallion {
+            position: absolute;
+            top: 44.0%;
+            left: 78.5%;
+            width: 17.5%;
+            height: 30.5%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            z-index: 15;
+            pointer-events: none;
+        }
+        .medallion-mublagh-text {
+            font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif;
+            font-size: 1.55rem;
+            color: #4a3b1e;
+            font-weight: bold;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+        .medallion-amount-text {
+            font-family: 'Impact', 'Arial Black', sans-serif;
+            font-size: 2.45rem;
+            color: #4a3b1e;
+            line-height: 1;
+            letter-spacing: 0.5px;
+        }
+        
+        /* 8. وصول کنندہ کا نام (Receiver Name) */
+        .val-receiver {
+            top: 81.5%;
+            left: 59.0%;
+            width: 25.0%;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #0f172a;
+            text-align: right;
+            line-height: 1.2;
+        }
+
+        /* 9. دستخط وصول کنندہ (Receiver Signature) */
+        .val-signature {
+            position: absolute;
+            bottom: 2.0%;
+            left: 49.0%;
+            transform: translateX(-50%);
+            width: 15.0%;
+            height: auto;
+            max-height: 18.0%;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            z-index: 20;
+            pointer-events: none;
+        }
+        .val-signature img {
+            width: 100%;
+            height: auto;
+            max-height: 100%;
+            display: block;
+            object-fit: contain;
+            mix-blend-mode: multiply;
+            filter: contrast(1.15);
+        }
+
+        /* Pure Icon Dock */
+        .receipt-action-dock {
+            position: fixed;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 10px 20px;
+            border-radius: 50px;
+            display: flex;
+            gap: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            z-index: 99999;
+        }
+        .dock-btn {
+            background: transparent;
+            border: none;
+            color: white;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .dock-btn:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+        }
+        .btn-dock-print { color: #38bdf8; }
+        .btn-dock-pdf { color: #f87171; }
+        .btn-dock-img { color: #4ade80; }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+                min-height: auto;
+            }
+            .receipt-container {
+                box-shadow: none;
+                border-radius: 0;
+                page-break-inside: avoid;
+                width: 8.2in;
+                height: 4.66in;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+    <script src="assets/js/html2canvas.min.js"></script>
+    <script src="assets/js/jspdf.umd.min.js"></script>
+    <script>
+    if (typeof html2canvas === 'undefined') {
+        document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+    }
+    if (typeof window.jspdf === 'undefined') {
+        document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+    }
+    </script>
+    <script>
+    function triggerDownload(blobOrDataUrl, filename) {
+        if (blobOrDataUrl instanceof Blob) {
+            const reader = new FileReader();
+            reader.onloadend = function() {
+                executeDownload(reader.result, filename);
+            };
+            reader.readAsDataURL(blobOrDataUrl);
+        } else {
+            executeDownload(blobOrDataUrl, filename);
+        }
+    }
+
+    function executeDownload(dataUrl, filename) {
+        let saved = false;
+        try {
+            if (window.opener && !window.opener.closed && typeof window.opener.saveBlobOrUrl === 'function') {
+                window.opener.saveBlobOrUrl(dataUrl, filename);
+                saved = true;
+            }
+        } catch(e) {
+            console.warn('Opener saveBlobOrUrl error:', e);
+        }
+
+        if (!saved) {
+            try {
+                if (window.opener && !window.opener.closed) {
+                    window.opener.postMessage({ type: 'SAVE_RECEIPT_DOWNLOAD', dataUrl: dataUrl, filename: filename }, '*');
+                    saved = true;
+                }
+            } catch(e) {
+                console.warn('postMessage error:', e);
+            }
+        }
+
+        try {
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { if (a.parentNode) a.parentNode.removeChild(a); }, 10000);
+        } catch(err) {
+            console.error('Direct download error:', err);
+        }
+
+        showDownloadToast(filename);
+    }
+
+    function showDownloadToast(filename) {
+        let toast = document.getElementById('receipt-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'receipt-toast';
+            toast.className = 'no-print';
+            toast.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#065f46; color:white; padding:12px 28px; border-radius:30px; font-family:"Segoe UI", Arial, sans-serif; font-size:1.1rem; font-weight:bold; box-shadow:0 6px 20px rgba(0,0,0,0.3); z-index:99999; display:flex; align-items:center; gap:10px;';
+            toast.innerHTML = '<i class="fas fa-check-circle" style="color:#4ade80; font-size:1.3rem;"></i> <span>رسید فائل ڈاؤن لوڈ ہو رہی ہے: ' + filename + '</span>';
+            document.body.appendChild(toast);
+        }
+        toast.style.display = 'flex';
+        setTimeout(() => { toast.style.display = 'none'; }, 4000);
+    }
+
+    function downloadReceiptPdf(filename) {
+        const btn = document.getElementById('btn-download-pdf');
+        const origHtml = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+        }
+
+        const safeName = (filename || 'رسید') + '.pdf';
+        const receiptEl = document.querySelector('.receipt-container');
+
+        const doPdfExport = (canvas) => {
+            try {
+                if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+                    console.warn('jsPDF not loaded, fallback to window.print');
+                    window.print();
+                    return;
+                }
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'mm',
+                    format: 'a5'
+                });
+                pdf.addImage(imgData, 'JPEG', 0, 0, 210, 148, undefined, 'FAST');
+
+                try {
+                    if (window.opener && !window.opener.closed && typeof window.opener.saveBlobOrUrl === 'function') {
+                        const blob = pdf.output('blob');
+                        window.opener.saveBlobOrUrl(blob, safeName);
+                    }
+                } catch(e) {}
+
+                pdf.save(safeName);
+                showDownloadToast('پی ڈی ایف محفوظ ہو گئی: ' + safeName);
+            } catch(e) {
+                console.error('PDF export error:', e);
+                window.print();
+            } finally {
+                if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+            }
+        };
+
+        if (typeof html2canvas !== 'undefined' && receiptEl) {
+            html2canvas(receiptEl, {
+                scale: 2.5,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#fbf8f0'
+            }).then(canvas => {
+                doPdfExport(canvas);
+            }).catch(err => {
+                console.warn('html2canvas error, fallback to 2D canvas draw:', err);
+                fallbackCanvasDraw(safeName, btn, origHtml, (canvas) => doPdfExport(canvas));
+            });
+        } else {
+            fallbackCanvasDraw(safeName, btn, origHtml, (canvas) => doPdfExport(canvas));
+        }
+    }
+
+    function downloadReceiptImage(filename) {
+        const btn = document.getElementById('btn-download-img');
+        const origText = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+        }
+
+        const safeName = (filename || 'رسید') + '.png';
+        const receiptEl = document.querySelector('.receipt-container');
+
+        if (typeof html2canvas !== 'undefined' && receiptEl) {
+            html2canvas(receiptEl, {
+                scale: 2.5,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#fbf8f0'
+            }).then(canvas => {
+                canvas.toBlob(blob => {
+                    triggerDownload(blob, safeName);
+                    if (btn) { btn.innerHTML = origText; btn.disabled = false; }
+                }, 'image/png');
+            }).catch(err => {
+                console.warn('html2canvas error, fallback to canvas draw:', err);
+                fallbackCanvasDraw(safeName, btn, origText);
+            });
+        } else {
+            fallbackCanvasDraw(safeName, btn, origText);
+        }
+    }
+
+    function fallbackCanvasDraw(safeName, btn, origText, onCanvasReady) {
+        try {
+            const bgImg = document.querySelector('.receipt-bg');
+            const canvas = document.createElement('canvas');
+            canvas.width = 1680;
+            canvas.height = 954;
+            const ctx = canvas.getContext('2d');
+
+            const drawFields = () => {
+                const hawala = document.querySelector('.val-hawala');
+                const dateDigits = document.querySelector('.val-date .date-digits');
+                const name = document.querySelector('.val-name');
+                const address = document.querySelector('.val-address');
+                const purpose = document.querySelector('.val-purpose');
+                const words = document.querySelector('.val-words');
+                const amount = document.querySelector('.medallion-amount-text');
+                const receiver = document.querySelector('.val-receiver');
+
+                if (hawala && hawala.innerText) {
+                    ctx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+                    ctx.fillStyle = '#1e3a8a';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(hawala.innerText.trim(), canvas.width * 0.812, canvas.height * 0.33);
+                }
+
+                if (dateDigits && dateDigits.innerText) {
+                    ctx.font = 'bold 28px "Segoe UI", Arial, sans-serif';
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(dateDigits.innerText.trim(), canvas.width * 0.15, canvas.height * 0.33);
+                }
+
+                if (name && name.innerText) {
+                    ctx.font = 'bold 34px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#065f46';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(name.innerText.trim(), canvas.width * 0.67, canvas.height * 0.435);
+                }
+
+                if (address && address.innerText) {
+                    ctx.font = 'bold 28px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#1e293b';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(address.innerText.trim(), canvas.width * 0.71, canvas.height * 0.525);
+                }
+
+                if (purpose && purpose.innerText) {
+                    ctx.font = 'bold 28px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#1e293b';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(purpose.innerText.trim(), canvas.width * 0.71, canvas.height * 0.61);
+                }
+
+                if (words && words.innerText) {
+                    ctx.font = 'bold 28px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(words.innerText.trim(), canvas.width * 0.63, canvas.height * 0.695);
+                }
+
+                if (amount && amount.innerText) {
+                    ctx.font = 'bold 34px "Segoe UI", Arial, sans-serif';
+                    ctx.fillStyle = '#1e3a8a';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(amount.innerText.trim(), canvas.width * 0.815, canvas.height * 0.85);
+                }
+
+                if (receiver && receiver.innerText) {
+                    ctx.font = 'bold 26px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(receiver.innerText.trim(), canvas.width * 0.18, canvas.height * 0.85);
+                }
+
+                if (typeof onCanvasReady === 'function') {
+                    onCanvasReady(canvas);
+                    return;
+                }
+
+                canvas.toBlob(blob => {
+                    triggerDownload(blob, safeName);
+                    if (btn) { btn.innerHTML = origText; btn.disabled = false; }
+                }, 'image/png');
+            };
+
+            if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
+                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+                drawFields();
+            } else if (bgImg) {
+                bgImg.onload = () => {
+                    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+                    drawFields();
+                };
+            } else {
+                drawFields();
+            }
+        } catch(e) {
+            console.error('Fallback canvas draw failed:', e);
+            if (btn) { btn.innerHTML = origText; btn.disabled = false; }
+            window.print();
+        }
+    }
+    </script>
+</head>
+<body>
+    <div class="receipt-container">
+        <img src="${RECEIPT_BLANK_URI}" alt="Official Receipt" class="receipt-bg">
+        
+        <div class="field-overlay val-hawala">
+            ${isBlank ? '' : (options.receiptNo || '')}
+        </div>
+        
+        <div class="field-overlay val-date">
+            ${isBlank ? '' : `<span class="date-label">تاریخ:</span><span class="date-digits">${dateVal}</span>`}
+        </div>
+        
+        <div class="field-overlay val-name">
+            ${isBlank ? '' : (options.payeeName || '')}
+        </div>
+        
+        <div class="field-overlay val-address">
+            ${isBlank ? '' : (options.address !== undefined && options.address !== '' ? options.address : 'بوسال کالونی، ضلع خانیوال')}
+        </div>
+        
+        <div class="field-overlay val-purpose">
+            ${isBlank ? '' : (options.onAccountOf || '')}
+        </div>
+        
+        <div class="field-overlay val-words">
+            ${isBlank ? '' : (options.amountInWords || '')}
+        </div>
+        
+        <div class="val-amount-medallion">
+            <div class="medallion-mublagh-text">مبلغ</div>
+            <div class="medallion-amount-text">${isBlank ? '' : numAmount}</div>
+        </div>
+        
+        <div class="field-overlay val-receiver">
+            ${isBlank ? '' : (options.receivedBy || 'ناظم مالیات / سیکرٹری')}
+        </div>
+
+        ${(!isBlank && typeof RECEIPT_SIGNATURE_URI !== 'undefined' && RECEIPT_SIGNATURE_URI) ? `
+        <div class="val-signature">
+            <img src="${RECEIPT_SIGNATURE_URI}" alt="Signature">
+        </div>` : ''}
+    </div>
+
+    <!-- Clean Floating Action Dock: Pure Icons Only -->
+    <div class="no-print receipt-action-dock">
+        <button type="button" class="dock-btn btn-dock-print" onclick="window.print()" title="پرنٹ کریں (Print A5)">
+            <i class="fas fa-print"></i>
+        </button>
+        <button type="button" id="btn-download-pdf" class="dock-btn btn-dock-pdf" onclick="downloadReceiptPdf('${safeJsBaseName}')" title="پی ڈی ایف فائل ڈاؤن لوڈ کریں (Download PDF)">
+            <i class="fas fa-file-pdf"></i>
+        </button>
+        <button type="button" id="btn-download-img" class="dock-btn btn-dock-img" onclick="downloadReceiptImage('${safeJsBaseName}')" title="رسید تصویر ڈاؤن لوڈ کریں (Download PNG)">
+            <i class="fas fa-image"></i>
+        </button>
+    </div>
+</body>
+</html>`;
+    }
