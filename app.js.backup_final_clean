@@ -2590,6 +2590,8 @@ class MadrassahApp {
     generateOfficialReceiptHtml(options) {
         const isBlank = !!options.isBlank;
         const numAmount = options.amount ? Number(options.amount).toLocaleString('en-US') : '';
+        
+        // Format Date: Ensure crisp, distinct numerals (DD / MM / YYYY)
         let dateVal = '';
         if (!isBlank) {
             let raw = options.dateStr;
@@ -2611,8 +2613,11 @@ class MadrassahApp {
                         }
                     } else {
                         const parsed = new Date(raw);
-                        if (!isNaN(parsed.getTime())) d = parsed;
-                        else dateVal = raw;
+                        if (!isNaN(parsed.getTime())) {
+                            d = parsed;
+                        } else {
+                            dateVal = raw;
+                        }
                     }
                 }
             }
@@ -2624,14 +2629,13 @@ class MadrassahApp {
                 dateVal = `${dd} / ${mm} / ${yyyy}`;
             }
         }
-        const safeJsBaseName = (options.payeeName ? options.payeeName.replace(/['"\\\s]+/g, '_') : 'رسید') + (options.receiptNo ? '_' + options.receiptNo : '');
 
         return `<!DOCTYPE html>
 <html lang="ur" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <base href="${window.location.href}">
-    <title>${options.receiptTitle || 'رسید'} - ${options.receiptNo || ''}</title>
+    <title>${options.receiptTitle || '\u0631\u0633\u06CC\u062F'} - ${options.receiptNo || ''}</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
     <style>
@@ -2684,7 +2688,7 @@ class MadrassahApp {
             z-index: 10;
         }
         
-        /* 1. حوالہ نمبر (Receipt No) */
+        /* 1. \u062D\u0648\u0627\u0644\u06C1 \u0646\u0645\u0628\u0631 (Receipt No) */
         .val-hawala {
             top: 29.2%;
             left: 74.0%;
@@ -2704,7 +2708,7 @@ class MadrassahApp {
             z-index: 10;
         }
         
-        /* 2. تاریخ (Date) */
+        /* 2. تاریخ (Date) - Complete Urdu label and crisp date digits */
         .val-date {
             top: 28.5%;
             left: 3.5%;
@@ -2745,7 +2749,7 @@ class MadrassahApp {
             display: inline-block;
         }
         
-        /* 3. اسم گرامی (Payee Name) */
+        /* 3. \u0627\u0633\u0645 \u06AF\u0631\u0627\u0645\u06CC (Payee Name) - Placed gracefully above dotted baseline */
         .val-name {
             top: 39.5%;
             left: 4.5%;
@@ -2758,7 +2762,7 @@ class MadrassahApp {
             line-height: 1.2;
         }
         
-        /* 4. پتہ (Address) */
+        /* 4. \u067E\u062A\u06C1 (Address) */
         .val-address {
             top: 48.5%;
             left: 4.5%;
@@ -2771,7 +2775,7 @@ class MadrassahApp {
             line-height: 1.2;
         }
         
-        /* 5. بمد (Purpose / On Account Of) */
+        /* 5. \u0628\u0645\u062F (Purpose / On Account Of) */
         .val-purpose {
             top: 57.0%;
             left: 4.5%;
@@ -2784,7 +2788,7 @@ class MadrassahApp {
             line-height: 1.2;
         }
         
-        /* 6. جنس لفظوں میں (Amount in Words) */
+        /* 6. \u062C\u0646\u0633 \u0644\u0641\u0638\u0648\u06BA \u0645\u06CC\u06BA (Amount in Words) */
         .val-words {
             top: 65.5%;
             left: 22.5%;
@@ -2797,7 +2801,7 @@ class MadrassahApp {
             line-height: 1.2;
         }
         
-        /* 7. رقم / مبلغ (Amount Medallion) */
+        /* 7. \u0631\u0642\u0645 / \u0645\u0628\u0644\u063A (Amount Medallion) */
         .val-amount-medallion {
             position: absolute;
             top: 44.0%;
@@ -2840,7 +2844,7 @@ class MadrassahApp {
             line-height: 1.2;
         }
 
-        /* 9. دستخط وصول کنندہ (Receiver Signature) */
+        /* 9. دستخط وصول کنندہ (Receiver Signature) - Positioned at bottom center */
         .val-signature {
             position: absolute;
             bottom: 2.0%;
@@ -2865,43 +2869,6 @@ class MadrassahApp {
             filter: contrast(1.15);
         }
 
-        /* Pure Icon Dock */
-        .receipt-action-dock {
-            position: fixed;
-            bottom: 25px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(10px);
-            padding: 10px 20px;
-            border-radius: 50px;
-            display: flex;
-            gap: 15px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-            z-index: 99999;
-        }
-        .dock-btn {
-            background: transparent;
-            border: none;
-            color: white;
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .dock-btn:hover {
-            background: rgba(255,255,255,0.2);
-            transform: translateY(-2px);
-        }
-        .btn-dock-print { color: #38bdf8; }
-        .btn-dock-pdf { color: #f87171; }
-        .btn-dock-img { color: #4ade80; }
-
         @media print {
             body {
                 background: white;
@@ -2924,10 +2891,10 @@ class MadrassahApp {
     <script src="assets/js/jspdf.umd.min.js"></script>
     <script>
     if (typeof html2canvas === 'undefined') {
-        document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+        document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>');
     }
     if (typeof window.jspdf === 'undefined') {
-        document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+        document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>');
     }
     </script>
     <script>
@@ -2945,6 +2912,7 @@ class MadrassahApp {
 
     function executeDownload(dataUrl, filename) {
         let saved = false;
+        // 1. Delegate directly to opener
         try {
             if (window.opener && !window.opener.closed && typeof window.opener.saveBlobOrUrl === 'function') {
                 window.opener.saveBlobOrUrl(dataUrl, filename);
@@ -2954,6 +2922,7 @@ class MadrassahApp {
             console.warn('Opener saveBlobOrUrl error:', e);
         }
 
+        // 2. PostMessage to opener
         if (!saved) {
             try {
                 if (window.opener && !window.opener.closed) {
@@ -2965,6 +2934,7 @@ class MadrassahApp {
             }
         }
 
+        // 3. Direct browser anchor download with data URL
         try {
             const a = document.createElement('a');
             a.href = dataUrl;
@@ -2977,6 +2947,7 @@ class MadrassahApp {
             console.error('Direct download error:', err);
         }
 
+        // Show toast notification
         showDownloadToast(filename);
     }
 
@@ -3014,6 +2985,7 @@ class MadrassahApp {
                 }
                 const imgData = canvas.toDataURL('image/jpeg', 0.95);
                 const { jsPDF } = window.jspdf;
+                // A5 landscape dimensions: 210mm x 148mm
                 const pdf = new jsPDF({
                     orientation: 'landscape',
                     unit: 'mm',
@@ -3021,6 +2993,7 @@ class MadrassahApp {
                 });
                 pdf.addImage(imgData, 'JPEG', 0, 0, 210, 148, undefined, 'FAST');
 
+                // 1. Delegate to opener if available
                 try {
                     if (window.opener && !window.opener.closed && typeof window.opener.saveBlobOrUrl === 'function') {
                         const blob = pdf.output('blob');
@@ -3028,7 +3001,9 @@ class MadrassahApp {
                     }
                 } catch(e) {}
 
+                // 2. Direct save via jsPDF
                 pdf.save(safeName);
+
                 showDownloadToast('پی ڈی ایف محفوظ ہو گئی: ' + safeName);
             } catch(e) {
                 console.error('PDF export error:', e);
@@ -3188,7 +3163,752 @@ class MadrassahApp {
             window.print();
         }
     }
+
+    numberToUrduWords(num) {
+        num = parseInt(num) || 0;
+        if (num === 0) return 'صفر روپے';
+        
+        const ones = ['', 'ایک', 'دو', 'تین', 'چار', 'پانچ', 'چھ', 'سات', 'آٹھ', 'نو', 'دس', 
+                      'گیارہ', 'بارہ', 'تیرہ', 'چودہ', 'پندرہ', 'سولہ', 'سترہ', 'اٹھارہ', 'انیس'];
+        const tens = ['', '', 'بیس', 'تیس', 'چالیس', 'پچاس', 'ساٹھ', 'ستر', 'اسی', 'نوے'];
+        
+        function convertChunk(n) {
+            let str = '';
+            if (n >= 100) {
+                str += ones[Math.floor(n / 100)] + ' سو ';
+                n %= 100;
+            }
+            if (n >= 20) {
+                str += tens[Math.floor(n / 10)] + ' ';
+                n %= 10;
+            }
+            if (n > 0) {
+                str += ones[n] + ' ';
+            }
+            return str;
+        }
+
+        let parts = [];
+        
+        if (num >= 10000000) {
+            const crore = Math.floor(num / 10000000);
+            parts.push(convertChunk(crore) + 'کروڑ');
+            num %= 10000000;
+        }
+        if (num >= 100000) {
+            const lakh = Math.floor(num / 100000);
+            parts.push(convertChunk(lakh) + 'لاکھ');
+            num %= 100000;
+        }
+        if (num >= 1000) {
+            const thousand = Math.floor(num / 1000);
+            parts.push(convertChunk(thousand) + 'ہزار');
+            num %= 1000;
+        }
+        if (num > 0) {
+            parts.push(convertChunk(num));
+        }
+        
+        return parts.join(' ').trim() + ' روپے صرف';
+    }
+
+    generateOfficialReceiptHtml(options) {
+        const isBlank = !!options.isBlank;
+        const numAmount = options.amount ? Number(options.amount).toLocaleString('en-US') : '';
+        
+        // Format Date: Ensure crisp, distinct numerals (DD / MM / YYYY)
+        let dateVal = '';
+        if (!isBlank) {
+            let raw = options.dateStr;
+            let d = null;
+            if (raw) {
+                if (raw instanceof Date) {
+                    d = raw;
+                } else if (typeof raw === 'number') {
+                    d = new Date(raw);
+                } else if (typeof raw === 'string') {
+                    const m = raw.match(/^(\d{1,4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,4})$/);
+                    if (m) {
+                        let p1 = m[1], p2 = m[2], p3 = m[3];
+                        if (p1.length === 4) {
+                            dateVal = `${p3.padStart(2, '0')} / ${p2.padStart(2, '0')} / ${p1}`;
+                        } else {
+                            let yr = p3.length === 2 ? '20' + p3 : p3;
+                            dateVal = `${p1.padStart(2, '0')} / ${p2.padStart(2, '0')} / ${yr}`;
+                        }
+                    } else {
+                        const parsed = new Date(raw);
+                        if (!isNaN(parsed.getTime())) {
+                            d = parsed;
+                        } else {
+                            dateVal = raw;
+                        }
+                    }
+                }
+            }
+            if (!dateVal) {
+                if (!d || isNaN(d.getTime())) d = new Date();
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const yyyy = d.getFullYear();
+                dateVal = `${dd} / ${mm} / ${yyyy}`;
+            }
+        }
+
+        return `<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <base href="${window.location.href}">
+    <title>${options.receiptTitle || '\u0631\u0633\u06CC\u062F'} - ${options.receiptNo || ''}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+    <style>
+        @page {
+            size: A5 landscape;
+            margin: 0;
+        }
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        body {
+            font-family: 'Jameel Noori Nastaleeq', 'Amiri', 'Noto Nastaliq Urdu', serif;
+            margin: 0;
+            padding: 20px;
+            background: #f1f5f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            direction: rtl;
+        }
+        .receipt-container {
+            position: relative;
+            width: 8.4in;
+            height: 4.77in;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.22);
+            border-radius: 4px;
+            overflow: hidden;
+            background: #fbf8f0;
+        }
+        .receipt-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: fill;
+            z-index: 1;
+        }
+        .field-overlay {
+            position: absolute;
+            font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif;
+            color: #0f172a;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            z-index: 10;
+        }
+        
+        /* 1. \u062D\u0648\u0627\u0644\u06C1 \u0646\u0645\u0628\u0631 (Receipt No) */
+        .val-hawala {
+            top: 29.2%;
+            left: 74.0%;
+            width: 14.5%;
+            height: 5.6%;
+            background: ${isBlank ? 'transparent' : '#faf8f2'};
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.22rem;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-weight: 700;
+            color: #1e3a8a;
+            direction: ltr;
+            letter-spacing: 0.5px;
+            z-index: 10;
+        }
+        
+        /* 2. تاریخ (Date) - Complete Urdu label and crisp date digits */
+        .val-date {
+            top: 28.5%;
+            left: 3.5%;
+            width: 23.5%;
+            height: 6.2%;
+            background: ${isBlank ? 'transparent' : '#faf8f2'};
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            direction: rtl;
+            z-index: 10;
+            padding: 0 10px 0 6px;
+            overflow: visible !important;
+            text-overflow: clip !important;
+        }
+        .val-date .date-label {
+            font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', 'Amiri', 'Segoe UI', Tahoma, sans-serif;
+            font-size: 1.35rem;
+            font-weight: bold;
+            color: #065f46;
+            line-height: 1;
+            margin: 0;
+            padding-right: 4px;
+            white-space: nowrap;
+            display: inline-block;
+        }
+        .val-date .date-digits {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #0f172a;
+            direction: ltr;
+            letter-spacing: 0.5px;
+            line-height: 1;
+            white-space: nowrap;
+            display: inline-block;
+        }
+        
+        /* 3. \u0627\u0633\u0645 \u06AF\u0631\u0627\u0645\u06CC (Payee Name) - Placed gracefully above dotted baseline */
+        .val-name {
+            top: 39.5%;
+            left: 4.5%;
+            width: 63.0%;
+            font-size: 1.35rem;
+            font-weight: bold;
+            color: #065f46;
+            text-align: right;
+            padding-right: 5px;
+            line-height: 1.2;
+        }
+        
+        /* 4. \u067E\u062A\u06C1 (Address) */
+        .val-address {
+            top: 48.5%;
+            left: 4.5%;
+            width: 67.0%;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #1e293b;
+            text-align: right;
+            padding-right: 5px;
+            line-height: 1.2;
+        }
+        
+        /* 5. \u0628\u0645\u062F (Purpose / On Account Of) */
+        .val-purpose {
+            top: 57.0%;
+            left: 4.5%;
+            width: 67.0%;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #1e293b;
+            text-align: right;
+            padding-right: 5px;
+            line-height: 1.2;
+        }
+        
+        /* 6. \u062C\u0646\u0633 \u0644\u0641\u0638\u0648\u06BA \u0645\u06CC\u06BA (Amount in Words) */
+        .val-words {
+            top: 65.5%;
+            left: 22.5%;
+            width: 41.0%;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #0f172a;
+            text-align: right;
+            padding-right: 5px;
+            line-height: 1.2;
+        }
+        
+        /* 7. \u0631\u0642\u0645 / \u0645\u0628\u0644\u063A (Amount Medallion) */
+        .val-amount-medallion {
+            position: absolute;
+            top: 44.0%;
+            left: 78.5%;
+            width: 17.5%;
+            height: 30.5%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            z-index: 15;
+            pointer-events: none;
+        }
+        .medallion-mublagh-text {
+            font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif;
+            font-size: 1.55rem;
+            color: #4a3b1e;
+            font-weight: bold;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+        .medallion-amount-text {
+            font-family: 'Impact', 'Arial Black', sans-serif;
+            font-size: 2.45rem;
+            color: #4a3b1e;
+            line-height: 1;
+            letter-spacing: 0.5px;
+        }
+        
+        /* 8. وصول کنندہ کا نام (Receiver Name) */
+        .val-receiver {
+            top: 81.5%;
+            left: 59.0%;
+            width: 25.0%;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #0f172a;
+            text-align: right;
+            line-height: 1.2;
+        }
+
+        /* 9. دستخط وصول کنندہ (Receiver Signature) - Positioned at bottom center */
+        .val-signature {
+            position: absolute;
+            bottom: 2.0%;
+            left: 49.0%;
+            transform: translateX(-50%);
+            width: 15.0%;
+            height: auto;
+            max-height: 18.0%;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            z-index: 20;
+            pointer-events: none;
+        }
+        .val-signature img {
+            width: 100%;
+            height: auto;
+            max-height: 100%;
+            display: block;
+            object-fit: contain;
+            mix-blend-mode: multiply;
+            filter: contrast(1.15);
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+                min-height: auto;
+            }
+            .receipt-container {
+                box-shadow: none;
+                border-radius: 0;
+                page-break-inside: avoid;
+                width: 8.2in;
+                height: 4.66in;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+    <script src="assets/js/html2canvas.min.js"></script>
+    <script src="assets/js/jspdf.umd.min.js"></script>
+    <script>
+    if (typeof html2canvas === 'undefined') {
+        document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>');
+    }
+    if (typeof window.jspdf === 'undefined') {
+        document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>');
+    }
     </script>
+    <script>
+    function triggerDownload(blobOrDataUrl, filename) {
+        if (blobOrDataUrl instanceof Blob) {
+            const reader = new FileReader();
+            reader.onloadend = function() {
+                executeDownload(reader.result, filename);
+            };
+            reader.readAsDataURL(blobOrDataUrl);
+        } else {
+            executeDownload(blobOrDataUrl, filename);
+        }
+    }
+
+    function executeDownload(dataUrl, filename) {
+        let saved = false;
+        // 1. Delegate directly to opener
+        try {
+            if (window.opener && !window.opener.closed && typeof window.opener.saveBlobOrUrl === 'function') {
+                window.opener.saveBlobOrUrl(dataUrl, filename);
+                saved = true;
+            }
+        } catch(e) {
+            console.warn('Opener saveBlobOrUrl error:', e);
+        }
+
+        // 2. PostMessage to opener
+        if (!saved) {
+            try {
+                if (window.opener && !window.opener.closed) {
+                    window.opener.postMessage({ type: 'SAVE_RECEIPT_DOWNLOAD', dataUrl: dataUrl, filename: filename }, '*');
+                    saved = true;
+                }
+            } catch(e) {
+                console.warn('postMessage error:', e);
+            }
+        }
+
+        // 3. Direct browser anchor download with data URL
+        try {
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { if (a.parentNode) a.parentNode.removeChild(a); }, 10000);
+        } catch(err) {
+            console.error('Direct download error:', err);
+        }
+
+        // Show toast notification
+        showDownloadToast(filename);
+    }
+
+    function showDownloadToast(filename) {
+        let toast = document.getElementById('receipt-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'receipt-toast';
+            toast.className = 'no-print';
+            toast.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#065f46; color:white; padding:12px 28px; border-radius:30px; font-family:"Segoe UI", Arial, sans-serif; font-size:1.1rem; font-weight:bold; box-shadow:0 6px 20px rgba(0,0,0,0.3); z-index:99999; display:flex; align-items:center; gap:10px;';
+            toast.innerHTML = '<i class="fas fa-check-circle" style="color:#4ade80; font-size:1.3rem;"></i> <span>رسید فائل ڈاؤن لوڈ ہو رہی ہے: ' + filename + '</span>';
+            document.body.appendChild(toast);
+        }
+        toast.style.display = 'flex';
+        setTimeout(() => { toast.style.display = 'none'; }, 4000);
+    }
+
+    function downloadReceiptImage(filename) {
+        const btn = document.getElementById('btn-download-img');
+        const origText = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> تصویر تیار ہو رہی ہے...';
+            btn.disabled = true;
+        }
+
+        const safeName = (filename || 'رسید') + '.png';
+        const receiptEl = document.querySelector('.receipt-container');
+
+        if (typeof html2canvas !== 'undefined' && receiptEl) {
+            html2canvas(receiptEl, {
+                scale: 2.5,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#fbf8f0'
+            }).then(canvas => {
+                canvas.toBlob(blob => {
+                    triggerDownload(blob, safeName);
+                    if (btn) { btn.innerHTML = origText; btn.disabled = false; }
+                }, 'image/png');
+            }).catch(err => {
+                console.warn('html2canvas error, fallback to canvas draw:', err);
+                fallbackCanvasDraw(safeName, btn, origText);
+            });
+        } else {
+            fallbackCanvasDraw(safeName, btn, origText);
+        }
+    }
+
+    function fallbackCanvasDraw(safeName, btn, origText) {
+        try {
+            const bgImg = document.querySelector('.receipt-bg');
+            const canvas = document.createElement('canvas');
+            canvas.width = 1680;
+            canvas.height = 954;
+            const ctx = canvas.getContext('2d');
+
+            const drawFields = () => {
+                const hawala = document.querySelector('.val-hawala');
+                const dateDigits = document.querySelector('.val-date .date-digits');
+                const name = document.querySelector('.val-name');
+                const address = document.querySelector('.val-address');
+                const purpose = document.querySelector('.val-purpose');
+                const words = document.querySelector('.val-words');
+                const amount = document.querySelector('.medallion-amount-text');
+                const receiver = document.querySelector('.val-receiver');
+
+                if (hawala && hawala.innerText) {
+                    ctx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+                    ctx.fillStyle = '#1e3a8a';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(hawala.innerText.trim(), canvas.width * 0.812, canvas.height * 0.33);
+                }
+
+                if (dateDigits && dateDigits.innerText) {
+                    ctx.font = 'bold 28px "Segoe UI", Arial, sans-serif';
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(dateDigits.innerText.trim(), canvas.width * 0.15, canvas.height * 0.33);
+                }
+
+                if (name && name.innerText) {
+                    ctx.font = 'bold 34px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#065f46';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(name.innerText.trim(), canvas.width * 0.67, canvas.height * 0.435);
+                }
+
+                if (address && address.innerText) {
+                    ctx.font = 'bold 28px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#1e293b';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(address.innerText.trim(), canvas.width * 0.71, canvas.height * 0.525);
+                }
+
+                if (purpose && purpose.innerText) {
+                    ctx.font = 'bold 28px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#1e293b';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(purpose.innerText.trim(), canvas.width * 0.71, canvas.height * 0.61);
+                }
+
+                if (words && words.innerText) {
+                    ctx.font = 'bold 28px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(words.innerText.trim(), canvas.width * 0.63, canvas.height * 0.695);
+                }
+
+                if (amount && amount.innerText) {
+                    ctx.font = 'bold 34px "Segoe UI", Arial, sans-serif';
+                    ctx.fillStyle = '#1e3a8a';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(amount.innerText.trim(), canvas.width * 0.815, canvas.height * 0.85);
+                }
+
+                if (receiver && receiver.innerText) {
+                    ctx.font = 'bold 26px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(receiver.innerText.trim(), canvas.width * 0.18, canvas.height * 0.85);
+                }
+
+                canvas.toBlob(blob => {
+                    triggerDownload(blob, safeName);
+                    if (btn) { btn.innerHTML = origText; btn.disabled = false; }
+                }, 'image/png');
+            };
+
+            if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
+                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+                drawFields();
+            } else if (bgImg) {
+                bgImg.onload = () => {
+                    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+    function downloadReceiptImage(filename) {
+        const btn = document.getElementById('btn-download-img');
+        const origText = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> تصویر تیار ہو رہی ہے...';
+            btn.disabled = true;
+        }
+
+        const safeName = (filename || 'رسید') + '.png';
+        const receiptEl = document.querySelector('.receipt-container');
+
+        if (typeof html2canvas !== 'undefined' && receiptEl) {
+            html2canvas(receiptEl, {
+                scale: 2.5,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#fbf8f0'
+            }).then(canvas => {
+                canvas.toBlob(blob => {
+                    triggerDownload(blob, safeName);
+                    if (btn) { btn.innerHTML = origText; btn.disabled = false; }
+                }, 'image/png');
+            }).catch(err => {
+                console.warn('html2canvas error, fallback to canvas draw:', err);
+                fallbackCanvasDraw(safeName, btn, origText);
+            });
+        } else {
+            fallbackCanvasDraw(safeName, btn, origText);
+        }
+    }
+
+    function fallbackCanvasDraw(safeName, btn, origText) {
+        try {
+            const bgImg = document.querySelector('.receipt-bg');
+            const canvas = document.createElement('canvas');
+            canvas.width = 1680;
+            canvas.height = 954;
+            const ctx = canvas.getContext('2d');
+
+            const drawFields = () => {
+                const hawala = document.querySelector('.val-hawala');
+                const dateDigits = document.querySelector('.val-date .date-digits');
+                const name = document.querySelector('.val-name');
+                const address = document.querySelector('.val-address');
+                const purpose = document.querySelector('.val-purpose');
+                const words = document.querySelector('.val-words');
+                const amount = document.querySelector('.medallion-amount-text');
+                const receiver = document.querySelector('.val-receiver');
+
+                if (hawala && hawala.innerText) {
+                    ctx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+                    ctx.fillStyle = '#1e3a8a';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(hawala.innerText.trim(), canvas.width * 0.812, canvas.height * 0.33);
+                }
+
+                if (dateDigits && dateDigits.innerText) {
+                    ctx.font = 'bold 28px "Segoe UI", Arial, sans-serif';
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(dateDigits.innerText.trim(), canvas.width * 0.15, canvas.height * 0.33);
+                }
+
+                if (name && name.innerText) {
+                    ctx.font = 'bold 34px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#065f46';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(name.innerText.trim(), canvas.width * 0.67, canvas.height * 0.435);
+                }
+
+                if (address && address.innerText) {
+                    ctx.font = 'bold 28px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#1e293b';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(address.innerText.trim(), canvas.width * 0.71, canvas.height * 0.525);
+                }
+
+                if (purpose && purpose.innerText) {
+                    ctx.font = 'bold 28px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#1e293b';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(purpose.innerText.trim(), canvas.width * 0.71, canvas.height * 0.61);
+                }
+
+                if (words && words.innerText) {
+                    ctx.font = 'bold 28px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(words.innerText.trim(), canvas.width * 0.63, canvas.height * 0.695);
+                }
+
+                if (amount && amount.innerText) {
+                    ctx.font = 'bold 34px "Segoe UI", Arial, sans-serif';
+                    ctx.fillStyle = '#1e3a8a';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(amount.innerText.trim(), canvas.width * 0.815, canvas.height * 0.85);
+                }
+
+                if (receiver && receiver.innerText) {
+                    ctx.font = 'bold 26px "Jameel Noori Nastaleeq", "Amiri", serif';
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(receiver.innerText.trim(), canvas.width * 0.18, canvas.height * 0.85);
+                }
+
+                canvas.toBlob(blob => {
+                    triggerDownload(blob, safeName);
+                    if (btn) { btn.innerHTML = origText; btn.disabled = false; }
+                }, 'image/png');
+            };
+
+            if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
+                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+                drawFields();
+            } else if (bgImg) {
+                bgImg.onload = () => {
+                    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+                    drawFields();
+                };
+            } else {
+                drawFields();
+            }
+        } catch(e) {
+            console.error('Fallback canvas draw failed:', e);
+            if (btn) { btn.innerHTML = origText; btn.disabled = false; }
+            window.print();
+        }
+    }
+
+    generateOfficialReceiptHtml(options) {
+        const isBlank = !!options.isBlank;
+        const numAmount = options.amount ? Number(options.amount).toLocaleString('en-US') : '';
+        let dateVal = '';
+        if (!isBlank) {
+            let raw = options.dateStr;
+            let d = null;
+            if (raw) {
+                if (raw instanceof Date) {
+                    d = raw;
+                } else if (typeof raw === 'number') {
+                    d = new Date(raw);
+                } else if (typeof raw === 'string') {
+                    const m = raw.match(/^(\d{1,4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,4})$/);
+                    if (m) {
+                        let p1 = m[1], p2 = m[2], p3 = m[3];
+                        if (p1.length === 4) {
+                            dateVal = `${p3.padStart(2, '0')} / ${p2.padStart(2, '0')} / ${p1}`;
+                        } else {
+                            let yr = p3.length === 2 ? '20' + p3 : p3;
+                            dateVal = `${p1.padStart(2, '0')} / ${p2.padStart(2, '0')} / ${yr}`;
+                        }
+                    } else {
+                        const parsed = new Date(raw);
+                        if (!isNaN(parsed.getTime())) d = parsed;
+                        else dateVal = raw;
+                    }
+                }
+            }
+            if (!dateVal) {
+                if (!d || isNaN(d.getTime())) d = new Date();
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const yyyy = d.getFullYear();
+                dateVal = `${dd} / ${mm} / ${yyyy}`;
+            }
+        }
+        const safeJsBaseName = (options.payeeName ? options.payeeName.replace(/['"\\s]+/g, '_') : 'رسید') + (options.receiptNo ? '_' + options.receiptNo : '');
+
+        return `<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <base href="${window.location.href}">
+    <title>${options.receiptTitle || 'رسمی رسید'}</title>
+    <link rel="stylesheet" href="assets/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/receipt.css">
+    <style>
+        @page { size: A5 landscape; margin: 0; }
+        body { margin: 0; padding: 0; background: #fbf8f0; font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif; }
+        .receipt-container { position: relative; width: 1680px; height: 954px; margin: 0 auto; background: #fbf8f0; overflow: hidden; page-break-after: always; }
+        .receipt-bg { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .field-overlay { position: absolute; box-sizing: border-box; }
+        .val-hawala { top: 31%; left: 75%; width: 12%; text-align: center; font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 30px; color: #1e3a8a; }
+        .val-date { top: 31%; left: 8%; width: 15%; text-align: center; font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 28px; color: #0f172a; display: flex; justify-content: center; gap: 8px; direction: ltr; }
+        .val-name { top: 41.5%; right: 20%; width: 62%; text-align: right; font-weight: bold; font-size: 34px; color: #065f46; }
+        .val-address { top: 50.5%; right: 18%; width: 65%; text-align: right; font-weight: bold; font-size: 28px; color: #1e293b; }
+        .val-purpose { top: 59%; right: 18%; width: 65%; text-align: right; font-weight: bold; font-size: 28px; color: #1e293b; }
+        .val-words { top: 67.5%; right: 22%; width: 60%; text-align: right; font-weight: bold; font-size: 28px; color: #0f172a; }
+        .val-amount-medallion { position: absolute; top: 81%; left: 74.5%; width: 15%; text-align: center; }
+        .medallion-mublagh-text { font-size: 16px; color: #64748b; font-weight: bold; margin-bottom: 2px; display: none; }
+        .medallion-amount-text { font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 34px; color: #1e3a8a; }
+        .val-receiver { top: 82%; left: 10%; width: 18%; text-align: center; font-weight: bold; font-size: 26px; color: #0f172a; }
+        .val-signature { position: absolute; top: 76%; left: 12%; width: 170px; height: 75px; z-index: 10; display: flex; align-items: center; justify-content: center; }
+        .val-signature img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .receipt-action-dock { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px); padding: 10px 20px; border-radius: 50px; display: flex; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); z-index: 99999; }
+        .dock-btn { background: transparent; border: none; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; transition: all 0.2s ease; }
+        .dock-btn:hover { background: rgba(255,255,255,0.2); transform: translateY(-2px); }
+        .btn-dock-print { color: #38bdf8; }
+        .btn-dock-pdf { color: #f87171; }
+        .btn-dock-img { color: #4ade80; }
+        @media print { .no-print { display: none !important; } body { background: transparent; } }
+    </style>
 </head>
 <body>
     <div class="receipt-container">
@@ -3249,8 +3969,7 @@ class MadrassahApp {
 </html>`;
     }
 
-
-downloadReceiptImageDirect(options) {
+    downloadReceiptImageDirect(options) {
         return new Promise((resolve, reject) => {
             try {
                 const isBlank = !!options.isBlank;
@@ -3508,11 +4227,205 @@ printBlankReceipt() {
         printWindow.document.write(html);
         printWindow.document.close();
     }
-
     async renderAttendanceModule(container) {
         const type = this.attendanceType;
         const section = this.currentSection;
         const isBanat = type === 'student' && section === 'banat';
+        const isBanin = type === 'student' && section === 'banin';
+        const isStaff = type === 'staff';
+        const date = this.attendanceDate;
+
+        let people = [];
+        let currentAtt = [];
+
+        if (type === 'student') {
+            const allStudents = await MadrassahDB.getAllStudents(this.currentSection);
+            people = allStudents.filter(s => s.className === this.attendanceClass || s.class === this.attendanceClass || s.department === this.attendanceClass);
+            currentAtt = await MadrassahDB.getAttendance('student', date, this.currentSection);
+        } else {
+            people = await MadrassahDB.getAllTeachers();
+            currentAtt = await MadrassahDB.getAttendance('staff', date);
+        }
+
+        const presentCount = people.filter(p => currentAtt.find(a => a.personId === p.id && a.status === 'Present')).length;
+        const absentCount = people.filter(p => currentAtt.find(a => a.personId === p.id && a.status === 'Absent')).length;
+        const leaveCount = people.filter(p => currentAtt.find(a => a.personId === p.id && a.status === 'Leave')).length;
+        const unmarkedCount = people.length - (presentCount + absentCount + leaveCount);
+        const percentage = people.length > 0 ? Math.round((presentCount / people.length) * 100) : 0;
+
+        const sectionBadge = isBanat 
+            ? '<span style="background:linear-gradient(135deg, #9d174d, #be185d); color:white; padding:4px 14px; border-radius:20px; font-size:0.9rem; font-weight:bold;"><i class="fas fa-female"></i> شعبہ بنات (طالبات)</span>'
+            : (isBanin 
+                ? '<span style="background:linear-gradient(135deg, #065f46, #047857); color:white; padding:4px 14px; border-radius:20px; font-size:0.9rem; font-weight:bold;"><i class="fas fa-male"></i> شعبہ بنین (طلباء)</span>'
+                : '<span style="background:linear-gradient(135deg, #1e40af, #2563eb); color:white; padding:4px 14px; border-radius:20px; font-size:0.9rem; font-weight:bold;"><i class="fas fa-chalkboard-teacher"></i> عملہ و ملازمین</span>');
+
+        container.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                <div>
+                    <h2 style="color:var(--primary); margin:0 0 5px 0;"><i class="fas fa-calendar-check"></i> حاضری کا نظام (Attendance System)</h2>
+                    <div>${sectionBadge}</div>
+                </div>
+                
+                <div style="display:flex; gap:0.8rem; align-items:center; flex-wrap:wrap;">
+                    <!-- 3-Way Target Tabs: Banin Students, Banat Students, Staff -->
+                    <div class="attendance-tabs" style="display:flex; background:#f1f5f9; padding:4px; border-radius:14px; border:1px solid #e2e8f0; gap:4px;">
+                        <button type="button" onclick="app.switchAttendanceTarget('student', 'banin')" class="tab-btn ${isBanin ? 'active' : ''}" style="padding:7px 16px; border-radius:10px; border:none; cursor:pointer; font-family:inherit; background:${isBanin ? '#065f46' : 'transparent'}; color:${isBanin ? 'white' : '#475569'}; box-shadow:${isBanin ? '0 4px 8px rgba(6,95,70,0.25)' : 'none'}; font-weight:bold; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-male"></i> طلباء (بنین)
+                        </button>
+                        <button type="button" onclick="app.switchAttendanceTarget('student', 'banat')" class="tab-btn ${isBanat ? 'active' : ''}" style="padding:7px 16px; border-radius:10px; border:none; cursor:pointer; font-family:inherit; background:${isBanat ? '#be185d' : 'transparent'}; color:${isBanat ? 'white' : '#475569'}; box-shadow:${isBanat ? '0 4px 8px rgba(190,24,93,0.25)' : 'none'}; font-weight:bold; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-female"></i> طالبات (بنات)
+                        </button>
+                        <button type="button" onclick="app.switchAttendanceTarget('staff')" class="tab-btn ${isStaff ? 'active' : ''}" style="padding:7px 16px; border-radius:10px; border:none; cursor:pointer; font-family:inherit; background:${isStaff ? '#1e40af' : 'transparent'}; color:${isStaff ? 'white' : '#475569'}; box-shadow:${isStaff ? '0 4px 8px rgba(30,64,175,0.25)' : 'none'}; font-weight:bold; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-chalkboard-teacher"></i> عملہ و اساتذہ
+                        </button>
+                    </div>
+
+                    <input type="date" id="att_date" class="mms-select" value="${date}" onchange="app.updateAttendanceDate(this.value)" style="min-width:140px;">
+                    <button class="btn btn-sm" onclick="app.showAttendanceReport()" style="background:#6366f1; color:white; padding:7px 15px; border-radius:10px; display:flex; align-items:center; gap:6px;" title="ماہانہ رجسٹر رپورٹ کھولیں">
+                        <i class="fas fa-file-contract"></i> ماہانہ رجسٹر
+                    </button>
+                </div>
+            </div>
+
+            <!-- Attendance Stats Cards -->
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="stat-card" style="padding:1rem; border-right:4px solid #6366f1;">
+                    <div class="stat-info"><h3 style="font-size:0.85rem;">کل تعداد</h3><p style="font-size:1.5rem; margin:0;">${people.length}</p></div>
+                </div>
+                <div class="stat-card" style="padding:1rem; border-right:4px solid #059669;">
+                    <div class="stat-info"><h3 style="font-size:0.85rem; color:#059669;">حاضر (P)</h3><p style="font-size:1.5rem; margin:0; color:#059669;">${presentCount}</p></div>
+                </div>
+                <div class="stat-card" style="padding:1rem; border-right:4px solid #dc2626;">
+                    <div class="stat-info"><h3 style="font-size:0.85rem; color:#dc2626;">غیر حاضر (A)</h3><p style="font-size:1.5rem; margin:0; color:#dc2626;">${absentCount}</p></div>
+                </div>
+                <div class="stat-card" style="padding:1rem; border-right:4px solid #d97706;">
+                    <div class="stat-info"><h3 style="font-size:0.85rem; color:#d97706;">رخصت (L)</h3><p style="font-size:1.5rem; margin:0; color:#d97706;">${leaveCount}</p></div>
+                </div>
+                <div class="stat-card" style="padding:1rem; border-right:4px solid #0284c7;">
+                    <div class="stat-info"><h3 style="font-size:0.85rem; color:#0284c7;">شرحِ حاضری</h3><p style="font-size:1.5rem; margin:0; color:#0284c7;">${percentage}%</p></div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom:1.5rem; padding:1.2rem; display:flex; justify-content:space-between; align-items:center; background:linear-gradient(135deg, #f8fafc, #ffffff); flex-wrap:wrap; gap:1rem;">
+                <div style="display:flex; gap:1.2rem; align-items:center;">
+                    ${type === 'student' ? `
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <label style="font-weight:bold; color:var(--primary); font-size:1rem;">کلاس / شعبہ:</label>
+                            <select onchange="app.switchAttendanceClass(this.value)" class="mms-select" style="min-width:200px;">
+                                ${Object.entries(this.madrsaDepartments).map(([dept, classes]) => {
+                                    if (classes.length === 0) {
+                                        return `<option value="${dept}" ${this.attendanceClass === dept ? 'selected' : ''}>${dept}</option>`;
+                                    } else {
+                                        return `
+                                            <optgroup label="${dept}">
+                                                ${classes.map(c => `<option value="${c}" ${this.attendanceClass === c ? 'selected' : ''}>${dept === 'درس نظامی' ? 'درجہ ' : ''}${c}</option>`).join('')}
+                                            </optgroup>
+                                        `;
+                                    }
+                                }).join('')}
+                            </select>
+                        </div>
+                    ` : '<div style="font-weight:bold; color:var(--primary); font-size:1.1rem;"><i class="fas fa-users"></i> تمام تدریسی و غیر تدریسی عملہ</div>'}
+                    <div style="color:#64748b; font-size:0.95rem;">
+                        منتخب شدہ فہرست: <b>${people.length}</b> ${type === 'student' ? (isBanat ? 'طالبات' : 'طلباء') : 'افراد'}
+                    </div>
+                </div>
+                
+                <div style="display:flex; gap:0.6rem;">
+                    <button class="btn btn-sm" onclick="app.bulkAttendance('Present')" style="background:#ecfdf5; color:#059669; border:1px solid #059669; border-radius:8px;">
+                        <i class="fas fa-check-double"></i> سب حاضر
+                    </button>
+                    <button class="btn btn-sm" onclick="app.bulkAttendance('Absent')" style="background:#fef2f2; color:#dc2626; border:1px solid #dc2626; border-radius:8px;">
+                        <i class="fas fa-user-xmark"></i> سب غیر حاضر
+                    </button>
+                </div>
+            </div>
+
+            <div class="card" style="padding:0; overflow:hidden;">
+                <table style="width:100%;">
+                    <thead>
+                        <tr>
+                            <th style="width:90px;">${type === 'student' ? 'رجسٹریشن' : 'شناختی نمبر'}</th>
+                            <th>${type === 'student' ? (isBanat ? 'نام طالبہ' : 'نام طالب علم') : 'نامِ اسٹاف'}</th>
+                            ${type === 'student' ? '<th>ولدیت</th>' : '<th>عہدہ / شعبہ</th>'}
+                            ${type === 'student' ? '<th>کلاس</th>' : ''}
+                            <th style="text-align:center; width:180px;">حاضری کی صورتحال</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${people.map(p => {
+                            const att = currentAtt.find(a => a.personId === p.id);
+                            const status = att ? att.status : null;
+                            return `
+                                <tr style="${status === 'Absent' ? 'background:#fff8f8;' : ''}">
+                                    <td style="font-weight:bold; color:var(--primary);">#${p.id}</td>
+                                    <td><b style="color:${isBanat ? '#9d174d' : 'var(--primary)'}; font-size:1.05rem;">${p.name}</b></td>
+                                    <td>${type === 'student' ? (p.fatherName || '---') : (p.designation || p.staffType || 'استاد')}</td>
+                                    ${type === 'student' ? `<td><span style="background:#f1f5f9; padding:2px 8px; border-radius:6px; font-size:0.85rem; color:#475569;">${p.className || p.class || p.department || '---'}</span></td>` : ''}
+                                    <td>
+                                        <div style="display:flex; justify-content:center; gap:0.5rem;">
+                                            <button onclick="app.markAttendance(${p.id}, 'Present')" class="btn-att ${status === 'Present' ? 'p-active' : ''}" title="حاضر (Present)">P</button>
+                                            <button onclick="app.markAttendance(${p.id}, 'Absent')" class="btn-att ${status === 'Absent' ? 'a-active' : ''}" title="غیر حاضر (Absent)">A</button>
+                                            <button onclick="app.markAttendance(${p.id}, 'Leave')" class="btn-att ${status === 'Leave' ? 'l-active' : ''}" title="رخصت (Leave)">L</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('') || `<tr><td colspan="${type === 'student' ? 5 : 4}" style="text-align:center; padding:3rem; color:#94a3b8;">اس کلاس / سیکشن میں کوئی ریکارڈ نہیں ملا</td></tr>`}
+                    </tbody>
+                </table>
+            </div>
+
+            <style>
+                .btn-att { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #e2e8f0; background: white; cursor: pointer; font-weight: bold; font-family: sans-serif; transition: all 0.2s; color: #94a3b8; font-size:0.85rem; }
+                .btn-att:hover { border-color: var(--primary); color: var(--primary); }
+                .p-active { background: #059669 !important; border-color: #059669 !important; color: white !important; box-shadow: 0 4px 10px rgba(5,150,105,0.3); }
+                .a-active { background: #dc2626 !important; border-color: #dc2626 !important; color: white !important; box-shadow: 0 4px 10px rgba(220,38,38,0.3); }
+                .l-active { background: #d97706 !important; border-color: #d97706 !important; color: white !important; box-shadow: 0 4px 10px rgba(217,119,6,0.3); }
+            </style>
+        `;
+    }
+
+    switchAttendanceTarget(type, section) {
+        this.attendanceType = type;
+        if (section) {
+            this.applySectionTheme(section);
+        }
+        this.render();
+    }
+
+    switchAttendanceType(type) { this.attendanceType = type; this.render(); }
+    switchAttendanceClass(className) { this.attendanceClass = className; this.render(); }
+    updateAttendanceDate(date) { this.attendanceDate = date; this.render(); }
+
+    async markAttendance(personId, status) {
+        await MadrassahDB.saveAttendance({
+            type: this.attendanceType,
+            section: this.attendanceType === 'student' ? this.currentSection : null,
+            personId: personId,
+            date: this.attendanceDate,
+            status: status,
+            timestamp: Date.now()
+        });
+        this.render();
+    }
+
+    async bulkAttendance(status) {
+        let people = [];
+        if (this.attendanceType === 'student') {
+            const allStudents = await MadrassahDB.getAllStudents(this.currentSection);
+            people = allStudents.filter(s => s.className === this.attendanceClass || s.class === this.attendanceClass || s.department === this.attendanceClass);
+        } else {
+            people = await MadrassahDB.getAllTeachers();
+        }
+
+        const promises = people.map(p => MadrassahDB.saveAttendance({
+            type: this.attendanceType,
+            section: this.attendanceType === 'student' ? this.currentSection : null,
+            personId: p.id,
+            date: this.attendanceDate,
+            status: status,
+            timestamp: Date.now()
         const isBanin = type === 'student' && section === 'banin';
         const isStaff = type === 'staff';
         const date = this.attendanceDate;
@@ -3822,15 +4735,13 @@ printBlankReceipt() {
         printWindow.document.close();
     }
 
-
-// --- Bait-ul-Maal (Accounts) Management ---
-    // State for filtering transaction history
-    accountsFilter = {
+    // --- Bait-ul-Maal (Accounts) Management ---
+    accountsFilter: {
         search: '',
         type: 'all',
         category: 'all',
         period: 'all'
-    };
+    },
 
     async renderAccountsModule(container) {
         const allTransactions = await MadrassahDB.getAllTransactions();
@@ -4697,7 +5608,7 @@ printBlankReceipt() {
         const payee = t.name ? (t.name + (t.phone ? ` (${t.phone})` : '')) : 'عام تعاون کنندہ';
         const purpose = `${t.category || 'عطیات / زکوٰۃ / صدقات'} ${t.description ? '(' + t.description + ')' : ''}`;
         
-        const html = this.generateOfficialReceiptHtml({
+        this.openReceiptWindow({
             receiptTitle: 'ڈونیشن / تعاون کی رسید (Donation Receipt)',
             receiptNo: t.receiptNo || 'DON-' + Math.floor(100000 + Math.random() * 900000),
             bookNo: '1',
@@ -4708,15 +5619,7 @@ printBlankReceipt() {
             onAccountOf: purpose,
             dateStr: t.date || Date.now()
         });
-
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.write(html);
-            printWindow.document.close();
-        }
     }
-
-
 
     printAdmissionReceipt(student, paidAmount, receiptNo, remaining) {
         if (!student) return;

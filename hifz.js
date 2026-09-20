@@ -491,11 +491,12 @@ const HifzModule = {
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1rem;">
                         <div class="form-group-horizontal" style="grid-column:span 2;">
                             <label>طالب علم منتخب کریں</label>
-                            <select name="studentId" required ${existing ? 'disabled' : ''}>
+                            <select name="studentId" id="hifzEnrollStudentSelect" required ${existing ? 'disabled' : ''} onchange="HifzModule.onEnrollStudentChange(this.value)">
                                 <option value="">انتخاب فرمائیں...</option>
-                                ${allStudents.map(s => `<option value="${s.id}" ${existing && existing.studentId === s.id ? 'selected' : ''}>#${s.id} - ${s.name} ولد ${s.fatherName} (${s.department || 'عام'})</option>`).join('')}
+                                ${allStudents.map(s => `<option value="${s.id}" ${existing && existing.studentId === s.id ? 'selected' : ''}>#${s.id} - ${s.name} ولد ${s.fatherName} (${s.department || 'عام'})${(s.isTransferHifz === 'yes' || s.hifzTotalParas) ? ' [منتقل شدہ حفظ ٹیسٹ]' : ''}</option>`).join('')}
                             </select>
                             ${existing ? `<input type="hidden" name="studentId" value="${existing.studentId}">` : ''}
+                            <div id="enrollStudentHifzHint" style="display:none; margin-top:8px; background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:8px 12px; font-size:0.9rem; color:#166534;"></div>
                         </div>
 
                         <div class="form-group-horizontal">
@@ -566,6 +567,45 @@ const HifzModule = {
             </div>
         `;
         document.body.appendChild(modalDiv);
+    },
+
+    async onEnrollStudentChange(studentId) {
+        const hintDiv = document.getElementById('enrollStudentHifzHint');
+        const juzSelect = document.querySelector('#hifzEnrollModal select[name="currentJuz"]');
+        if (!studentId || !hintDiv) {
+            if (hintDiv) hintDiv.style.display = 'none';
+            return;
+        }
+        const student = await MadrassahDB.getStudentById(studentId);
+        if (student && (student.isTransferHifz === 'yes' || student.hifzTotalParas || student.examinerRemarks)) {
+            hintDiv.style.display = 'block';
+            hintDiv.innerHTML = `
+                <div style="font-weight:bold; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                    <i class="fas fa-clipboard-check"></i> سابقہ حفظ ٹیسٹ رپورٹ (داخلہ جائزہ):
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:0.9rem;">
+                    <span><b>حفظ شدہ پارے:</b> ${student.hifzTotalParas ? `${student.hifzTotalParas} پارے` : '---'} ${student.hifzParasDetail ? `(${student.hifzParasDetail})` : ''}</span>
+                    <span><b>منزل کی یادداشت:</b> <span style="font-weight:bold; color:#047857;">${student.manzilQuality || '---'}</span></span>
+                    <span><b>تجویز کردہ پارہ:</b> <span style="font-weight:bold; color:#d97706;">${student.recommendedJuz || '---'}</span></span>
+                    <span><b>ممتحن:</b> ${student.examinerName || '---'}</span>
+                </div>
+                ${student.examinerRemarks ? `<div style="margin-top:4px; font-size:0.85rem; color:#14532d; border-top:1px dashed #86efac; padding-top:4px;"><b>رائے ممتحن:</b> "${student.examinerRemarks}"</div>` : ''}
+            `;
+            if (juzSelect && student.recommendedJuz) {
+                const normalized = String(student.recommendedJuz)
+                    .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+                    .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+                const match = normalized.match(/\d+/);
+                if (match && QuranData.paras.some(p => p.id === parseInt(match[0]))) {
+                    juzSelect.value = match[0];
+                }
+            } else if (juzSelect && student.hifzTotalParas) {
+                const nextJuz = Math.min(30, (parseInt(student.hifzTotalParas) || 0) + 1);
+                juzSelect.value = nextJuz;
+            }
+        } else {
+            hintDiv.style.display = 'none';
+        }
     },
 
     async handleEnrollmentSubmit(e) {

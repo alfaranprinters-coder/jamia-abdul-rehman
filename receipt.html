@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>رسید - مدرسہ عبد الرحمن بن عوف</title>
+</head>
+<body style="margin:0; padding:0; background:#0f172a;">
+    <script>
+        let options = {};
+        try {
+            const raw = localStorage.getItem('mms_active_receipt');
+            if (raw) options = JSON.parse(raw);
+        } catch(e) {}
+
+        if (window.opener && window.opener.app && typeof window.opener.app.generateOfficialReceiptHtml === 'function') {
+            document.open();
+            document.write(window.opener.app.generateOfficialReceiptHtml(options));
+            document.close();
+        } else {
+            const s = document.createElement('script');
+            s.src = 'app.js';
+            s.onload = function() {
+                try {
+                    const appInstance = new MadrassahApp();
+                    document.open();
+                    document.write(appInstance.generateOfficialReceiptHtml(options));
+                    document.close();
+                } catch(err) {
+                    console.error('Error rendering receipt standalone:', err);
+                }
+            };
+            document.head.appendChild(s);
+        }
+    </script>
+</body>
+</html>

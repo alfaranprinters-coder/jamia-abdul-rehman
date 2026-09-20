@@ -36,6 +36,9 @@
                 <div class="nav-link" onclick="app.navigate('students')">
                     <i class="fas fa-user-graduate"></i> <span id="nav-students-label">طلباء کی فہرست</span>
                 </div>
+                <div class="nav-link" onclick="app.navigate('graduates')">
+                    <i class="fas fa-graduation-cap"></i> <span id="nav-graduates-label">فارغ التحصیل طلباء</span>
+                </div>
                 <div class="nav-link" onclick="app.navigate('staff_list')">
                     <i class="fas fa-chalkboard-teacher"></i> <span>عملہ کی فہرست</span>
                 </div>
@@ -59,6 +62,9 @@
                 </div>
                 <div class="nav-link" onclick="app.navigate('accounts')">
                     <i class="fas fa-wallet"></i> <span>بیت المال</span>
+                </div>
+                <div class="nav-link" onclick="app.navigate('donors')">
+                    <i class="fas fa-hand-holding-heart"></i> <span>مستقل ڈونرز</span>
                 </div>
                 <div class="nav-link" onclick="app.navigate('exams')">
                     <i class="fas fa-file-signature"></i> <span>امتحانات</span>
@@ -124,10 +130,15 @@
     </div>
 
     <!-- DB and App Scripts -->
+    <script src="assets/js/html2canvas.min.js"></script>
+    <script src="assets/js/jspdf.umd.min.js"></script>
     <script src="db.js"></script>
     <script src="assets/js/address-data.js"></script>
     <script src="assets/js/quran-data.js"></script>
     <script src="hifz.js"></script>
+    <script src="donors.js"></script>
+    <script src="graduates.js"></script>
+    <script src="timetable.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

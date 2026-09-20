@@ -3,7 +3,7 @@
 
 const MadrassahDB = {
     dbName: 'MadrassahProDB',
-    dbVersion: 14, // Added resilient index migration for Hifz Module object stores
+    dbVersion: 16, // Added Graduates / Alumni Module object store (graduates)
 
     initDB() {
         return new Promise((resolve, reject) => {
@@ -127,6 +127,31 @@ const MadrassahDB = {
                 } else {
                     const hComp = txn.objectStore('hifz_completions');
                     if (!hComp.indexNames.contains('studentId')) hComp.createIndex('studentId', 'studentId', { unique: false });
+                }
+
+                // --- Donors Module Stores (Version 15) ---
+                if (!db.objectStoreNames.contains('donors')) {
+                    const donorStore = db.createObjectStore('donors', { keyPath: 'id', autoIncrement: true });
+                    donorStore.createIndex('name', 'name', { unique: false });
+                    donorStore.createIndex('phone', 'phone', { unique: false });
+                    donorStore.createIndex('status', 'status', { unique: false });
+                }
+                if (!db.objectStoreNames.contains('donor_donations')) {
+                    const dStore = db.createObjectStore('donor_donations', { keyPath: 'id', autoIncrement: true });
+                    dStore.createIndex('donorId', 'donorId', { unique: false });
+                    dStore.createIndex('year', 'year', { unique: false });
+                    dStore.createIndex('receiptNo', 'receiptNo', { unique: false });
+                    dStore.createIndex('date', 'date', { unique: false });
+                }
+
+                // --- Graduates / Alumni Module Store (Version 16) ---
+                if (!db.objectStoreNames.contains('graduates')) {
+                    const gradStore = db.createObjectStore('graduates', { keyPath: 'id', autoIncrement: true });
+                    gradStore.createIndex('studentId', 'studentId', { unique: false });
+                    gradStore.createIndex('graduationYear', 'graduationYear', { unique: false });
+                    gradStore.createIndex('graduationType', 'graduationType', { unique: false });
+                    gradStore.createIndex('name', 'name', { unique: false });
+                    gradStore.createIndex('section', 'section', { unique: false });
                 }
             };
 
@@ -1128,6 +1153,274 @@ const MadrassahDB = {
         if (logs.length > 15) logs.length = 15;
         await this.saveSetting('backup_history_log', logs);
         return logs;
+    },
+
+    // ==========================================
+    // --- DONORS MODULE METHODS (مستقل ڈونرز) ---
+    // ==========================================
+    saveDonor(data) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['donors'], 'readwrite');
+            const store = transaction.objectStore('donors');
+            
+            const hasValidId = data.id && String(data.id).trim() !== '' && !isNaN(data.id) && parseInt(data.id) > 0;
+            if (hasValidId) {
+                data.id = parseInt(data.id);
+                if (!data.donorCode) {
+                    data.donorCode = 'DNR-' + (1000 + data.id);
+                }
+            } else {
+                delete data.id;
+            }
+            if (!data.createdAt) {
+                data.createdAt = new Date().toISOString();
+            }
+
+            const request = hasValidId ? store.put(data) : store.add(data);
+            request.onsuccess = (e) => {
+                const insertedId = e.target.result;
+                if (!hasValidId && insertedId) {
+                    data.id = insertedId;
+                    data.donorCode = 'DNR-' + (1000 + parseInt(insertedId));
+                    try {
+                        const updateTx = this.db.transaction(['donors'], 'readwrite');
+                        updateTx.objectStore('donors').put(data);
+                    } catch (err) {
+                        console.warn('Could not update donor donorCode immediately', err);
+                    }
+                }
+                resolve(insertedId || data.id);
+            };
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    getAllDonors() {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['donors'], 'readonly');
+            const store = transaction.objectStore('donors');
+            const request = store.getAll();
+            request.onsuccess = () => {
+                let results = request.result || [];
+                let needsRepair = false;
+                let maxId = 0;
+                results.forEach(d => {
+                    const num = parseInt(d.id);
+                    if (!isNaN(num) && num > maxId) maxId = num;
+                    if (!d.id || d.id === '' || isNaN(d.id) || parseInt(d.id) <= 0) {
+                        needsRepair = true;
+                    }
+                });
+
+                if (needsRepair) {
+                    try {
+                        const repairTx = this.db.transaction(['donors', 'donor_donations'], 'readwrite');
+                        const dStore = repairTx.objectStore('donors');
+                        const donStore = repairTx.objectStore('donor_donations');
+
+                        results.forEach(d => {
+                            if (!d.id || d.id === '' || isNaN(d.id) || parseInt(d.id) <= 0) {
+                                const oldKey = d.id;
+                                maxId++;
+                                const newId = maxId;
+                                try { dStore.delete(oldKey); } catch(e){}
+                                d.id = newId;
+                                d.donorCode = 'DNR-' + (1000 + newId);
+                                dStore.put(d);
+
+                                const allDonsReq = donStore.getAll();
+                                allDonsReq.onsuccess = () => {
+                                    (allDonsReq.result || []).forEach(pay => {
+                                        if (pay.donorId === oldKey || !pay.donorId || isNaN(pay.donorId)) {
+                                            pay.donorId = newId;
+                                            pay.donorCode = d.donorCode;
+                                            donStore.put(pay);
+                                        }
+                                    });
+                                };
+                            }
+                        });
+                    } catch (repairErr) {
+                        console.warn('Donor repair warning:', repairErr);
+                    }
+                }
+                resolve(results);
+            };
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    getDonorById(id) {
+        return new Promise((resolve, reject) => {
+            if (id === null || id === undefined || id === '') {
+                return resolve(null);
+            }
+            const transaction = this.db.transaction(['donors'], 'readonly');
+            const store = transaction.objectStore('donors');
+            const key = (!isNaN(id) && parseInt(id) > 0) ? parseInt(id) : id;
+            try {
+                const request = store.get(key);
+                request.onsuccess = () => {
+                    if (request.result) {
+                        resolve(request.result);
+                    } else {
+                        const allReq = store.getAll();
+                        allReq.onsuccess = () => {
+                            const found = (allReq.result || []).find(d => String(d.id) === String(id));
+                            resolve(found || null);
+                        };
+                        allReq.onerror = () => resolve(null);
+                    }
+                };
+                request.onerror = () => {
+                    const allReq = store.getAll();
+                    allReq.onsuccess = () => {
+                        const found = (allReq.result || []).find(d => String(d.id) === String(id));
+                        resolve(found || null);
+                    };
+                    allReq.onerror = () => resolve(null);
+                };
+            } catch (err) {
+                const allReq = store.getAll();
+                allReq.onsuccess = () => {
+                    const found = (allReq.result || []).find(d => String(d.id) === String(id));
+                    resolve(found || null);
+                };
+                allReq.onerror = () => resolve(null);
+            }
+        });
+    },
+
+    deleteDonor(id) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['donors'], 'readwrite');
+            const store = transaction.objectStore('donors');
+            const request = store.delete(parseInt(id));
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    saveDonorDonation(data) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['donor_donations'], 'readwrite');
+            const store = transaction.objectStore('donor_donations');
+            if (!data.receiptNo) {
+                data.receiptNo = 'DNR-' + (data.year || new Date().getFullYear()) + '-' + Math.floor(10000 + Math.random() * 90000);
+            }
+            if (!data.createdAt) {
+                data.createdAt = new Date().toISOString();
+            }
+            const request = data.id ? store.put(data) : store.add(data);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    getAllDonorDonations() {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['donor_donations'], 'readonly');
+            const store = transaction.objectStore('donor_donations');
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result || []);
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    getDonorDonations(donorId) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['donor_donations'], 'readonly');
+            const store = transaction.objectStore('donor_donations');
+            const request = store.getAll();
+            request.onsuccess = () => {
+                const list = (request.result || []).filter(d => parseInt(d.donorId) === parseInt(donorId));
+                resolve(list);
+            };
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    deleteDonorDonation(id) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['donor_donations'], 'readwrite');
+            const store = transaction.objectStore('donor_donations');
+            const request = store.delete(parseInt(id));
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    // ==========================================
+    // --- GRADUATES MODULE METHODS (فارغین و حفاظ) ---
+    // ==========================================
+    saveGraduate(data) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['graduates'], 'readwrite');
+            const store = transaction.objectStore('graduates');
+            if (data.studentId) data.studentId = parseInt(data.studentId);
+            if (data.id) data.id = parseInt(data.id);
+            if (!data.createdAt) data.createdAt = new Date().toISOString();
+            
+            const request = data.id ? store.put(data) : store.add(data);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    getAllGraduates(section = null) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['graduates'], 'readonly');
+            const store = transaction.objectStore('graduates');
+            const request = store.getAll();
+            request.onsuccess = () => {
+                let results = request.result || [];
+                if (section) {
+                    results = results.filter(g => !g.section || g.section === section);
+                }
+                resolve(results);
+            };
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    getGraduateById(id) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['graduates'], 'readonly');
+            const store = transaction.objectStore('graduates');
+            const request = store.get(parseInt(id));
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    deleteGraduate(id) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['graduates'], 'readwrite');
+            const store = transaction.objectStore('graduates');
+            const request = store.delete(parseInt(id));
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    getGraduatesByYear(year, section = null) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['graduates'], 'readonly');
+            const store = transaction.objectStore('graduates');
+            const request = store.getAll();
+            request.onsuccess = () => {
+                let results = (request.result || []).filter(g => String(g.graduationYear) === String(year));
+                if (section) {
+                    results = results.filter(g => !g.section || g.section === section);
+                }
+                resolve(results);
+            };
+            request.onerror = () => reject(request.target.error);
+        });
     }
 };
+
+if (typeof window !== 'undefined') {
+    window.MadrassahDB = MadrassahDB;
+}
 
