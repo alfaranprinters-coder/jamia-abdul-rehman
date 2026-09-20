@@ -92,6 +92,8 @@ class MadrassahApp {
                 'مشقِ ترتیل و حدر مع توجیہ الوجوہ والروایات'
             ]
         };
+        const savedAuth = typeof sessionStorage !== 'undefined' && (sessionStorage.getItem('mms_authenticated') === 'true' || localStorage.getItem('mms_authenticated') === 'true');
+        this.isAuthenticated = !!savedAuth;
         this.init();
     }
 
@@ -100,8 +102,13 @@ class MadrassahApp {
             window.app = this;
             await MadrassahDB.initDB();
             await MadrassahDB.ensureUniqueCodes();
-            this.applySectionTheme(this.currentSection || 'banin');
-            await this.render();
+            if (!this.isAuthenticated) {
+                this.showWelcomeLoginScreen();
+            } else {
+                this.showAppScreen();
+                this.applySectionTheme(this.currentSection || 'banin');
+                await this.render();
+            }
             this.initAutoBackupScheduler();
             this.initGoogleDriveModule();
             window.addEventListener('online', () => {
@@ -124,6 +131,175 @@ class MadrassahApp {
             }
         }
     }
+
+    showWelcomeLoginScreen() {
+        const welcome = document.getElementById('welcome-login-screen');
+        const appEl = document.getElementById('app');
+        if (welcome) welcome.style.display = 'flex';
+        if (appEl) appEl.style.display = 'none';
+        const passInput = document.getElementById('login-password-input');
+        if (passInput) {
+            passInput.value = '';
+            setTimeout(() => passInput.focus(), 250);
+        }
+        const errAlert = document.getElementById('login-error-alert');
+        if (errAlert) errAlert.style.display = 'none';
+    }
+
+    showAppScreen() {
+        const welcome = document.getElementById('welcome-login-screen');
+        const appEl = document.getElementById('app');
+        if (welcome) welcome.style.display = 'none';
+        if (appEl) appEl.style.display = 'flex';
+    }
+
+    toggleLoginPassVisibility() {
+        const input = document.getElementById('login-password-input');
+        const btn = document.getElementById('login-pass-toggle-btn');
+        if (!input) return;
+        if (input.type === 'password') {
+            input.type = 'text';
+            if (btn) btn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+        } else {
+            input.type = 'password';
+            if (btn) btn.innerHTML = '<i class="fas fa-eye"></i>';
+        }
+    }
+
+    async handleLogin(event) {
+        if (event) event.preventDefault();
+        const input = document.getElementById('login-password-input');
+        const rememberCheckbox = document.getElementById('login-remember-checkbox');
+        const errAlert = document.getElementById('login-error-alert');
+        const errText = document.getElementById('login-error-text');
+        const submitBtn = document.getElementById('btn-login-submit');
+
+        if (!input) return;
+        const enteredPassword = input.value.trim();
+
+        // Default password is '123' if not yet customized in Settings
+        let storedPassword = '123';
+        try {
+            const val = await MadrassahDB.getSetting('app_password');
+            if (val) storedPassword = val;
+        } catch (e) {
+            console.error('Error reading app_password setting:', e);
+        }
+
+        if (enteredPassword === storedPassword) {
+            if (errAlert) errAlert.style.display = 'none';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> لاگ ان ہو رہا ہے...';
+            }
+
+            this.isAuthenticated = true;
+            if (typeof sessionStorage !== 'undefined') {
+                sessionStorage.setItem('mms_authenticated', 'true');
+            }
+            if (rememberCheckbox && rememberCheckbox.checked) {
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem('mms_authenticated', 'true');
+                }
+            } else {
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.removeItem('mms_authenticated');
+                }
+            }
+
+            setTimeout(async () => {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-right-to-bracket"></i> داخل ہوں (Sign In)';
+                }
+                this.showAppScreen();
+                this.applySectionTheme(this.currentSection || 'banin');
+                this.navigate('dashboard');
+                this.showToast('خوش آمدید! آپ کامیابی سے لاگ ان ہو چکے ہیں۔', 'success');
+            }, 300);
+        } else {
+            if (errAlert) {
+                errAlert.style.display = 'flex';
+                if (errText) errText.innerText = 'درج کردہ پاسورڈ درست نہیں ہے! دوبارہ کوشش فرمائیں۔ (ڈیفالٹ: 123)';
+            }
+            input.style.borderColor = '#ef4444';
+            input.select();
+            input.focus();
+            setTimeout(() => {
+                if (input) input.style.borderColor = '#cbd5e1';
+            }, 2000);
+        }
+    }
+
+    logout() {
+        if (!confirm('کیا آپ واقعی سافٹ ویئر سے لاگ آؤٹ ہونا چاہتے ہیں؟')) return;
+        this.isAuthenticated = false;
+        if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('mms_authenticated');
+        if (typeof localStorage !== 'undefined') localStorage.removeItem('mms_authenticated');
+        this.showWelcomeLoginScreen();
+        this.showToast('آپ کامیابی سے لاگ آؤٹ ہو چکے ہیں۔', 'info');
+    }
+
+    async handlePasswordChange(event) {
+        if (event) event.preventDefault();
+        const currentInput = document.getElementById('current-pass-input');
+        const newInput = document.getElementById('new-pass-input');
+        const confirmInput = document.getElementById('confirm-pass-input');
+        const msgSpan = document.getElementById('pass-change-msg');
+
+        if (!currentInput || !newInput || !confirmInput) return;
+
+        const currentVal = currentInput.value.trim();
+        const newVal = newInput.value.trim();
+        const confirmVal = confirmInput.value.trim();
+
+        let storedPass = '123';
+        try {
+            const val = await MadrassahDB.getSetting('app_password');
+            if (val) storedPass = val;
+        } catch (e) {
+            console.error('Error reading app_password:', e);
+        }
+
+        const showMsg = (text, isError = true) => {
+            if (msgSpan) {
+                msgSpan.style.display = 'inline-block';
+                msgSpan.style.color = isError ? '#dc2626' : '#059669';
+                msgSpan.innerHTML = (isError ? '<i class="fas fa-circle-exclamation"></i> ' : '<i class="fas fa-circle-check"></i> ') + text;
+            }
+        };
+
+        if (currentVal !== storedPass) {
+            showMsg('موجودہ پاسورڈ غلط ہے!', true);
+            currentInput.focus();
+            return;
+        }
+
+        if (!newVal) {
+            showMsg('نیا پاسورڈ خالی نہیں ہو سکتا!', true);
+            newInput.focus();
+            return;
+        }
+
+        if (newVal !== confirmVal) {
+            showMsg('نئے پاسورڈ اور تصدیق میں مطابقت نہیں ہے!', true);
+            confirmInput.focus();
+            return;
+        }
+
+        try {
+            await MadrassahDB.saveSetting('app_password', newVal);
+            showMsg('پاسورڈ کامیابی سے تبدیل کر دیا گیا ہے!', false);
+            this.showToast('سیکیورٹی پاسورڈ کامیابی سے تبدیل کر دیا گیا ہے!', 'success');
+
+            currentInput.value = '';
+            newInput.value = '';
+            confirmInput.value = '';
+        } catch (err) {
+            showMsg('پاسورڈ محفوظ کرتے وقت خرابی پیش آگئی: ' + err.message, true);
+        }
+    }
+
 
     navigate(view) { 
         this.currentView = view; 
@@ -1363,7 +1539,7 @@ class MadrassahApp {
                     </div>
                 </div>
 
-                <form onsubmit="app.handleStudentSubmit(event)">
+                <form id="admissionStudentForm" novalidate onsubmit="event.preventDefault(); (window.app || app).handleStudentSubmit(event); return false;">
                     <input type="hidden" name="id" value="${student ? student.id : ''}">
                     <input type="hidden" name="section" value="${student ? (student.section || this.currentSection) : this.currentSection}">
                     
@@ -1383,9 +1559,9 @@ class MadrassahApp {
                             </div>
 
                             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; width: 100%;">
-                                <div class="form-group-horizontal"><label>تاریخ داخلہ</label><input type="date" name="admissionDate" value="${student ? student.admissionDate : new Date().toISOString().split('T')[0]}" required></div>
-                                <div class="form-group-horizontal"><label>${isBanat ? 'نام طالبہ' : 'نام طالب علم'}</label><input type="text" name="name" value="${student ? student.name : ''}" required></div>
-                                <div class="form-group-horizontal"><label>ولدیت</label><input type="text" name="fatherName" value="${student ? student.fatherName : ''}" required></div>
+                                <div class="form-group-horizontal"><label>تاریخ داخلہ</label><input type="date" name="admissionDate" value="${student ? student.admissionDate : new Date().toISOString().split('T')[0]}"></div>
+                                <div class="form-group-horizontal"><label>${isBanat ? 'نام طالبہ' : 'نام طالب علم'}</label><input type="text" name="name" value="${student ? student.name : ''}"></div>
+                                <div class="form-group-horizontal"><label>ولدیت</label><input type="text" name="fatherName" value="${student ? student.fatherName : ''}"></div>
                                 <div class="form-group-horizontal"><label>شناختی کارڈ/ب فارم</label><input type="text" name="cnic" maxlength="15" oninput="app.formatCNIC(this)" value="${student ? student.cnic : ''}"></div>
                                 <div class="form-group-horizontal"><label>تاریخ پیدائش</label><input type="date" name="dob" value="${student ? student.dob : ''}"></div>
                                 <div class="form-group-horizontal"><label>بلڈ گروپ</label>
@@ -1406,36 +1582,37 @@ class MadrassahApp {
                             <div class="form-group-horizontal"><label>والد کا شناختی کارڈ</label><input type="text" name="fatherCNIC" maxlength="15" oninput="app.formatCNIC(this)" value="${student ? student.fatherCNIC : ''}"></div>
                             <div class="form-group-horizontal"><label>والد کا پیشہ</label><input type="text" name="fatherOccupation" value="${student ? student.fatherOccupation : ''}"></div>
                             <div class="form-group-horizontal"><label>ہنگامی رابطہ نمبر</label><input type="text" name="emergencyContact" value="${student ? student.emergencyContact : ''}"></div>
+                            <div class="form-group-horizontal"><label>واٹس ایپ نمبر</label><input type="text" name="whatsapp" value="${student ? (student.whatsapp || '') : ''}" placeholder="0300-0000000"></div>
                         </div>
 
                         <!-- Hierarchical Address -->
                         <div style="margin-top: 1rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem;">
                             <div class="form-group-horizontal">
                                 <label>صوبہ / ریاست</label>
-                                <select name="province" id="addr_province" onchange="app.updateDivisions(this.value)" required>
+                                <select name="province" id="addr_province" onchange="(window.app || app).updateDivisions(this.value)">
                                     <option value="">انتخاب کریں</option>
-                                    ${Object.keys(PakistanAddressData).map(p => `<option value="${p}" ${student && student.province === p ? 'selected' : ''}>${p}</option>`).join('')}
+                                    ${Object.keys(typeof PakistanAddressData !== 'undefined' ? PakistanAddressData : (typeof window !== 'undefined' ? window.PakistanAddressData || {} : {})).map(p => `<option value="${p}" ${student && student.province === p ? 'selected' : ''}>${p}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="form-group-horizontal">
                                 <label>ڈویژن</label>
-                                <select name="division" id="addr_division" onchange="app.updateDistricts(this.value)" required>
-                                    <option value="">انتخاب کریں</option>
-                                    ${student && student.province ? Object.keys(PakistanAddressData[student.province]).map(d => `<option value="${d}" ${student.division === d ? 'selected' : ''}>${d}</option>`).join('') : ''}
+                                <select name="division" id="addr_division" onchange="(window.app || app).updateDistricts(this.value)">
+                                    <option value="">انتخاب کریں (اختیاری)</option>
+                                    ${student && student.province && (typeof PakistanAddressData !== 'undefined' ? PakistanAddressData : window.PakistanAddressData)?.[student.province] ? Object.keys((typeof PakistanAddressData !== 'undefined' ? PakistanAddressData : window.PakistanAddressData)[student.province]).map(d => `<option value="${d}" ${student.division === d ? 'selected' : ''}>${d}</option>`).join('') : ''}
                                 </select>
                             </div>
                             <div class="form-group-horizontal">
                                 <label>ضلع</label>
-                                <select name="district" id="addr_district" onchange="app.updateTehsils(this.value)" required>
+                                <select name="district" id="addr_district" onchange="(window.app || app).updateTehsils(this.value)">
                                     <option value="">انتخاب کریں</option>
-                                    ${student && student.province && student.division ? Object.keys(PakistanAddressData[student.province][student.division]).map(dist => `<option value="${dist}" ${student.district === dist ? 'selected' : ''}>${dist}</option>`).join('') : ''}
+                                    ${student && student.province && student.division && (typeof PakistanAddressData !== 'undefined' ? PakistanAddressData : window.PakistanAddressData)?.[student.province]?.[student.division] ? Object.keys((typeof PakistanAddressData !== 'undefined' ? PakistanAddressData : window.PakistanAddressData)[student.province][student.division]).map(dist => `<option value="${dist}" ${student.district === dist ? 'selected' : ''}>${dist}</option>`).join('') : ''}
                                 </select>
                             </div>
                             <div class="form-group-horizontal">
                                 <label>تحصیل</label>
-                                <select name="tehsil" id="addr_tehsil" required>
+                                <select name="tehsil" id="addr_tehsil">
                                     <option value="">انتخاب کریں</option>
-                                    ${student && student.province && student.division && student.district ? PakistanAddressData[student.province][student.division][student.district].map(t => `<option value="${t}" ${student.tehsil === t ? 'selected' : ''}>${t}</option>`).join('') : ''}
+                                    ${student && student.province && student.division && student.district && (typeof PakistanAddressData !== 'undefined' ? PakistanAddressData : window.PakistanAddressData)?.[student.province]?.[student.division]?.[student.district] ? (typeof PakistanAddressData !== 'undefined' ? PakistanAddressData : window.PakistanAddressData)[student.province][student.division][student.district].map(t => `<option value="${t}" ${student.tehsil === t ? 'selected' : ''}>${t}</option>`).join('') : ''}
                                 </select>
                             </div>
                             <div class="form-group-horizontal" style="grid-column: span 2;">
@@ -1630,12 +1807,6 @@ class MadrassahApp {
                             </div>
                         </div>
 
-                        <!-- Previous Results & Reason for Leaving -->
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; background: white; padding: 1rem; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 0.8rem;">
-                            <div class="form-group-horizontal"><label>کل نمبر</label><input type="number" id="totalMarks" name="totalMarks" value="${student ? student.totalMarks : ''}" oninput="app.calculatePercentage()"></div>
-                            <div class="form-group-horizontal"><label>حاصل کردہ نمبر</label><input type="number" id="obtainedMarks" name="obtainedMarks" value="${student ? student.obtainedMarks : ''}" oninput="app.calculatePercentage()"></div>
-                            <div class="form-group-horizontal"><label>فیصد (%)</label><input type="text" id="percentage" name="percentage" value="${student ? student.percentage : ''}" readonly style="background:#e2e8f0; font-weight:bold;"></div>
-                        </div>
 
                         <div class="form-group-horizontal"><label style="min-width: 130px;">سابقہ ادارہ چھوڑنے کی وجہ</label><input type="text" name="leavingReason" value="${student ? student.leavingReason : ''}" placeholder="ادارہ چھوڑنے کی وجہ درج فرمائیں..."></div>
                     </div>
@@ -1814,14 +1985,13 @@ class MadrassahApp {
                             </div>
                         </div>
                     </div>
-
                     <!-- Section 4: Admission Info -->
                     <div style="margin-bottom: 1.5rem; padding: 1rem; background: #fffbeb; border-radius: 16px; border: 1px solid #fef3c7;">
                         <h3 style="color:var(--secondary); margin-bottom:0.8rem; border-bottom:2px solid #fde68a; padding-bottom:0.4rem; text-align:center;"><i class="fas fa-university"></i> داخلہ سیکشن (Admission Section)</h3>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                             <div class="form-group-horizontal">
                                 <label>شعبہ (Department)</label>
-                                <select name="department" id="student_department" onchange="app.updateMadrsaClasses(this.value)" required>
+                                <select name="department" id="student_department" onchange="(window.app || app).updateMadrsaClasses(this.value)">
                                     <option value="">انتخاب کریں</option>
                                     ${Object.keys(this.madrsaDepartments).map(dept => `<option value="${dept}" ${student && student.department === dept ? 'selected' : ''}>${dept}</option>`).join('')}
                                 </select>
@@ -1885,10 +2055,10 @@ class MadrassahApp {
                     </div>
 
                     <div style="text-align:center; margin-top:2rem; padding-top:1rem; border-top:1px solid #eee; display: flex; justify-content: center; gap: 1.5rem;">
-                        <button type="submit" name="action" value="save" class="btn" style="min-width:200px; background: #64748b; color: white; font-size:1.1rem;">
+                        <button type="button" onclick="(window.app || app).handleStudentSubmit(event, 'save')" class="btn" style="min-width:200px; background: #64748b; color: white; font-size:1.1rem; cursor: pointer;">
                             <i class="fas fa-save"></i> ${student ? 'تبدیلی محفوظ کریں' : 'صرف داخلہ محفوظ کریں'}
                         </button>
-                        <button type="submit" name="action" value="collect" class="btn btn-primary" style="min-width:300px; font-size:1.2rem; background: linear-gradient(135deg, #059669, #064e3b);">
+                        <button type="button" onclick="(window.app || app).handleStudentSubmit(event, 'collect')" class="btn btn-primary" style="min-width:300px; font-size:1.2rem; background: linear-gradient(135deg, #059669, #064e3b); cursor: pointer;">
                             <i class="fas fa-hand-holding-dollar"></i> داخلہ کریں اور فیس وصول کریں
                         </button>
                     </div>
@@ -1897,80 +2067,158 @@ class MadrassahApp {
         `;
     }
 
-    async handleStudentSubmit(event) {
-        event.preventDefault();
-        const action = event.submitter ? event.submitter.value : 'save';
-        const formData = new FormData(event.target);
-        const data = Object.fromEntries(formData.entries());
-        data.photo = this.studentPhoto;
-        data.mahram1Photo = this.mahram1Photo;
-        data.mahram2Photo = this.mahram2Photo;
-        const isNewStudent = !data.id;
-        
-        if (data.id) data.id = parseInt(data.id); else delete data.id;
-        
-        // Ensure fees are numbers
-        data.admissionFee = parseInt(data.admissionFee || 0);
-        data.monthlyFee = parseInt(data.monthlyFee || 0);
-        data.totalFee = data.admissionFee + data.monthlyFee;
-        const paidNow = parseInt(data.paidNow || 0);
-
-        // Calculate Arrears
-        if (isNewStudent) {
-            data.arrears = Math.max(0, data.totalFee - paidNow);
-        } else {
-            if (paidNow > 0) {
-                data.arrears = Math.max(0, parseInt(data.arrears || 0) - paidNow);
+    async handleStudentSubmit(event, directAction) {
+        if (event && event.preventDefault) event.preventDefault();
+        try {
+            const form = document.getElementById('admissionStudentForm') || 
+                         (event && event.target && event.target.closest ? event.target.closest('form') : null) || 
+                         (event && event.target && event.target.tagName === 'FORM' ? event.target : null) || 
+                         document.querySelector('form');
+            if (!form) {
+                alert('داخلہ فارم نہیں مل سکا!');
+                return;
             }
-        }
+            const action = directAction || (event && event.submitter && event.submitter.value) || (form && form._clickedAction) || 'save';
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
 
-        const studentId = await MadrassahDB.saveStudent(data);
-        const savedStudent = await MadrassahDB.getStudentById(studentId);
-        
-        this.studentPhoto = null;
-        this.mahram1Photo = null;
-        this.mahram2Photo = null;
+            // Core Validation
+            if (!data.name || !data.name.trim()) {
+                alert('برائے مہربانی طالب علم / طالبہ کا نام درج فرمائیں!');
+                const el = form.querySelector('[name="name"]');
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.focus();
+                }
+                return;
+            }
+            if (!data.fatherName || !data.fatherName.trim()) {
+                alert('برائے مہربانی ولدیت درج فرمائیں!');
+                const el = form.querySelector('[name="fatherName"]');
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.focus();
+                }
+                return;
+            }
+            if (!data.department) {
+                alert('برائے مہربانی داخلہ کا شعبہ (Department) منتخب فرمائیں!');
+                const el = document.getElementById('student_department');
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.focus();
+                }
+                return;
+            }
 
-        // Record payment if requested
-        if (action === 'collect' && paidNow > 0) {
-            const receiptNo = 'ADM-' + Math.floor(100000 + Math.random() * 900000);
+            data.photo = this.studentPhoto || null;
+            data.mahram1Photo = this.mahram1Photo || null;
+            data.mahram2Photo = this.mahram2Photo || null;
+            const isNewStudent = !data.id;
             
-            // Save to general transactions (Bait-ul-Maal)
-            await MadrassahDB.saveTransaction({
-                type: 'Income',
-                category: 'داخلہ فیس',
-                amount: paidNow,
-                name: data.name,
-                receiptNo: receiptNo,
-                date: Date.now(),
-                description: `داخلہ فیس وصولی (طالب علم: ${data.name}, رجسٹریشن: ${studentId})`
-            });
-
-            // Save to student's personal fee history
-            await MadrassahDB.saveFee({
-                studentId: parseInt(studentId),
-                studentName: data.name,
-                fatherName: data.fatherName || '',
-                className: data.className || data.class || '---',
-                feeType: 'داخلہ فیس',
-                amount: paidNow,
-                month: new Date().toLocaleDateString('ur-PK', { month: 'long' }),
-                timestamp: Date.now(),
-                receiptNo: receiptNo
-            });
+            if (data.id) {
+                data.id = parseInt(data.id);
+            } else {
+                delete data.id;
+            }
             
-            // 1. Automatically open the official Madrassah fee receipt
-            this.printAdmissionReceipt(savedStudent, paidNow, receiptNo, savedStudent.arrears || 0);
+            // Explicitly capture Hifz Transfer checkbox status
+            data.isTransferHifz = (formData.get('isTransferHifz') === 'yes') ? 'yes' : 'no';
+            
+            // Ensure fees are numbers
+            data.admissionFee = parseInt(data.admissionFee || 0) || 0;
+            data.monthlyFee = parseInt(data.monthlyFee || 0) || 0;
+            data.totalFee = data.admissionFee + data.monthlyFee;
+            const paidNow = parseInt(data.paidNow || 0) || 0;
 
-            // 2. Show interactive post-admission confirmation dialog on screen with 1-click re-print / challan / 360 options
-            this.showAdmissionSuccessModal(savedStudent, paidNow, receiptNo, savedStudent.arrears || 0);
-        } else if (action === 'collect') {
-            // Admission with zero payment now (fee pending / deferred)
-            this.printAdmissionChallan(savedStudent, 0);
-            this.showAdmissionSuccessModal(savedStudent, 0, null, savedStudent.arrears || data.totalFee);
-        } else {
-            alert('طالب علم کے کوائف کامیابی سے محفوظ کر لیے گئے ہیں۔');
-            this.navigate('students');
+            // Calculate Arrears
+            if (isNewStudent) {
+                data.arrears = Math.max(0, data.totalFee - paidNow);
+            } else {
+                let existingArrears = parseInt(data.arrears || 0);
+                if (isNaN(existingArrears)) existingArrears = 0;
+                if (paidNow > 0) {
+                    data.arrears = Math.max(0, existingArrears - paidNow);
+                } else {
+                    data.arrears = existingArrears;
+                }
+            }
+
+            if (!data.section) {
+                data.section = this.currentSection || 'banin';
+            }
+
+            const studentId = await MadrassahDB.saveStudent(data);
+            let savedStudent = await MadrassahDB.getStudentById(studentId);
+            if (!savedStudent) {
+                savedStudent = Object.assign({}, data, { id: studentId });
+            }
+            
+            this.studentPhoto = null;
+            this.mahram1Photo = null;
+            this.mahram2Photo = null;
+            this.editStudentId = null;
+
+            // Record payment if requested
+            if (action === 'collect' && paidNow > 0) {
+                const receiptNo = 'ADM-' + Math.floor(100000 + Math.random() * 900000);
+                
+                try {
+                    // Save to general transactions (Bait-ul-Maal)
+                    await MadrassahDB.saveTransaction({
+                        type: 'Income',
+                        category: 'داخلہ فیس',
+                        amount: paidNow,
+                        name: data.name,
+                        receiptNo: receiptNo,
+                        date: Date.now(),
+                        description: `داخلہ فیس وصولی (طالب علم: ${data.name}, رجسٹریشن: ${studentId})`
+                    });
+                } catch (txErr) {
+                    console.warn('Transaction record warning:', txErr);
+                }
+
+                try {
+                    // Save to student's personal fee history
+                    await MadrassahDB.saveFee({
+                        studentId: parseInt(studentId),
+                        studentName: data.name,
+                        fatherName: data.fatherName || '',
+                        className: data.className || data.class || '---',
+                        feeType: 'داخلہ فیس',
+                        amount: paidNow,
+                        month: new Date().toLocaleDateString('ur-PK', { month: 'long' }),
+                        timestamp: Date.now(),
+                        receiptNo: receiptNo
+                    });
+                } catch (feeErr) {
+                    console.warn('Fee record warning:', feeErr);
+                }
+                
+                // 1. Automatically open the official Madrassah fee receipt
+                try {
+                    this.printAdmissionReceipt(savedStudent, paidNow, receiptNo, savedStudent.arrears || 0);
+                } catch (pErr) {
+                    console.warn('Print receipt warning:', pErr);
+                }
+
+                // 2. Show interactive post-admission confirmation dialog on screen with 1-click re-print / challan / 360 options
+                this.showAdmissionSuccessModal(savedStudent, paidNow, receiptNo, savedStudent.arrears || 0);
+            } else if (action === 'collect') {
+                // Admission with zero payment now (fee pending / deferred)
+                try {
+                    this.printAdmissionChallan(savedStudent, 0);
+                } catch (pErr) {
+                    console.warn('Print challan warning:', pErr);
+                }
+                this.showAdmissionSuccessModal(savedStudent, 0, null, savedStudent.arrears || data.totalFee);
+            } else {
+                alert('طالب علم کے کوائف کامیابی سے محفوظ کر لیے گئے ہیں۔');
+                this.navigate('students');
+            }
+        } catch (error) {
+            console.error('Admission submit error:', error);
+            alert('داخلہ فارم محفوظ کرنے میں خرابی پیش آئی ہے: ' + (error.message || error));
         }
     }
 
@@ -1996,7 +2244,7 @@ class MadrassahApp {
                         <h3 style="margin: 0; font-size: 1.6rem; font-weight: bold;"><i class="fas fa-check-circle" style="color:#86efac; margin-left: 8px;"></i> داخلہ کامیابی سے محفوظ ہو گیا!</h3>
                         <p style="margin: 3px 0 0 0; opacity: 0.9; font-size: 1rem;">مدرسہ عبد الرحمن بن عوف — شعبہ داخلہ و فیس وصولی</p>
                     </div>
-                    <button onclick="document.getElementById('admission-success-modal').remove(); app.navigate('students');" style="background: rgba(255,255,255,0.2); border: none; color: white; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center;">
+                    <button onclick="document.getElementById('admission-success-modal').remove(); (window.app || app).navigate('students');" style="background: rgba(255,255,255,0.2); border: none; color: white; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center;">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -2037,7 +2285,7 @@ class MadrassahApp {
                             <button id="btn_view_360_dossier" class="btn" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 8px; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
                                 <i class="fas fa-fingerprint"></i> ۳۶۰° مکمل فائل
                             </button>
-                            <button onclick="document.getElementById('admission-success-modal').remove(); app.navigate('students');" class="btn" style="background: #64748b; color: white; border: none; padding: 8px; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            <button onclick="document.getElementById('admission-success-modal').remove(); (window.app || app).navigate('students');" class="btn" style="background: #64748b; color: white; border: none; padding: 8px; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
                                 <i class="fas fa-list"></i> طلباء کی فہرست
                             </button>
                         </div>
@@ -2061,6 +2309,210 @@ class MadrassahApp {
             modal.remove();
             this.showUniversalDossier(student.id, 'student');
         });
+    }
+
+    // =========================================================================
+    // --- ADMISSION FORM & ASSESSMENT HELPERS ---
+    // =========================================================================
+    toggleHifzTestSection(isOpen) {
+        const sec = document.getElementById('hifzTestSection');
+        const chk = document.getElementById('isTransferHifzCheck');
+        if (isOpen === undefined) {
+            isOpen = sec ? (sec.style.display === 'none' || getComputedStyle(sec).display === 'none') : (chk ? !chk.checked : true);
+        }
+        isOpen = Boolean(isOpen);
+        if (chk && chk.checked !== isOpen) {
+            chk.checked = isOpen;
+        }
+        if (sec) {
+            sec.style.display = isOpen ? 'block' : 'none';
+            if (isOpen) {
+                setTimeout(() => {
+                    try {
+                        sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    } catch(e) {}
+                }, 50);
+            }
+        }
+    }
+
+    calculateHifzTestScore() {
+        const totalEl = document.getElementById('hifzTestTotalMarks');
+        const obtEl = document.getElementById('hifzTestObtainedMarks');
+        const gradeEl = document.getElementById('hifzTestGrade');
+        if (!totalEl || !obtEl || !gradeEl) return;
+        
+        const total = parseFloat(totalEl.value) || 100;
+        const obtVal = String(obtEl.value || '').trim();
+        if (obtVal === '') {
+            gradeEl.value = '';
+            return;
+        }
+        const obt = parseFloat(obtVal);
+        if (isNaN(obt)) {
+            gradeEl.value = '';
+            return;
+        }
+        const perc = Math.round((obt / total) * 100);
+        let grade = 'راسب (Fail)';
+        if (perc >= 85) grade = `ممتاز (A+) - ${perc}%`;
+        else if (perc >= 70) grade = `جید جداً (A) - ${perc}%`;
+        else if (perc >= 60) grade = `جید (B) - ${perc}%`;
+        else if (perc >= 50) grade = `مقبول (C) - ${perc}%`;
+        else grade = `ناقص / محتاجِ محنت - ${perc}%`;
+        
+        gradeEl.value = grade;
+    }
+
+    updateDivisions(province) {
+        const divSelect = document.getElementById('addr_division');
+        const distSelect = document.getElementById('addr_district');
+        const tehSelect = document.getElementById('addr_tehsil');
+        const data = (typeof PakistanAddressData !== 'undefined' ? PakistanAddressData : (typeof window !== 'undefined' ? window.PakistanAddressData : null));
+        if (!divSelect || !data) return;
+        
+        divSelect.innerHTML = '<option value="">انتخاب کریں</option>';
+        if (distSelect) distSelect.innerHTML = '<option value="">انتخاب کریں</option>';
+        if (tehSelect) tehSelect.innerHTML = '<option value="">انتخاب کریں</option>';
+
+        if (!province || !data[province]) return;
+        const provData = data[province];
+
+        // 1. Populate Divisions
+        Object.keys(provData).forEach(div => {
+            divSelect.innerHTML += `<option value="${div}">${div}</option>`;
+        });
+
+        // 2. Also populate all Districts for this Province immediately so District dropdown is never empty
+        if (distSelect) {
+            const allDistricts = [];
+            Object.keys(provData).forEach(div => {
+                if (typeof provData[div] === 'object') {
+                    Object.keys(provData[div]).forEach(dist => {
+                        if (!allDistricts.includes(dist)) allDistricts.push(dist);
+                    });
+                }
+            });
+            allDistricts.sort().forEach(dist => {
+                distSelect.innerHTML += `<option value="${dist}">${dist}</option>`;
+            });
+        }
+    }
+
+    updateDistricts(division) {
+        const provEl = document.getElementById('addr_province');
+        const province = provEl ? provEl.value : '';
+        const distSelect = document.getElementById('addr_district');
+        const tehSelect = document.getElementById('addr_tehsil');
+        const data = (typeof PakistanAddressData !== 'undefined' ? PakistanAddressData : (typeof window !== 'undefined' ? window.PakistanAddressData : null));
+        if (!distSelect || !data) return;
+        
+        distSelect.innerHTML = '<option value="">انتخاب کریں</option>';
+        if (tehSelect) tehSelect.innerHTML = '<option value="">انتخاب کریں</option>';
+
+        if (province && division && data[province]?.[division]) {
+            Object.keys(data[province][division]).forEach(dist => {
+                distSelect.innerHTML += `<option value="${dist}">${dist}</option>`;
+            });
+        } else if (province && data[province]) {
+            // Show all districts of this province if division is cleared
+            const allDistricts = [];
+            Object.keys(data[province]).forEach(d => {
+                if (typeof data[province][d] === 'object') {
+                    Object.keys(data[province][d]).forEach(dist => {
+                        if (!allDistricts.includes(dist)) allDistricts.push(dist);
+                    });
+                }
+            });
+            allDistricts.sort().forEach(dist => {
+                distSelect.innerHTML += `<option value="${dist}">${dist}</option>`;
+            });
+        }
+    }
+
+    updateTehsils(district) {
+        const provEl = document.getElementById('addr_province');
+        const divEl = document.getElementById('addr_division');
+        const province = provEl ? provEl.value : '';
+        let division = divEl ? divEl.value : '';
+        const tehSelect = document.getElementById('addr_tehsil');
+        const data = (typeof PakistanAddressData !== 'undefined' ? PakistanAddressData : (typeof window !== 'undefined' ? window.PakistanAddressData : null));
+        if (!tehSelect || !data) return;
+        
+        tehSelect.innerHTML = '<option value="">انتخاب کریں</option>';
+        if (!district) return;
+
+        // Auto-detect and set division if not already selected
+        if (province && !division && data[province]) {
+            for (const d of Object.keys(data[province])) {
+                if (data[province][d] && data[province][d][district]) {
+                    division = d;
+                    if (divEl) divEl.value = d;
+                    break;
+                }
+            }
+        }
+
+        if (province && division && data[province]?.[division]?.[district]) {
+            data[province][division][district].forEach(teh => {
+                tehSelect.innerHTML += `<option value="${teh}">${teh}</option>`;
+            });
+        } else if (province && data[province]) {
+            for (const d of Object.keys(data[province])) {
+                if (data[province][d] && data[province][d][district]) {
+                    if (divEl && !divEl.value) divEl.value = d;
+                    data[province][d][district].forEach(teh => {
+                        tehSelect.innerHTML += `<option value="${teh}">${teh}</option>`;
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
+    calculatePercentage() {
+        const totalEl = document.getElementById('totalMarks');
+        const obtEl = document.getElementById('obtainedMarks');
+        const percInput = document.getElementById('percentage');
+        if (!totalEl || !obtEl || !percInput) return;
+        
+        const total = parseFloat(totalEl.value);
+        const obtained = parseFloat(obtEl.value);
+        
+        if (!isNaN(total) && !isNaN(obtained) && total > 0) {
+            const p = (obtained / total) * 100;
+            percInput.value = p.toFixed(1) + '%';
+        } else {
+            percInput.value = '';
+        }
+    }
+
+    calculateAdmissionTotalFee() {
+        const adm = parseFloat(document.getElementById('student_admission_fee')?.value || 0) || 0;
+        const mon = parseFloat(document.getElementById('student_monthly_fee')?.value || 0) || 0;
+        const totalInput = document.getElementById('totalAdmissionFee');
+        if (totalInput) {
+            totalInput.value = (adm + mon) > 0 ? (adm + mon) : '';
+        }
+    }
+
+    updateMadrsaClasses(dept) {
+        const classContainer = document.getElementById('class_selection_container');
+        const classSelect = document.getElementById('student_class');
+        const paidNowContainer = document.getElementById('paid_now_container');
+        if (!classContainer || !classSelect) return;
+        
+        const classes = (this.madrsaDepartments && this.madrsaDepartments[dept]) ? this.madrsaDepartments[dept] : [];
+        if (classes.length > 0) {
+            classContainer.style.display = '';
+            classSelect.innerHTML = '<option value="">انتخاب کریں</option>' + 
+                classes.map(c => `<option value="${c}">${c}</option>`).join('');
+            if (paidNowContainer) paidNowContainer.style.gridColumn = '';
+        } else {
+            classContainer.style.display = 'none';
+            classSelect.innerHTML = '<option value="">انتخاب کریں</option>';
+            if (paidNowContainer) paidNowContainer.style.gridColumn = 'span 2';
+        }
     }
 
     async renderStudentList(container) {
@@ -7500,6 +7952,68 @@ printBlankReceipt() {
                     </p>
                 </div>
 
+                
+                <!-- CARD 0: Security Password Change Card -->
+                <div class="card" style="border-radius:18px; margin-bottom:1.5rem; border-top:5px solid #065f46; box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:1.2rem; border-bottom:1px solid #f1f5f9; padding-bottom:1rem;">
+                        <div style="display:flex; align-items:center; gap:14px;">
+                            <div style="width:52px; height:52px; border-radius:14px; background:#ecfdf5; color:#065f46; display:flex; align-items:center; justify-content:center; font-size:1.6rem;">
+                                <i class="fas fa-shield-halved"></i>
+                            </div>
+                            <div>
+                                <h3 style="margin:0; color:#065f46; font-size:1.35rem;">سیکیورٹی پاسورڈ تبدیل کریں (Change Password)</h3>
+                                <p style="margin:2px 0 0 0; color:#64748b; font-size:0.95rem;">سافٹ ویئر لاگ ان کے لیے اپنی مرضی کا نیا پاسورڈ مقرر فرمائیں (موجودہ ڈیفالٹ: 123)</p>
+                            </div>
+                        </div>
+                        <span style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; padding:4px 14px; border-radius:20px; font-size:0.85rem; font-weight:bold;">
+                            <i class="fas fa-lock"></i> پاسورڈ پروٹیکٹڈ
+                        </span>
+                    </div>
+
+                    <form onsubmit="app.handlePasswordChange(event)" style="max-width:650px;">
+                        <div style="display:grid; grid-template-columns:1fr; gap:1.2rem; margin-bottom:1.2rem;">
+                            <div>
+                                <label style="display:block; font-weight:bold; color:#1e293b; margin-bottom:6px; font-size:0.95rem;">
+                                    موجودہ پاسورڈ (Current Password):
+                                </label>
+                                <div style="position:relative;">
+                                    <input type="password" id="current-pass-input" placeholder="موجودہ پاسورڈ لکھیں (ڈیفالٹ: 123)" required style="width:100%; padding:10px 40px 10px 12px; font-size:1rem; border:1.5px solid #cbd5e1; border-radius:10px; background:#fff;">
+                                    <i class="fas fa-key" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8;"></i>
+                                </div>
+                            </div>
+
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:1rem;">
+                                <div>
+                                    <label style="display:block; font-weight:bold; color:#1e293b; margin-bottom:6px; font-size:0.95rem;">
+                                        نیا پاسورڈ (New Password):
+                                    </label>
+                                    <div style="position:relative;">
+                                        <input type="password" id="new-pass-input" placeholder="نیا پاسورڈ درج کریں..." required style="width:100%; padding:10px 40px 10px 12px; font-size:1rem; border:1.5px solid #cbd5e1; border-radius:10px; background:#fff;">
+                                        <i class="fas fa-lock" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8;"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label style="display:block; font-weight:bold; color:#1e293b; margin-bottom:6px; font-size:0.95rem;">
+                                        نئے پاسورڈ کی تصدیق (Confirm):
+                                    </label>
+                                    <div style="position:relative;">
+                                        <input type="password" id="confirm-pass-input" placeholder="نیا پاسورڈ دوبارہ درج کریں..." required style="width:100%; padding:10px 40px 10px 12px; font-size:1rem; border:1.5px solid #cbd5e1; border-radius:10px; background:#fff;">
+                                        <i class="fas fa-check-double" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8;"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+                            <button type="submit" class="btn btn-primary" style="background:#065f46; padding:10px 24px; font-size:1rem; font-weight:bold; display:flex; align-items:center; gap:8px; border-radius:10px;">
+                                <i class="fas fa-floppy-disk"></i> نیا پاسورڈ محفوظ کریں
+                            </button>
+                            <span id="pass-change-msg" style="font-weight:bold; font-size:0.95rem; display:none;"></span>
+                        </div>
+                    </form>
+                </div>
+
+
                 <!-- UNIFIED DATA GUARANTEE NOTICE (Banin + Banat in ONE single file) -->
                 <div style="background:#ecfdf5; border:1.5px solid #10b981; border-radius:14px; padding:14px 20px; margin-bottom:1.5rem; display:flex; align-items:center; gap:16px; box-shadow:0 4px 12px rgba(16,185,129,0.08);">
                     <div style="width:44px; height:44px; border-radius:12px; background:#d1fae5; color:#059669; display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0;">
@@ -8018,17 +8532,863 @@ printBlankReceipt() {
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> \u0627\u0628\u06BE\u06CC Drive \u067E\u0631 \u0628\u06CC\u06A9 \u0627\u067E \u0644\u06CC\u06BA'; }
         }
     }
+
+    // =========================================================================
+    // --- 1. STAFF MANAGEMENT MODULE (عملہ کی فہرست و فارم) ---
+    // =========================================================================
+    async renderStaffList(container) {
+        const staff = await MadrassahDB.getAllTeachers();
+        container.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+                <h2 style="color:var(--primary);"><i class="fas fa-chalkboard-teacher"></i> عملہ کی فہرست (Staff List)</h2>
+                <button class="btn btn-primary" onclick="app.navigate('staff_form')"><i class="fas fa-plus"></i> نیا عملہ شامل کریں</button>
+            </div>
+            <div class="card" style="padding:0; overflow:hidden;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>فوٹو</th>
+                            <th>نام</th>
+                            <th>عہدہ</th>
+                            <th>کیٹیگری</th>
+                            <th>رابطہ</th>
+                            <th>ایکشن</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${staff.map(s => `
+                            <tr>
+                                <td><img src="${s.photo || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:50%; object-fit:cover;"></td>
+                                <td style="font-weight:600;">${s.name}</td>
+                                <td>${s.designation || '---'}</td>
+                                <td><span class="badge" style="background:${s.staffType === 'teaching' ? '#ecfdf5' : '#f8fafc'}; color:${s.staffType === 'teaching' ? '#065f46' : '#64748b'}; padding:4px 10px; border-radius:6px; font-weight:600;">${s.staffType === 'teaching' ? 'تدریسی' : 'غیر تدریسی'}</span></td>
+                                <td>${s.phone || '---'}</td>
+                                <td>
+                                    <button class="btn btn-sm" onclick="app.editStaff(${s.id})"><i class="fas fa-edit"></i></button>
+                                    <button class="btn btn-sm" style="color:#ef4444;" onclick="app.deleteStaff(${s.id})"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                        `).join('') || '<tr><td colspan="6" style="text-align:center; padding:3rem;">کوئی ریکارڈ نہیں ملا</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    async renderStaffForm(container) {
+        let staff = null;
+        if (this.editTeacherId) {
+            staff = await MadrassahDB.getTeacherById(this.editTeacherId);
+            this.teacherPhoto = staff.photo;
+        } else {
+            this.teacherPhoto = null;
+        }
+
+        container.innerHTML = `
+            <div class="card" style="max-width: 1000px; margin: 0 auto;">
+                <div class="madrsa-header">
+                    <h1 class="madrsa-name">مدرسہ عبد الرحمن بن عوف</h1>
+                    <h2 class="form-title">${staff ? 'ترمیمِ کوائفِ عملہ' : 'فارمِ بھرتی عملہ (Staff Form)'}</h2>
+                </div>
+
+                <form onsubmit="app.handleStaffSubmit(event)">
+                    <input type="hidden" name="id" value="${staff ? staff.id : ''}">
+                    
+                    <!-- Section 1: Staff Type -->
+                    <div style="margin-bottom: 1.5rem; text-align:center; background:#f8fafc; padding:1.5rem; border-radius:16px;">
+                        <label style="font-weight:700; font-size:1.2rem; margin-left:2rem;">عملہ کی قسم:</label>
+                        <label style="margin-left:2rem; cursor:pointer;"><input type="radio" name="staffType" value="teaching" ${!staff || staff.staffType === 'teaching' ? 'checked' : ''}> تدریسی عملہ</label>
+                        <label style="cursor:pointer;"><input type="radio" name="staffType" value="non-teaching" ${staff && staff.staffType === 'non-teaching' ? 'checked' : ''}> غیر تدریسی عملہ</label>
+                    </div>
+
+                    <!-- Section 2: Personal Info -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <h3 style="color:var(--primary); margin-bottom:1rem; border-bottom:2px solid #e2e8f0; padding-bottom:0.4rem; text-align:center;"><i class="fas fa-user"></i> بنیادی کوائف (Personal Details)</h3>
+                        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 2.5rem; align-items: start;">
+                            <div class="photo-box">
+                                <div class="preview-circle" id="staffPhotoPreview">
+                                    ${this.teacherPhoto ? `<img src="${this.teacherPhoto}">` : `<div style="height:100%; display:flex; align-items:center; justify-content:center; background:#e2e8f0;"><i class="fas fa-user-tie" style="font-size:3rem;color:#94a3b8;"></i></div>`}
+                                </div>
+                                <div class="photo-overlay">
+                                    <button type="button" class="overlay-btn" onclick="app.openCamera('teacher')"><i class="fas fa-camera"></i></button>
+                                    <button type="button" class="overlay-btn" onclick="document.getElementById('staffFileInput').click()"><i class="fas fa-upload"></i></button>
+                                </div>
+                                <input type="file" id="staffFileInput" hidden accept="image/*" onchange="app.handleFileUpload(event, 'teacher')">
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.2rem; width:100%;">
+                                <div class="form-group-horizontal"><label>نامِ عملہ</label><input type="text" name="name" value="${staff ? staff.name : ''}" required></div>
+                                <div class="form-group-horizontal"><label>ولدیت / زوجیت</label><input type="text" name="fatherName" value="${staff ? staff.fatherName : ''}" required></div>
+                                <div class="form-group-horizontal"><label>شناختی کارڈ نمبر</label><input type="text" name="cnic" oninput="app.formatCNIC(this)" maxlength="15" value="${staff ? staff.cnic : ''}"></div>
+                                <div class="form-group-horizontal"><label>تاریخِ پیدائش</label><input type="date" name="dob" value="${staff ? staff.dob : ''}"></div>
+                                <div class="form-group-horizontal"><label>رابطہ نمبر</label><input type="text" name="phone" value="${staff ? staff.phone : ''}"></div>
+                                <div class="form-group-horizontal"><label>بلڈ گروپ</label>
+                                    <select name="bloodGroup">
+                                        <option value="">انتخاب کریں</option>
+                                        ${['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => `<option value="${bg}" ${staff && staff.bloodGroup === bg ? 'selected' : ''}>${bg}</option>`).join('')}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Professional Info -->
+                    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0;">
+                        <h3 style="color:var(--primary); margin-bottom:0.8rem; border-bottom:2px solid #cbd5e1; padding-bottom:0.4rem; text-align:center;"><i class="fas fa-briefcase"></i> پیشہ ورانہ کوائف (Professional Details)</h3>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.2rem;">
+                            <div class="form-group-horizontal"><label>عہدہ</label><input type="text" name="designation" placeholder="مثلاً مدرس، اکاؤنٹنٹ، ناظم" value="${staff ? staff.designation : ''}"></div>
+                            <div class="form-group-horizontal"><label>ماہانہ تنخواہ</label><input type="number" name="salary" value="${staff ? staff.salary : ''}"></div>
+                            <div class="form-group-horizontal"><label>تاریخِ تقرری</label><input type="date" name="joinDate" value="${staff ? staff.joinDate : new Date().toISOString().split('T')[0]}"></div>
+                            <div class="form-group-horizontal"><label>ڈیوٹی شفٹ</label>
+                                <select name="shift">
+                                    <option value="صبح" ${staff && staff.shift === 'صبح' ? 'selected' : ''}>صبح</option>
+                                    <option value="شام" ${staff && staff.shift === 'شام' ? 'selected' : ''}>شام</option>
+                                    <option value="مکمل وقت" ${staff && staff.shift === 'مکمل وقت' ? 'selected' : ''}>مکمل وقت (Full Time)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 4: Education & Skills -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <h3 style="color:var(--primary); margin-bottom:1rem; border-bottom:2px solid #e2e8f0; padding-bottom:0.4rem; text-align:center;"><i class="fas fa-graduation-cap"></i> تعلیمی و دینی قابلیت</h3>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.2rem;">
+                            <div class="form-group-horizontal">
+                                <label>دنیوی تعلیم</label>
+                                <select name="qualification" onchange="app.toggleStaffSubject(this.value)">
+                                    <option value="">انتخاب کریں</option>
+                                    ${['پرائمری', 'مڈل', 'میٹرک', 'انٹر', 'بی ایس', 'ایم فل', 'پی ایچ ڈی'].map(q => `<option value="${q}" ${staff && staff.qualification === q ? 'selected' : ''}>${q}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group-horizontal" id="staff_subject_container" style="${staff && ['بی ایس', 'ایم فل', 'پی ایچ ڈی'].includes(staff.qualification) ? '' : 'display:none;'}">
+                                <label>مضمون (Subject)</label>
+                                <input type="text" name="subject" value="${staff ? staff.subject : ''}" placeholder="مثلاً اسلامیات، اردو، ریاضی">
+                            </div>
+
+                            <div class="form-group-horizontal" style="grid-column: span 2;">
+                                <label style="margin-bottom:0.8rem; display:block; font-weight:700;">دینی تعلیم (ایک سے زائد منتخب کر سکتے ہیں):</label>
+                                <div class="edu-checkbox-group">
+                                    ${['حفظ', 'قرات', 'درس نظامی', 'تخصص', 'حفظ و درس نظامی'].map(edu => `
+                                        <label class="edu-checkbox-item">
+                                            <input type="checkbox" name="religiousEdu" value="${edu}" ${staff && staff.religiousEdu && (Array.isArray(staff.religiousEdu) ? staff.religiousEdu.includes(edu) : staff.religiousEdu === edu) ? 'checked' : ''}>
+                                            <span>${edu}</span>
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            <div class="form-group-horizontal" style="grid-column: span 2;"><label>سابقہ تجربہ</label><input type="text" name="experience" placeholder="کسی بھی ادارے کا سابقہ تجربہ" value="${staff ? staff.experience : ''}"></div>
+                        </div>
+                    </div>
+
+                    <div style="text-align:center; margin-top:2rem; padding-top:1rem; border-top:1px solid #eee; display: flex; justify-content: center; gap: 1rem;">
+                        <button type="submit" class="btn btn-primary" style="min-width:300px; font-size:1.3rem;">
+                            <i class="fas fa-save"></i> ${staff ? 'تبدیلی محفوظ کریں' : 'ڈیٹا محفوظ کریں'}
+                        </button>
+                        <button type="button" class="btn" style="background: #64748b; color: white;" onclick="window.print()">
+                            <i class="fas fa-print"></i> پرنٹ فارم
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+    }
+
+    async handleStaffSubmit(event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        const data = Object.fromEntries(formData.entries());
+        
+        // Handle multiple checkboxes for religiousEdu
+        const religiousEdu = formData.getAll('religiousEdu');
+        data.religiousEdu = religiousEdu;
+
+        data.photo = this.teacherPhoto;
+        if (data.id) data.id = parseInt(data.id); else delete data.id;
+        await MadrassahDB.saveTeacher(data);
+        this.navigate('staff_list');
+    }
+
+    toggleStaffSubject(val) {
+        const container = document.getElementById('staff_subject_container');
+        if (!container) return;
+        if (['بی ایس', 'ایم فل', 'پی ایچ ڈی'].includes(val)) {
+            container.style.display = 'flex';
+        } else {
+            container.style.display = 'none';
+        }
+    }
+
+    async editStaff(id) {
+        this.editTeacherId = id;
+        this.currentView = 'staff_form';
+        this.render();
+    }
+
+    async deleteStaff(id) {
+        if (confirm('کیا آپ واقعی یہ اسٹاف ممبر حذف کرنا چاہتے ہیں؟')) {
+            await MadrassahDB.deleteTeacher(id);
+            this.render();
+        }
+    }
+
+    // =========================================================================
+    // --- 2. FEE COLLECTION MODULE (فیس وصولی، بقایا جات و رسیدات) ---
+    // =========================================================================
+    async renderFeeModule(container) {
+        const students = await MadrassahDB.getAllStudents(this.currentSection);
+        container.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2 style="color:var(--primary); margin:0;"><i class="fas fa-money-bill-wave"></i> فیس وصولی و رسید بک</h2>
+                <button class="btn btn-primary" onclick="app.printBlankReceipt()"><i class="fas fa-receipt"></i> خالی رسید پرنٹ کریں</button>
+            </div>
+            <div style="display: grid; grid-template-columns: 400px 1fr; gap: 2rem;">
+                <!-- Left: Student Search & Selection -->
+                <div class="card" style="height: fit-content;">
+                    <h3 style="color:var(--primary); margin-bottom:1.5rem;"><i class="fas fa-search"></i> طالب علم منتخب کریں</h3>
+                    <div class="form-group-horizontal" style="margin-bottom:1rem;">
+                        <input type="text" id="fee_student_search" placeholder="نام یا رول نمبر سے تلاش کریں..." style="width:100%;" oninput="app.filterFeeStudents(this.value)">
+                    </div>
+                    <div id="fee_student_list" style="max-height: 500px; overflow-y: auto; border:1px solid #eee; border-radius:8px;">
+                        ${students.map(s => `
+                            <div class="fee-student-item" onclick="app.selectStudentForFee(${s.id})" style="padding:0.8rem; border-bottom:1px solid #eee; cursor:pointer; transition:all 0.2s;">
+                                <div style="display:flex; align-items:center; gap:1rem;">
+                                    <img src="${s.photo || 'https://via.placeholder.com/40'}" style="width:35px; height:35px; border-radius:50%; object-fit:cover;">
+                                    <div>
+                                        <div style="font-weight:600;">${s.name}</div>
+                                        <div style="font-size:0.8rem; color:#666;">رجسٹریشن #: ${s.id} | درجہ: ${s.className || s.class || '---'}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <!-- Right: Fee Collection Form & History -->
+                <div id="fee_details_container">
+                    <div class="card" style="text-align:center; padding:5rem; background:#f8fafc; border:2px dashed #e2e8f0;">
+                        <i class="fas fa-hand-holding-dollar" style="font-size:4rem; color:#cbd5e1; margin-bottom:1rem;"></i>
+                        <h3 style="color:#94a3b8;">فیس وصولی کے لیے بائیں جانب سے طالب علم منتخب کریں</h3>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    filterFeeStudents(query) {
+        const items = document.querySelectorAll('.fee-student-item');
+        items.forEach(item => {
+            const text = item.innerText.toLowerCase();
+            item.style.display = text.includes(query.toLowerCase()) ? 'block' : 'none';
+        });
+    }
+
+    async selectStudentForFee(id) {
+        const student = await MadrassahDB.getStudentById(id);
+        const fees = await MadrassahDB.getStudentFees(id);
+        this.currentFeeStudent = student;
+        this.currentFeeHistory = fees;
+        
+        const container = document.getElementById('fee_details_container');
+        if (!container) return;
+        
+        const currentArrears = parseInt(student.arrears || 0);
+        const monthlyFee = parseInt(student.monthlyFee || 0);
+        
+        // Initial month (current month)
+        const currentMonthName = ['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'][new Date().getMonth()];
+        const isPaid = fees.some(f => f.month === currentMonthName && f.feeType === 'ماہانہ فیس');
+        const displayedMonthlyFee = isPaid ? 0 : monthlyFee;
+        const totalDue = currentArrears + displayedMonthlyFee;
+
+        container.innerHTML = `
+            <div class="card" style="margin-bottom:2rem; border-right:5px solid var(--primary);">
+                <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:1.5rem;">
+                    <div>
+                        <h2 style="color:var(--primary); margin:0;">${student.name} <span style="font-size:1.2rem; background:#f1f5f9; padding:4px 15px; border-radius:30px; margin-right:10px;">رجسٹریشن نمبر: #${student.id}</span></h2>
+                        <p style="color:#666; margin:0.3rem 0;">${student.fatherName || ''} | درجہ: ${student.className || student.class || '---'} | شعبہ: ${student.department || '---'}</p>
+                    </div>
+                    <div style="text-align:right; display:flex; gap:1rem;">
+                        <button class="btn btn-sm" style="background:#f1f5f9; color:var(--primary);" onclick="app.printFeeReceipt({studentName: '${student.name}', fatherName: '${student.fatherName || ''}', className: '${student.className || student.class || ''}', amount: ${totalDue}, feeType: 'ماہانہ فیس', month: '${currentMonthName}'})"><i class="fas fa-print"></i> رسید پریویو</button>
+                    </div>
+                </div>
+
+                <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom:1.5rem; gap:1rem;">
+                    <div style="background:#fef2f2; padding:1rem; border-radius:12px; text-align:center;">
+                        <div style="font-size:0.8rem; color:#991b1b;">سابقہ بقایا (Arrears)</div>
+                        <div id="stat_arrears" style="font-size:1.5rem; font-weight:bold; color:#991b1b;">${currentArrears}</div>
+                    </div>
+                    <div style="background:#eff6ff; padding:1rem; border-radius:12px; text-align:center;">
+                        <div id="stat_month_label" style="font-size:0.8rem; color:#1e40af;">فیس برائے ${currentMonthName} ${isPaid ? '(ادا شدہ)' : ''}</div>
+                        <div id="stat_monthly_fee" style="font-size:1.5rem; font-weight:bold; color:#1e40af;">${displayedMonthlyFee}</div>
+                    </div>
+                    <div style="background:var(--primary); padding:1rem; border-radius:12px; text-align:center; color:white;">
+                        <div style="font-size:0.8rem; opacity:0.9;">کل واجب الادا (Total)</div>
+                        <div id="stat_total_due" style="font-size:1.5rem; font-weight:bold;">${totalDue}</div>
+                    </div>
+                </div>
+
+                <form onsubmit="app.handleFeeSubmit(event)" style="background:#f8fafc; padding:1.5rem; border-radius:12px; border:1px solid #e2e8f0;">
+                    <input type="hidden" name="studentId" value="${student.id}">
+                    <input type="hidden" name="studentName" value="${student.name}">
+                    <input type="hidden" name="className" value="${student.className || student.class || '---'}">
+                    <input type="hidden" id="total_payable_hidden" value="${totalDue}">
+                    
+                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:1.2rem;">
+                        <div class="form-group-horizontal">
+                            <label>فیس کی قسم</label>
+                            <select name="feeType" id="fee_type_select" onchange="app.updateFeeCalculation()" required>
+                                <option value="ماہانہ فیس">ماہانہ فیس</option>
+                                <option value="داخلہ فیس">داخلہ فیس</option>
+                                <option value="تعاون">تعاون</option>
+                                <option value="کتب فیس">کتب فیس</option>
+                                <option value="دیگر">دیگر</option>
+                            </select>
+                        </div>
+                        <div class="form-group-horizontal">
+                            <label>وصول شدہ رقم</label>
+                            <input type="number" name="amount" id="fee_paid_amount" value="${totalDue}" oninput="app.updateArrearsPreview()" required>
+                        </div>
+                        <div class="form-group-horizontal">
+                            <label>مہینہ (Month)</label>
+                            <select name="month" id="fee_month_select" onchange="app.updateFeeCalculation()">
+                                ${['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'].map(m => `<option value="${m}" ${currentMonthName === m ? 'selected' : ''}>${m}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="arrears_preview" style="margin-top:1rem; text-align:center; color:#666; font-size:0.9rem;">
+                        باقی رقم (Balance): <span style="font-weight:bold; color:var(--primary);">0</span> روپے
+                    </div>
+
+                    <div style="margin-top:1.5rem; display:flex; justify-content:center; gap:1.5rem;">
+                        <button type="submit" name="action" value="save" class="btn" style="min-width:200px; background:#64748b; color:white;"><i class="fas fa-save"></i> صرف محفوظ کریں</button>
+                        <button type="submit" name="action" value="print" class="btn btn-primary" style="min-width:250px; background:linear-gradient(135deg, var(--primary), #065f46);"><i class="fas fa-print"></i> محفوظ کریں اور چالان پرنٹ کریں</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card" style="padding:0; overflow:hidden;">
+                <div style="padding:1rem; background:white; border-bottom:1px solid #eee;">
+                    <h3 style="margin:0; color:#475569;"><i class="fas fa-history"></i> سابقہ ریکارڈ (Fee History)</h3>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>تاریخ</th>
+                            <th>قسم</th>
+                            <th>مہینہ</th>
+                            <th>رقم</th>
+                            <th>ایکشن</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${fees.reverse().map(f => `
+                            <tr>
+                                <td>${new Date(f.timestamp).toLocaleDateString('ur-PK')}</td>
+                                <td>${f.feeType}</td>
+                                <td>${f.month || '---'}</td>
+                                <td style="font-weight:bold; color:#166534;">${f.amount} روپے</td>
+                                <td style="display:flex; gap:0.5rem;">
+                                    <button class="btn btn-sm" onclick="app.printFeeReceipt(${JSON.stringify(f).replace(/"/g, '&quot;')})"><i class="fas fa-print"></i> رسید</button>
+                                    <button class="btn btn-sm" style="background:#ef4444; color:white;" onclick="app.deleteFee(${f.id})"><i class="fas fa-trash"></i> ڈیلیٹ</button>
+                                </td>
+                            </tr>
+                        `).join('') || '<tr><td colspan="5" style="text-align:center; padding:2rem;">کوئی ریکارڈ نہیں ملا</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    updateFeeCalculation() {
+        const student = this.currentFeeStudent;
+        const fees = this.currentFeeHistory;
+        if (!student) return;
+
+        const selectedMonth = document.getElementById('fee_month_select').value;
+        const feeType = document.getElementById('fee_type_select').value;
+        
+        const currentArrears = parseInt(student.arrears || 0);
+        const monthlyFee = parseInt(student.monthlyFee || 0);
+        
+        let displayedMonthlyFee = 0;
+        let isPaid = false;
+
+        if (feeType === 'ماہانہ فیس') {
+            isPaid = fees.some(f => f.month === selectedMonth && f.feeType === 'ماہانہ فیس');
+            displayedMonthlyFee = isPaid ? 0 : monthlyFee;
+        }
+
+        const totalDue = currentArrears + displayedMonthlyFee;
+
+        // Update UI
+        const lbl = document.getElementById('stat_month_label');
+        if (lbl) lbl.innerText = `فیس برائے ${selectedMonth} ${isPaid ? '(ادا شدہ)' : ''}`;
+        const smf = document.getElementById('stat_monthly_fee');
+        if (smf) smf.innerText = displayedMonthlyFee;
+        const std = document.getElementById('stat_total_due');
+        if (std) std.innerText = totalDue;
+        const tph = document.getElementById('total_payable_hidden');
+        if (tph) tph.value = totalDue;
+        const fpa = document.getElementById('fee_paid_amount');
+        if (fpa) fpa.value = totalDue;
+        this.updateArrearsPreview();
+    }
+
+    updateArrearsPreview() {
+        const total = parseInt(document.getElementById('total_payable_hidden')?.value || 0);
+        const paid = parseInt(document.getElementById('fee_paid_amount')?.value || 0);
+        const balance = total - paid;
+        const prev = document.getElementById('arrears_preview');
+        if (prev) {
+            prev.innerHTML = `باقی رقم (Balance): <span style="font-weight:bold; color:${balance > 0 ? '#ef4444' : '#059669'};">${balance}</span> روپے`;
+        }
+    }
+
+    async handleFeeSubmit(event) {
+        event.preventDefault();
+        const action = event.submitter ? event.submitter.value : 'save';
+        const formData = new FormData(event.target);
+        const data = Object.fromEntries(formData.entries());
+        data.studentId = parseInt(data.studentId);
+        data.amount = parseInt(data.amount);
+        data.timestamp = Date.now();
+        data.receiptNo = 'RF-' + Math.floor(100000 + Math.random() * 900000);
+        
+        // Calculate and Update Arrears
+        const student = await MadrassahDB.getStudentById(data.studentId);
+        const fees = await MadrassahDB.getStudentFees(data.studentId);
+        
+        let monthlyFeeToAdd = 0;
+        if (data.feeType === 'ماہانہ فیس') {
+            const isAlreadyCharged = fees.some(f => f.month === data.month && f.feeType === 'ماہانہ فیس');
+            if (!isAlreadyCharged) {
+                monthlyFeeToAdd = parseInt(student.monthlyFee || 0);
+            }
+        }
+
+        const totalPayable = (parseInt(student.arrears || 0)) + monthlyFeeToAdd;
+        const newArrears = totalPayable - data.amount;
+        
+        student.arrears = newArrears;
+        await MadrassahDB.saveStudent(student);
+
+        await MadrassahDB.saveFee(data);
+
+        // Record automated income in Bait-ul-Maal
+        await MadrassahDB.saveTransaction({
+            type: 'Income',
+            category: data.feeType,
+            amount: data.amount,
+            name: data.studentName,
+            receiptNo: data.receiptNo,
+            date: Date.now(),
+            description: `فیس برائے ${data.month || '---'} (طالب علم: ${data.studentName}, رجسٹریشن: ${data.studentId}). بقایا: ${newArrears}`
+        });
+
+        if (action === 'print') {
+            this.printFeeReceipt({
+                receiptNo: data.receiptNo,
+                studentName: student.name,
+                fatherName: student.fatherName,
+                className: student.className || student.class,
+                amount: data.amount,
+                feeType: data.feeType,
+                month: data.month,
+                date: Date.now()
+            });
+        } else {
+            alert(`فیس وصول کر لی گئی ہے۔ طالب علم کا بقایا اپڈیٹ کر دیا گیا ہے: ${newArrears} روپے`);
+        }
+        
+        this.selectStudentForFee(data.studentId);
+    }
+
+    printBlankReceipt() {
+        const html = this.generateOfficialReceiptHtml({
+            receiptTitle: 'رسید بک (Official Receipt)',
+            receiptNo: 'REC-' + Math.floor(100000 + Math.random() * 900000),
+            amount: '',
+            amountInWords: '',
+            payeeName: '',
+            address: '',
+            onAccountOf: '',
+            dateStr: '',
+            receivedBy: ''
+        });
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(html);
+        printWindow.document.close();
+    }
+
+    printFeeReceipt(fee) {
+        const date = new Date(fee.timestamp || fee.date || Date.now()).toLocaleDateString('ur-PK');
+        const amountWords = this.numberToUrduWords(fee.amount);
+        const payee = `${fee.studentName || '---'} ${fee.fatherName ? `ولد ${fee.fatherName}` : ''}`;
+        const purpose = `${fee.feeType || 'فیس'} ${fee.month ? `(برائے ${fee.month})` : ''} ${fee.className ? `- درجہ ${fee.className}` : ''}`;
+        
+        const html = this.generateOfficialReceiptHtml({
+            receiptTitle: 'فیس وصولی کی رسید (Fee Receipt)',
+            receiptNo: fee.receiptNo || 'REC-' + Math.floor(100000 + Math.random() * 900000),
+            bookNo: '1',
+            amount: fee.amount,
+            amountInWords: amountWords,
+            payeeName: payee,
+            onAccountOf: purpose,
+            dateStr: date
+        });
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(html);
+        printWindow.document.close();
+    }
+
+    async deleteFee(id) {
+        if (confirm('کیا آپ واقعی یہ فیس ریکارڈ حذف کرنا چاہتے ہیں؟')) {
+            await MadrassahDB.deleteFee(id);
+            if (this.currentFeeStudent) {
+                this.selectStudentForFee(this.currentFeeStudent.id);
+            } else {
+                this.render();
+            }
+        }
+    }
+
+    // =========================================================================
+    // --- 3. SALARY MANAGEMENT MODULE (تنخواہوں کا نظام، ایڈوانس و پے سلپ) ---
+    // =========================================================================
+    async renderSalaryModule(container) {
+        const staff = await MadrassahDB.getAllTeachers();
+        const now = new Date();
+        const currentMonth = ['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'][now.getMonth()];
+        const currentYear = now.getFullYear();
+        
+        const selectedMonth = this.salaryMonth || currentMonth;
+        const selectedYear = this.salaryYear || currentYear;
+        const salaries = await MadrassahDB.getSalariesByMonth(selectedMonth, selectedYear);
+
+        container.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2 style="color:var(--primary); margin:0;"><i class="fas fa-hand-holding-dollar"></i> تنخواہوں کا نظام (Payroll System)</h2>
+                <div style="display:flex; gap:0.8rem; background:white; padding:0.4rem; border-radius:16px; border:1px solid #e2e8f0; box-shadow: var(--shadow-sm);">
+                    <select id="salary_month" class="mms-select" onchange="app.updateSalaryFilter()" style="min-width:140px;">
+                        ${['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'].map(m => `<option value="${m}" ${selectedMonth === m ? 'selected' : ''}>${m}</option>`).join('')}
+                    </select>
+                    <select id="salary_year" class="mms-select" onchange="app.updateSalaryFilter()" style="min-width:110px;">
+                        ${[2024, 2025, 2026, 2027].map(y => `<option value="${y}" ${selectedYear == y ? 'selected' : ''}>${y}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+
+            <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 2rem;">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background:#ecfdf5;color:var(--primary);"><i class="fas fa-users"></i></div>
+                    <div class="stat-info"><h3>کل اسٹاف</h3><p>${staff.length}</p></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background:#eff6ff;color:#2563eb;"><i class="fas fa-check-double"></i></div>
+                    <div class="stat-info"><h3>ادا شدہ</h3><p>${salaries.length}</p></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background:#fff7ed;color:#ea580c;"><i class="fas fa-clock"></i></div>
+                    <div class="stat-info"><h3>باقی</h3><p>${staff.length - salaries.length}</p></div>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap: 2rem;">
+                <div class="card" style="padding:0; overflow:hidden;">
+                    <div style="padding:1.2rem; background:white; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="margin:0; color:var(--primary);"><i class="fas fa-list-check"></i> ادائیگی کی تفصیلات (${selectedMonth} ${selectedYear})</h3>
+                    </div>
+                    <table style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th>نامِ عملہ</th>
+                                <th>بنیادی تنخواہ</th>
+                                <th>اسٹیٹس</th>
+                                <th>ایکشن</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${staff.map(s => {
+                                const paidRecord = salaries.find(sal => sal.staffId === s.id);
+                                return `
+                                    <tr>
+                                        <td style="font-weight:600;">${s.name}</td>
+                                        <td>${s.salary || 0}</td>
+                                        <td>
+                                            ${paidRecord 
+                                                ? `<span class="badge" style="background:#ecfdf5; color:#065f46; padding:4px 12px; border-radius:20px;">ادا شدہ (${new Date(paidRecord.paymentDate).toLocaleDateString('ur-PK')})</span>` 
+                                                : `<span class="badge" style="background:#fef2f2; color:#ef4444; padding:4px 12px; border-radius:20px;">باقی</span>`
+                                            }
+                                        </td>
+                                        <td>
+                                            <div style="display:flex; justify-content:center;">
+                                            ${paidRecord 
+                                                ? `<button class="btn btn-sm" style="background:#f1f5f9; color:var(--primary); width:100%; max-width:120px;" onclick="app.printPayslip(${paidRecord.id})"><i class="fas fa-print"></i> پرچی</button>` 
+                                                : `<button class="btn btn-sm btn-primary" style="width:100%; max-width:140px;" onclick="app.showPaySalaryForm(${s.id})"><i class="fas fa-money-check-dollar"></i> ادائیگی کریں</button>`
+                                            }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="salary_side_container">
+                    <div class="card" style="text-align:center; padding:4rem 2rem; background:#f8fafc; border:2px dashed #e2e8f0;">
+                        <i class="fas fa-calculator" style="font-size:3rem; color:#cbd5e1; margin-bottom:1rem;"></i>
+                        <h4 style="color:#94a3b8;">ادائیگی کے لیے کسی ملازم کا انتخاب کریں یا ایڈوانس کا ریکارڈ دیکھیں</h4>
+                        <button class="btn btn-sm" style="margin-top:1rem; border:1px solid #ddd;" onclick="app.renderAdvanceModule()">ایڈوانس ریکارڈ چیک کریں</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    updateSalaryFilter() {
+        const m = document.getElementById('salary_month');
+        const y = document.getElementById('salary_year');
+        if (m) this.salaryMonth = m.value;
+        if (y) this.salaryYear = y.value;
+        this.render();
+    }
+
+    async showPaySalaryForm(staffId) {
+        const staff = await MadrassahDB.getTeacherById(staffId);
+        const advances = await MadrassahDB.getStaffAdvances(staffId);
+        const pendingAdvance = advances.filter(a => a.status === 'Pending').reduce((sum, a) => sum + parseInt(a.amount || 0), 0);
+        
+        const container = document.getElementById('salary_side_container');
+        if (!container) return;
+        container.innerHTML = `
+            <div class="card" style="border-right:5px solid var(--primary);">
+                <h3 style="color:var(--primary); margin-bottom:1.5rem; border-bottom:1px solid #eee; padding-bottom:0.5rem;">ادائیگیِ تنخواہ: ${staff.name}</h3>
+                <form onsubmit="app.handleSalarySubmit(event)">
+                    <input type="hidden" name="staffId" value="${staff.id}">
+                    <input type="hidden" name="staffName" value="${staff.name}">
+                    <input type="hidden" name="month" value="${this.salaryMonth || 'جنوری'}">
+                    <input type="hidden" name="year" value="${this.salaryYear || 2026}">
+                    
+                    <div class="tt-form-group"><label>بنیادی تنخواہ</label><input type="number" id="base_salary" name="baseSalary" value="${staff.salary || 0}" readonly style="background:#f1f5f9;"></div>
+                    <div class="tt-form-group"><label>الاؤنس (Allowances)</label><input type="number" name="allowances" value="0" oninput="app.calculateNetSalary()"></div>
+                    <div class="tt-form-group"><label>کٹوتی (Deductions)</label><input type="number" name="deductions" value="0" oninput="app.calculateNetSalary()"></div>
+                    
+                    <div style="background:#fffbeb; padding:1rem; border-radius:12px; border:1px solid #fde68a; margin-bottom:1.2rem;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+                            <span>کل بقایا ایڈوانس:</span>
+                            <span style="font-weight:bold; color:#b45309;">${pendingAdvance} روپے</span>
+                        </div>
+                        <div class="form-group-horizontal">
+                            <label style="font-size:0.9rem;">اس ماہ کٹوتی ایڈوانس</label>
+                            <input type="number" name="advanceDeduction" value="0" max="${pendingAdvance}" oninput="app.calculateNetSalary()">
+                        </div>
+                    </div>
+
+                    <div style="background:var(--primary); color:white; padding:1.2rem; border-radius:12px; text-align:center; margin-bottom:1.5rem;">
+                        <div style="font-size:0.9rem; opacity:0.8;">خالص تنخواہ (Net Payable)</div>
+                        <div id="net_salary_display" style="font-size:2rem; font-weight:800;">${staff.salary || 0}</div>
+                        <input type="hidden" name="netSalary" id="net_salary_input" value="${staff.salary || 0}">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width:100%;">تنخواہ ادا کریں</button>
+                </form>
+            </div>
+        `;
+    }
+
+    calculateNetSalary() {
+        const base = parseInt(document.getElementById('base_salary')?.value || 0);
+        const allow = parseInt(document.querySelector('input[name="allowances"]')?.value || 0);
+        const deduct = parseInt(document.querySelector('input[name="deductions"]')?.value || 0);
+        const advDeduct = parseInt(document.querySelector('input[name="advanceDeduction"]')?.value || 0);
+        
+        const net = base + allow - deduct - advDeduct;
+        const disp = document.getElementById('net_salary_display');
+        if (disp) disp.innerText = net;
+        const inp = document.getElementById('net_salary_input');
+        if (inp) inp.value = net;
+    }
+
+    async handleSalarySubmit(e) {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        data.paymentDate = Date.now();
+        data.payslipNo = 'PS-' + Math.floor(100000 + Math.random() * 900000);
+        
+        await MadrassahDB.saveSalary(data);
+
+        // Record as expense in Accounts
+        await MadrassahDB.saveTransaction({
+            type: 'Expense',
+            category: 'تنخواہ عملہ',
+            amount: data.netSalary,
+            name: data.staffName,
+            date: Date.now(),
+            description: `تنخواہ برائے ماہ ${data.month} ${data.year} (Payslip: ${data.payslipNo})`
+        });
+
+        alert('تنخواہ کامیابی سے ریکارڈ کر لی گئی ہے اور بیت المال کے اخراجات میں درج کر دی گئی ہے۔');
+        this.render();
+    }
+
+    async renderAdvanceModule() {
+        const staff = await MadrassahDB.getAllTeachers();
+        const container = document.getElementById('salary_side_container');
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="card">
+                <h3 style="color:var(--primary); margin-bottom:1.5rem; border-bottom:1px solid #eee; padding-bottom:0.5rem;"><i class="fas fa-hand-holding-hand"></i> ایڈوانس / قرض ریکارڈ</h3>
+                <form onsubmit="app.handleAdvanceSubmit(event)" style="margin-bottom:2rem; background:#f8fafc; padding:1.2rem; border-radius:12px;">
+                    <div class="tt-form-group">
+                        <label>ملازم منتخب کریں</label>
+                        <select name="staffId" required>
+                            <option value="">انتخاب کریں...</option>
+                            ${staff.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="tt-form-group"><label>رقم (Amount)</label><input type="number" name="amount" required></div>
+                    <div class="tt-form-group"><label>وجہ / تفصیل</label><input type="text" name="reason" placeholder="مثلاً بیماری، گھریلو ضرورت"></div>
+                    <button type="submit" class="btn btn-primary" style="width:100%;">ایڈوانس ریکارڈ کریں</button>
+                </form>
+                
+                <p style="font-size:0.8rem; color:#666; text-align:center;">ایڈوانس کی کٹوتی تنخواہ دیتے وقت کی جائے گی۔</p>
+            </div>
+        `;
+    }
+
+    async handleAdvanceSubmit(e) {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        data.date = Date.now();
+        data.status = 'Pending';
+        data.staffId = parseInt(data.staffId);
+        
+        await MadrassahDB.saveAdvance(data);
+        alert('ایڈوانس ریکارڈ کر لیا گیا ہے۔');
+        this.render();
+    }
+
+    async printPayslip(id) {
+        const salaries = await MadrassahDB.getAllSalaries();
+        const salary = salaries.find(s => s.id === id);
+        if (!salary) return;
+        const staff = (await MadrassahDB.getTeacherById(salary.staffId)) || {};
+        
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html lang="ur" dir="rtl">
+            <head>
+                <title>تنخواہ پرچی - ${salary.payslipNo}</title>
+                <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+                <style>
+                    body { font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif; padding: 40px; background: #f1f5f9; }
+                    .payslip-container { background: white; max-width: 800px; margin: 0 auto; padding: 40px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.1); border-top: 15px solid #065f46; }
+                    .header { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; }
+                    .madrsa-name { font-size: 2.8rem; color: #065f46; margin: 0; }
+                    .payslip-title { font-size: 1.5rem; color: #475569; margin-top: 10px; font-weight: bold; }
+                    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
+                    .info-item { border-bottom: 1px dotted #ccc; padding: 8px 0; display: flex; justify-content: space-between; }
+                    .info-label { color: #065f46; font-weight: bold; }
+                    .salary-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+                    .salary-table th, .salary-table td { border: 1px solid #e2e8f0; padding: 12px; text-align: right; }
+                    .salary-table th { background: #f8fafc; color: #065f46; }
+                    .total-row { background: #065f46; color: white; font-weight: bold; font-size: 1.3rem; }
+                    .footer { display: flex; justify-content: space-between; margin-top: 60px; }
+                    .signature { border-top: 1px solid #000; width: 150px; text-align: center; padding-top: 10px; font-size: 0.9rem; }
+                    @media print { body { background: white; padding: 0; } .payslip-container { box-shadow: none; border: 1px solid #eee; } .no-print { display: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="payslip-container">
+                    <div class="header">
+                        <img src="${TITLE_DATA_URI}" alt="مدرسہ عبد الرحمن بن عوف غفوریہ" style="max-height:65px; max-width:85%; object-fit:contain; mix-blend-mode:multiply; display:block; margin:0 auto 4px auto;">
+                        <div class="payslip-title">تنخواہ پرچی (Monthly Payslip)</div>
+                    </div>
+                    
+                    <div class="info-grid">
+                        <div class="info-item"><span class="info-label">نامِ ملازم:</span> <span>${salary.staffName}</span></div>
+                        <div class="info-item"><span class="info-label">تاریخِ ادائیگی:</span> <span>${new Date(salary.paymentDate).toLocaleDateString('ur-PK')}</span></div>
+                        <div class="info-item"><span class="info-label">عہدہ:</span> <span>${staff.designation || '---'}</span></div>
+                        <div class="info-item"><span class="info-label">مہینہ / سال:</span> <span>${salary.month} ${salary.year}</span></div>
+                        <div class="info-item"><span class="info-label">پرچی نمبر:</span> <span>${salary.payslipNo}</span></div>
+                    </div>
+
+                    <table class="salary-table">
+                        <thead>
+                            <tr><th>تفصیل</th><th>رقم (روپے)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>بنیادی تنخواہ (Base Salary)</td><td>${salary.baseSalary}</td></tr>
+                            <tr><td>الاؤنسز (Allowances)</td><td>${salary.allowances || 0}</td></tr>
+                            <tr style="color:#ef4444;"><td>کٹوتی (Deductions)</td><td>-${salary.deductions || 0}</td></tr>
+                            <tr style="color:#ef4444;"><td>ایڈوانس کٹوتی (Advance Adjustment)</td><td>-${salary.advanceDeduction || 0}</td></tr>
+                            <tr class="total-row">
+                                <td>خالص تنخواہ (Net Payable)</td>
+                                <td>${salary.netSalary} /-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="footer">
+                        <div class="signature">دستخط ملازم</div>
+                        <div class="signature">دستخط ناظمِ اعلیٰ / خزانچی</div>
+                    </div>
+                </div>
+                <div class="no-print" style="text-align:center; margin-top:30px;">
+                    <button onclick="window.print()" style="padding:10px 40px; background:#065f46; color:white; border:none; border-radius:5px; cursor:pointer; font-size:1.1rem;">پرنٹ کریں</button>
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    }
+
+    // =========================================================================
+    // --- 4. STUDENT RECORD ACTIONS & HELPERS ---
+    // =========================================================================
+    async editStudent(id) {
+        this.editStudentId = id;
+        this.currentView = 'admission';
+        this.render();
+    }
+
+    openFeeForStudent(id) {
+        this.currentView = 'fees';
+        this.updateNavActiveState();
+        this.render().then(() => {
+            this.selectStudentForFee(id);
+        });
+    }
+
+    async deleteStudent(id) {
+        if (confirm('کیا آپ واقعی یہ ریکارڈ حذف کرنا چاہتے ہیں؟')) {
+            await MadrassahDB.deleteStudent(id);
+            this.render();
+        }
+    }
+
+    filterStudents(query) {
+        const rows = document.querySelectorAll('#studentTable tbody tr');
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(query.toLowerCase()) ? '' : 'none';
+        });
+    }
 }
 
 window.app = new MadrassahApp();
 
 document.addEventListener('DOMContentLoaded', () => {
     if (window.app && window.app.render) {
-        window.app.render();
+        if (window.app && window.app.isAuthenticated) window.app.render();
     }
 });
 window.addEventListener('load', () => {
     if (window.app && window.app.render) {
-        window.app.render();
+        if (window.app && window.app.isAuthenticated) window.app.render();
     }
 });

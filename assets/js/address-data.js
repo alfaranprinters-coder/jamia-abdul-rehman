@@ -130,3 +130,7 @@ const PakistanAddressData = {
         }
     }
 };
+
+if (typeof window !== 'undefined') {
+    window.PakistanAddressData = PakistanAddressData;
+}
