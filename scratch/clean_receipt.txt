@@ -198,8 +198,8 @@
         /* 6. جنس لفظوں میں (Amount in Words) */
         .val-words {
             top: 65.5%;
-            left: 22.5%;
-            width: 41.0%;
+            left: 17.5%;
+            width: 39.0%;
             font-size: 1.25rem;
             font-weight: bold;
             color: #0f172a;
@@ -554,7 +554,7 @@
                     ctx.font = 'bold 28px "Jameel Noori Nastaleeq", "Amiri", serif';
                     ctx.fillStyle = '#0f172a';
                     ctx.textAlign = 'right';
-                    ctx.fillText(words.innerText.trim(), canvas.width * 0.63, canvas.height * 0.695);
+                    ctx.fillText(words.innerText.trim(), canvas.width * 0.565, canvas.height * 0.695);
                 }
 
                 if (amount && amount.innerText) {

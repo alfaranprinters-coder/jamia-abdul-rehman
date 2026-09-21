@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>باضابطہ رسید - Madrassah Pro Manager</title>
+</head>
+<body>
+    <div id="receipt-loader" style="display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif; font-size:1.2rem; color:#64748b;">
+        رسید لوڈ ہو رہی ہے، براہ کرم انتظار فرمائیں...
+    </div>
+    <script src="app.js?v=4.2"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', function() {
+            try {
+                const activeData = JSON.parse(localStorage.getItem('mms_active_receipt') || '{}');
+                const dummy = new MadrassahApp();
+                const html = dummy.generateOfficialReceiptHtml(activeData);
+                document.open();
+                document.write(html);
+                document.close();
+            } catch(e) {
+                console.error('Error rendering receipt:', e);
+                const loader = document.getElementById('receipt-loader');
+                if (loader) loader.innerHTML = '<span style="color:#ef4444;">رسید کھولنے میں خرابی پیش آئی: ' + e.message + '</span>';
+            }
+        });
+    </script>
+</body>
+</html>

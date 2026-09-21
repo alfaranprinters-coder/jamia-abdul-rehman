@@ -221,7 +221,7 @@ const MadrassahDB = {
             request.onerror = () => reject(request.target.error); 
         }); 
     },
-    getAllStudents(section) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readonly'); const store = transaction.objectStore('students'); const request = store.getAll(); request.onsuccess = () => { const students = request.result.filter(s => s.section === section); resolve(students); }; request.onerror = () => reject(request.target.error); }); },
+    getAllStudents(section) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readonly'); const store = transaction.objectStore('students'); const request = store.getAll(); request.onsuccess = () => { const all = request.result || []; const students = (!section || section === 'all') ? all : all.filter(s => (s.section || 'banin') === section); resolve(students); }; request.onerror = () => reject(request.target.error); }); },
     getAllStudentsAllSections() { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readonly'); const store = transaction.objectStore('students'); const request = store.getAll(); request.onsuccess = () => resolve(request.result || []); request.onerror = () => reject(request.target.error); }); },
     getStudentById(id) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readonly'); const store = transaction.objectStore('students'); const request = store.get(parseInt(id)); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
     deleteStudent(id) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readwrite'); const store = transaction.objectStore('students'); const request = store.delete(parseInt(id)); request.onsuccess = () => resolve(); request.onerror = () => reject(request.target.error); }); },
@@ -288,13 +288,26 @@ const MadrassahDB = {
         });
     },
 
+    getAllFees() {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['fees'], 'readonly');
+            const store = transaction.objectStore('fees');
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result || []);
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
     getStudentFees(studentId) {
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction(['fees'], 'readonly');
             const store = transaction.objectStore('fees');
-            const index = store.index('studentId');
-            const request = index.getAll(parseInt(studentId));
-            request.onsuccess = () => resolve(request.result);
+            const request = store.getAll();
+            request.onsuccess = () => {
+                const sId = String(studentId);
+                const results = (request.result || []).filter(f => String(f.studentId) === sId);
+                resolve(results);
+            };
             request.onerror = () => reject(request.target.error);
         });
     },
@@ -404,6 +417,48 @@ const MadrassahDB = {
                 resolve(results);
             };
             request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    getAttendanceByYear(type, year, section) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['attendance'], 'readonly');
+            const store = transaction.objectStore('attendance');
+            const request = store.getAll();
+            request.onsuccess = () => {
+                const yrStr = String(year);
+                let results = request.result.filter(r => (!type || r.type === type) && (r.date || '').startsWith(yrStr));
+                if (type === 'student' && section) {
+                    results = results.filter(r => r.section === section || !r.section);
+                }
+                resolve(results);
+            };
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    saveAttendanceBatch(records) {
+        return new Promise((resolve, reject) => {
+            if (!records || records.length === 0) return resolve();
+            const transaction = this.db.transaction(['attendance'], 'readwrite');
+            const store = transaction.objectStore('attendance');
+            const getAllReq = store.getAll();
+            getAllReq.onsuccess = () => {
+                const existingList = getAllReq.result || [];
+                for (const data of records) {
+                    const existing = existingList.find(r =>
+                        r.personId === data.personId &&
+                        r.date === data.date &&
+                        r.type === data.type &&
+                        (r.type !== 'student' || !data.section || !r.section || r.section === data.section)
+                    );
+                    if (existing) data.id = existing.id;
+                    if (data.id) store.put(data);
+                    else store.add(data);
+                }
+            };
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
         });
     },
 
@@ -1094,6 +1149,14 @@ const MadrassahDB = {
     // --- FULL DATABASE BACKUP & RESTORE ---
     // ==========================================
     async exportDatabaseBackup() {
+        try {
+            if (typeof localStorage !== 'undefined') {
+                const localBg = localStorage.getItem('custom_receipt_bg');
+                if (localBg && typeof this.saveSetting === 'function') {
+                    await this.saveSetting('custom_receipt_bg', localBg).catch(e => console.warn(e));
+                }
+            }
+        } catch(e) {}
         const storeNames = Array.from(this.db.objectStoreNames);
         const backup = {
             appName: 'Madrassah Pro Manager',
@@ -1139,6 +1202,14 @@ const MadrassahDB = {
                 tx.onerror = () => reject(tx.error);
             });
         }
+        try {
+            if (backup.data && backup.data.settings && Array.isArray(backup.data.settings) && typeof localStorage !== 'undefined') {
+                const receiptSetting = backup.data.settings.find(s => s.key === 'custom_receipt_bg');
+                if (receiptSetting && receiptSetting.value) {
+                    localStorage.setItem('custom_receipt_bg', receiptSetting.value);
+                }
+            }
+        } catch(e) {}
         return true;
     },
 
@@ -1357,12 +1428,22 @@ const MadrassahDB = {
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction(['graduates'], 'readwrite');
             const store = transaction.objectStore('graduates');
-            if (data.studentId) data.studentId = parseInt(data.studentId);
-            if (data.id) data.id = parseInt(data.id);
+            if (data.studentId && !isNaN(data.studentId)) data.studentId = parseInt(data.studentId);
+            if (data.id && String(data.id).trim() !== '' && !isNaN(data.id) && parseInt(data.id) > 0) {
+                data.id = parseInt(data.id);
+            } else {
+                delete data.id;
+            }
             if (!data.createdAt) data.createdAt = new Date().toISOString();
             
             const request = data.id ? store.put(data) : store.add(data);
-            request.onsuccess = () => resolve(request.result);
+            request.onsuccess = () => {
+                const insertedId = request.result;
+                if (!data.id && insertedId) {
+                    data.id = insertedId;
+                }
+                resolve(insertedId);
+            };
             request.onerror = () => reject(request.target.error);
         });
     },
@@ -1374,6 +1455,12 @@ const MadrassahDB = {
             const request = store.getAll();
             request.onsuccess = () => {
                 let results = request.result || [];
+                // Auto-heal records if ID is missing or empty string
+                results.forEach((g, i) => {
+                    if (g.id === undefined || g.id === null || g.id === '') {
+                        g.id = i + 1;
+                    }
+                });
                 if (section) {
                     results = results.filter(g => !g.section || g.section === section);
                 }
@@ -1385,10 +1472,23 @@ const MadrassahDB = {
 
     getGraduateById(id) {
         return new Promise((resolve, reject) => {
+            if (!this.db) return resolve(null);
             const transaction = this.db.transaction(['graduates'], 'readonly');
             const store = transaction.objectStore('graduates');
-            const request = store.get(parseInt(id));
-            request.onsuccess = () => resolve(request.result);
+            const numId = Number(id);
+            const key = (!isNaN(numId) && numId > 0) ? numId : id;
+            const request = store.get(key);
+            request.onsuccess = () => {
+                if (request.result) {
+                    resolve(request.result);
+                } else if (typeof key === 'number') {
+                    const fallbackReq = store.get(String(id));
+                    fallbackReq.onsuccess = () => resolve(fallbackReq.result);
+                    fallbackReq.onerror = () => resolve(undefined);
+                } else {
+                    resolve(undefined);
+                }
+            };
             request.onerror = () => reject(request.target.error);
         });
     },
@@ -1397,9 +1497,19 @@ const MadrassahDB = {
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction(['graduates'], 'readwrite');
             const store = transaction.objectStore('graduates');
-            const request = store.delete(parseInt(id));
+            const numId = Number(id);
+            const key = (!isNaN(numId) && numId > 0) ? numId : id;
+            const request = store.delete(key);
             request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.target.error);
+            request.onerror = () => {
+                if (typeof key === 'number') {
+                    const fallbackReq = store.delete(String(id));
+                    fallbackReq.onsuccess = () => resolve();
+                    fallbackReq.onerror = () => reject(fallbackReq.error);
+                } else {
+                    reject(request.target.error);
+                }
+            };
         });
     },
 
@@ -1416,6 +1526,54 @@ const MadrassahDB = {
                 resolve(results);
             };
             request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    // --- Settings Storage Methods ---
+    getSetting(key) {
+        return new Promise((resolve, reject) => {
+            if (!this.db) return resolve(null);
+            try {
+                const transaction = this.db.transaction(['settings'], 'readonly');
+                const store = transaction.objectStore('settings');
+                const request = store.get(key);
+                request.onsuccess = () => {
+                    resolve(request.result ? request.result.value : null);
+                };
+                request.onerror = () => resolve(null);
+            } catch(e) {
+                resolve(null);
+            }
+        });
+    },
+
+    saveSetting(key, value) {
+        return new Promise((resolve, reject) => {
+            if (!this.db) return resolve(false);
+            try {
+                const transaction = this.db.transaction(['settings'], 'readwrite');
+                const store = transaction.objectStore('settings');
+                const request = store.put({ key: key, value: value });
+                request.onsuccess = () => resolve(true);
+                request.onerror = () => reject(request.target.error);
+            } catch(e) {
+                reject(e);
+            }
+        });
+    },
+
+    deleteSetting(key) {
+        return new Promise((resolve, reject) => {
+            if (!this.db) return resolve(false);
+            try {
+                const transaction = this.db.transaction(['settings'], 'readwrite');
+                const store = transaction.objectStore('settings');
+                const request = store.delete(key);
+                request.onsuccess = () => resolve(true);
+                request.onerror = () => reject(request.target.error);
+            } catch(e) {
+                reject(e);
+            }
         });
     }
 };

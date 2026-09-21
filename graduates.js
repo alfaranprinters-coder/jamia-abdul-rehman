@@ -7,7 +7,7 @@ const GraduatesModule = {
     filterYear: 'all',
     filterType: 'all',
     filterGrade: 'all',
-    activeView: 'cards', // 'cards' | 'table'
+    activeView: 'table', // 'table' (لسٹ ویو) | 'cards'
 
     // Main Render Function
     async render(container) {
@@ -62,6 +62,9 @@ const GraduatesModule = {
 
             return matchesSearch && matchesYear && matchesType && matchesGrade;
         });
+
+        this.currentGraduates = filtered;
+        this.allGraduates = graduates;
 
         container.innerHTML = `
             <div class="graduates-module-wrapper" style="padding-bottom: 2.5rem;">
@@ -160,12 +163,12 @@ const GraduatesModule = {
                             </select>
 
                             <!-- View Mode Toggle -->
-                            <div style="display:flex; background:#f1f5f9; padding:3px; border-radius:8px;">
-                                <button onclick="GraduatesModule.toggleView('cards')" style="border:none; cursor:pointer; padding:6px 12px; border-radius:6px; font-size:0.9rem; ${this.activeView === 'cards' ? 'background:white; color:#4338ca; font-weight:bold; box-shadow:0 1px 3px rgba(0,0,0,0.1);' : 'background:transparent; color:#64748b;'}" title="کارڈز ویو">
-                                    <i class="fas fa-th-large"></i>
+                            <div style="display:flex; background:#f1f5f9; padding:3px; border-radius:10px; border:1px solid #cbd5e1;">
+                                <button onclick="GraduatesModule.toggleView('table')" style="border:none; cursor:pointer; padding:6px 14px; border-radius:8px; font-size:0.9rem; display:flex; align-items:center; gap:6px; ${this.activeView === 'table' ? 'background:#4338ca; color:white; font-weight:bold; box-shadow:0 2px 4px rgba(67,56,202,0.3);' : 'background:transparent; color:#64748b;'}" title="فہرست (لسٹ ویو)">
+                                    <i class="fas fa-list"></i> فہرست (لسٹ)
                                 </button>
-                                <button onclick="GraduatesModule.toggleView('table')" style="border:none; cursor:pointer; padding:6px 12px; border-radius:6px; font-size:0.9rem; ${this.activeView === 'table' ? 'background:white; color:#4338ca; font-weight:bold; box-shadow:0 1px 3px rgba(0,0,0,0.1);' : 'background:transparent; color:#64748b;'}" title="ٹیبل ویو">
-                                    <i class="fas fa-list"></i>
+                                <button onclick="GraduatesModule.toggleView('cards')" style="border:none; cursor:pointer; padding:6px 14px; border-radius:8px; font-size:0.9rem; display:flex; align-items:center; gap:6px; ${this.activeView === 'cards' ? 'background:#4338ca; color:white; font-weight:bold; box-shadow:0 2px 4px rgba(67,56,202,0.3);' : 'background:transparent; color:#64748b;'}" title="کارڈز ویو">
+                                    <i class="fas fa-th-large"></i> کارڈز
                                 </button>
                             </div>
                         </div>
@@ -197,7 +200,7 @@ const GraduatesModule = {
     renderCardsView(graduates) {
         return `
             <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap:1.4rem;">
-                ${graduates.map(g => {
+                ${graduates.map((g, idx) => {
                     // WhatsApp link
                     const rawWa = g.whatsapp || g.phone || '';
                     const cleanWa = rawWa.replace(/[^0-9]/g, '');
@@ -317,8 +320,11 @@ const GraduatesModule = {
 
                             <!-- Bottom Action Buttons -->
                             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; border-top:1px solid #e2e8f0; padding-top:10px; margin-top:5px; flex-wrap:wrap;">
-                                <div style="display:flex; gap:6px;">
-                                    <button onclick="GraduatesModule.printMadrasaSanad(${g.id})" class="btn" style="background:#4338ca; color:white; font-size:0.85rem; font-weight:bold; padding:6px 12px; border-radius:8px; border:none; cursor:pointer;" title="مدرسہ کی باضابطہ سند پرنٹ کریں">
+                                <div style="display:flex; gap:6px; align-items:center;">
+                                    <button type="button" onclick="GraduatesModule.showGraduateDetails('${g.id}', ${idx})" class="btn" style="background:linear-gradient(135deg, #2563eb, #1d4ed8); color:white; font-size:0.85rem; font-weight:bold; padding:6px 12px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 4px rgba(37,99,235,0.25);" title="مکمل کوائف دیکھیں">
+                                        <i class="fas fa-eye"></i> تفصیل
+                                    </button>
+                                    <button type="button" onclick="GraduatesModule.printMadrasaSanad('${g.id}')" class="btn" style="background:#4338ca; color:white; font-size:0.85rem; font-weight:bold; padding:6px 12px; border-radius:8px; border:none; cursor:pointer;" title="مدرسہ کی باضابطہ سند پرنٹ کریں">
                                         <i class="fas fa-award"></i> سند پرنٹ
                                     </button>
                                     ${formattedWa ? `
@@ -329,10 +335,10 @@ const GraduatesModule = {
                                 </div>
 
                                 <div style="display:flex; gap:6px;">
-                                    <button onclick="GraduatesModule.showGraduateModal(${g.id})" class="btn" style="background:#f1f5f9; color:#475569; font-size:0.85rem; padding:6px 10px; border-radius:8px; border:none; cursor:pointer;" title="کوائف میں ترمیم">
+                                    <button type="button" onclick="GraduatesModule.showGraduateModal('${g.id}')" class="btn" style="background:#f1f5f9; color:#475569; font-size:0.85rem; padding:6px 10px; border-radius:8px; border:none; cursor:pointer;" title="کوائف میں ترمیم">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button onclick="GraduatesModule.deleteGraduate(${g.id})" class="btn" style="background:#fee2e2; color:#b91c1c; font-size:0.85rem; padding:6px 10px; border-radius:8px; border:none; cursor:pointer;" title="حذف کریں">
+                                    <button type="button" onclick="GraduatesModule.deleteGraduate('${g.id}')" class="btn" style="background:#fee2e2; color:#b91c1c; font-size:0.85rem; padding:6px 10px; border-radius:8px; border:none; cursor:pointer;" title="حذف کریں">
                                         <i class="fas fa-trash-alt"></i>
                                     </button>
                                 </div>
@@ -344,80 +350,390 @@ const GraduatesModule = {
         `;
     },
 
-    // 2. TABLE VIEW
+    // 2. TABLE (LIST) VIEW
     renderTableView(graduates) {
         return `
-            <div class="card" style="background:white; border-radius:14px; padding:1.2rem; overflow-x:auto;">
-                <table class="table" style="width:100%; border-collapse:collapse; font-size:0.95rem;">
-                    <thead>
-                        <tr style="background:#f1f5f9; color:#1e293b; border-bottom:2px solid #cbd5e1;">
-                            <th style="padding:10px 12px; text-align:right;">نام طالب علم مع ولدیت</th>
-                            <th style="padding:10px 12px; text-align:center;">سالِ فراغت</th>
-                            <th style="padding:10px 12px; text-align:right;">شعبہ</th>
-                            <th style="padding:10px 12px; text-align:right;">وفاق رول نمبر</th>
-                            <th style="padding:10px 12px; text-align:center;">وفاق نمبرات و گریڈ</th>
-                            <th style="padding:10px 12px; text-align:center;">وفاق رزلٹ کارڈ</th>
-                            <th style="padding:10px 12px; text-align:center;">سندِ حفظ</th>
-                            <th style="padding:10px 12px; text-align:right;">موجودہ مصروفیت</th>
-                            <th style="padding:10px 12px; text-align:center;">ایکشنز</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${graduates.map(g => `
-                            <tr style="border-bottom:1px solid #f1f5f9;">
-                                <td style="padding:10px 12px; font-weight:bold; color:#0f172a;">
-                                    ${g.name}
-                                    <div style="font-size:0.8rem; color:#64748b; font-weight:normal;">${g.fatherName ? `ولد ${g.fatherName}` : ''} ${g.phone ? `| ${g.phone}` : ''}</div>
-                                </td>
-                                <td style="padding:10px 12px; text-align:center; font-weight:bold; color:#312e81;">
-                                    ${g.graduationYear || '---'}ء
-                                </td>
-                                <td style="padding:10px 12px; color:#475569;">
-                                    ${g.graduationType || 'حفظِ قرآن'}
-                                </td>
-                                <td style="padding:10px 12px; font-family:monospace; color:#0f172a;">
-                                    ${g.wafaqRollNo || '---'}
-                                </td>
-                                <td style="padding:10px 12px; text-align:center;">
-                                    ${g.wafaqGrade ? `<span style="background:#ecfdf5; color:#15803d; padding:2px 8px; border-radius:6px; font-size:0.82rem; font-weight:bold;">${g.wafaqGrade}</span>` : '---'}
-                                    ${g.wafaqObtainedMarks ? `<div style="font-size:0.8rem; font-family:monospace; color:#64748b;">${g.wafaqObtainedMarks}/${g.wafaqTotalMarks || 100}</div>` : ''}
-                                </td>
-                                <td style="padding:10px 12px; text-align:center;">
-                                    ${g.wafaqResultCardDoc ? `
-                                        <button onclick="GraduatesModule.viewDocument('${g.id}', 'wafaq')" class="btn" style="background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; padding:3px 8px; border-radius:6px; font-size:0.82rem; cursor:pointer;">
-                                            <i class="fas fa-eye"></i> رزلٹ کارڈ
-                                        </button>
-                                    ` : '<span style="color:#cbd5e1;">—</span>'}
-                                </td>
-                                <td style="padding:10px 12px; text-align:center;">
-                                    ${g.hifzSanadDoc ? `
-                                        <button onclick="GraduatesModule.viewDocument('${g.id}', 'sanad')" class="btn" style="background:#f0f9ff; color:#0284c7; border:1px solid #bae6fd; padding:3px 8px; border-radius:6px; font-size:0.82rem; cursor:pointer;">
-                                            <i class="fas fa-eye"></i> سند
-                                        </button>
-                                    ` : '<span style="color:#cbd5e1;">—</span>'}
-                                </td>
-                                <td style="padding:10px 12px; color:#475569; font-size:0.88rem;">
-                                    ${g.currentOccupation || '---'}
-                                </td>
-                                <td style="padding:10px 12px; text-align:center;">
-                                    <div style="display:inline-flex; gap:6px;">
-                                        <button onclick="GraduatesModule.printMadrasaSanad(${g.id})" class="btn" style="background:#4338ca; color:white; border:none; padding:4px 10px; border-radius:6px; font-size:0.85rem; cursor:pointer;" title="سند پرنٹ">
-                                            <i class="fas fa-award"></i>
-                                        </button>
-                                        <button onclick="GraduatesModule.showGraduateModal(${g.id})" class="btn" style="background:#f1f5f9; color:#475569; border:none; padding:4px 8px; border-radius:6px; font-size:0.85rem; cursor:pointer;" title="ترمیم">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button onclick="GraduatesModule.deleteGraduate(${g.id})" class="btn" style="background:#fee2e2; color:#b91c1c; border:none; padding:4px 8px; border-radius:6px; font-size:0.85rem; cursor:pointer;" title="حذف">
-                                            <i class="fas fa-trash-alt"></i>
-                                        </button>
-                                    </div>
-                                </td>
+            <div class="card" style="background:white; border-radius:14px; padding:1.2rem; box-shadow:var(--shadow-sm);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:0.92rem; color:#64748b; background:#f8fafc; padding:10px 14px; border-radius:10px; border:1px solid #e2e8f0;">
+                    <div>
+                        <i class="fas fa-info-circle" style="color:#2563eb; margin-left:6px;"></i> کسی بھی طالب علم کی مکمل تفصیلات دیکھنے کے لیے اس کی قطار (Row) یا <b>"تفصیل"</b> بٹن پر کلک فرمائیں۔
+                    </div>
+                    <div style="font-weight:bold; color:#1e293b; background:#e2e8f0; padding:3px 10px; border-radius:16px;">
+                        تعداد فارغین: ${graduates.length}
+                    </div>
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table class="table" style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+                        <thead>
+                            <tr style="background:#f1f5f9; color:#1e293b; border-bottom:2px solid #cbd5e1;">
+                                <th style="padding:10px 12px; text-align:center; width:45px;">#</th>
+                                <th style="padding:10px 12px; text-align:right;">نام فارغ التحصیل مع ولدیت</th>
+                                <th style="padding:10px 12px; text-align:center;">سالِ فراغت</th>
+                                <th style="padding:10px 12px; text-align:right;">شعبہ فراغت</th>
+                                <th style="padding:10px 12px; text-align:right;">استاد محترم</th>
+                                <th style="padding:10px 12px; text-align:center;">وفاق امتحانی کوائف</th>
+                                <th style="padding:10px 12px; text-align:center;">دستاویزات</th>
+                                <th style="padding:10px 12px; text-align:right;">موجودہ مصروفیت و رابطہ</th>
+                                <th style="padding:10px 12px; text-align:center;">ایکشنز</th>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            ${graduates.map((g, idx) => {
+                                const gradeColor = (g.wafaqGrade && (g.wafaqGrade.includes('ممتاز') || g.wafaqGrade.includes('A+'))) ? '#15803d' : '#0369a1';
+                                const gradeBg = (g.wafaqGrade && (g.wafaqGrade.includes('ممتاز') || g.wafaqGrade.includes('A+'))) ? '#dcfce7' : '#e0f2fe';
+
+                                return `
+                                    <tr onclick="GraduatesModule.showGraduateDetails('${g.id}', ${idx})" style="border-bottom:1px solid #f1f5f9; cursor:pointer; transition:all 0.15s ease;" onmouseover="this.style.backgroundColor='#f8fafc'" onmouseout="this.style.backgroundColor='transparent'">
+                                        <td style="padding:10px 8px; text-align:center; font-weight:bold; color:#64748b; font-family:monospace;">
+                                            ${idx + 1}
+                                        </td>
+                                        <td style="padding:10px 12px;">
+                                            <div style="display:flex; align-items:center; gap:10px;">
+                                                <div style="width:36px; height:36px; border-radius:8px; background:#eef2ff; color:#4338ca; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0;">
+                                                    <i class="fas fa-graduation-cap"></i>
+                                                </div>
+                                                <div>
+                                                    <div style="font-weight:bold; font-size:1.05rem; font-family:'Aref Ruqaa', 'Amiri', serif; color:#0f172a;">
+                                                        ${g.name}
+                                                    </div>
+                                                    <div style="font-size:0.82rem; color:#64748b;">
+                                                        ${g.fatherName ? `ولد ${g.fatherName}` : ''}
+                                                        ${g.studentCode ? `<span style="background:#f1f5f9; color:#475569; padding:1px 5px; border-radius:4px; margin-right:4px; font-family:monospace;">${g.studentCode}</span>` : ''}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td style="padding:10px 12px; text-align:center;">
+                                            <span style="background:#fef3c7; color:#92400e; padding:3px 10px; border-radius:18px; font-size:0.85rem; font-weight:bold; display:inline-block;">
+                                                سال ${g.graduationYear || '---'}ء
+                                            </span>
+                                        </td>
+                                        <td style="padding:10px 12px; color:#312e81; font-weight:600; font-size:0.92rem;">
+                                            ${g.graduationType || 'حفظِ قرآن کریم'}
+                                        </td>
+                                        <td style="padding:10px 12px; color:#475569; font-size:0.9rem;">
+                                            ${g.ustadName || '---'}
+                                        </td>
+                                        <td style="padding:10px 12px; text-align:center;">
+                                            ${g.wafaqRollNo ? `<div style="font-family:monospace; font-weight:bold; color:#0f172a; font-size:0.9rem;">رول: ${g.wafaqRollNo}</div>` : ''}
+                                            ${g.wafaqGrade ? `<span style="background:${gradeBg}; color:${gradeColor}; padding:2px 8px; border-radius:6px; font-size:0.8rem; font-weight:bold; display:inline-block; margin-top:2px;">${g.wafaqGrade}</span>` : '<span style="color:#cbd5e1;">—</span>'}
+                                            ${g.wafaqObtainedMarks ? `<div style="font-size:0.78rem; font-family:monospace; color:#64748b; margin-top:2px;">${g.wafaqObtainedMarks}/${g.wafaqTotalMarks || 100}</div>` : ''}
+                                        </td>
+                                        <td style="padding:10px 12px; text-align:center;" onclick="event.stopPropagation()">
+                                            <div style="display:flex; flex-direction:column; gap:4px; align-items:center;">
+                                                ${g.wafaqResultCardDoc ? `
+                                                    <button type="button" onclick="GraduatesModule.viewDocument('${g.id}', 'wafaq')" class="btn" style="background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; padding:2px 8px; border-radius:6px; font-size:0.8rem; cursor:pointer; width:95px; display:inline-flex; align-items:center; justify-content:center; gap:4px;" title="رزلٹ کارڈ دیکھیں">
+                                                        <i class="fas fa-file-invoice"></i> رزلٹ کارڈ
+                                                    </button>
+                                                ` : ''}
+                                                ${g.hifzSanadDoc ? `
+                                                    <button type="button" onclick="GraduatesModule.viewDocument('${g.id}', 'sanad')" class="btn" style="background:#f0f9ff; color:#0284c7; border:1px solid #bae6fd; padding:2px 8px; border-radius:6px; font-size:0.8rem; cursor:pointer; width:95px; display:inline-flex; align-items:center; justify-content:center; gap:4px;" title="سندِ فراغت دیکھیں">
+                                                        <i class="fas fa-award"></i> سندِ فراغت
+                                                    </button>
+                                                ` : ''}
+                                                ${!g.wafaqResultCardDoc && !g.hifzSanadDoc ? '<span style="color:#cbd5e1; font-size:0.85rem;">—</span>' : ''}
+                                            </div>
+                                        </td>
+                                        <td style="padding:10px 12px; color:#475569; font-size:0.88rem;">
+                                            <div>${g.currentOccupation || '---'}</div>
+                                            ${g.phone ? `<div style="font-size:0.82rem; color:#059669; font-family:monospace; margin-top:2px;" dir="ltr"><i class="fas fa-phone"></i> ${g.phone}</div>` : ''}
+                                        </td>
+                                        <td style="padding:10px 12px; text-align:center;" onclick="event.stopPropagation()">
+                                            <div style="display:inline-flex; gap:6px; align-items:center;">
+                                                <button type="button" onclick="event.stopPropagation(); GraduatesModule.showGraduateDetails('${g.id}', ${idx})" class="btn" style="background:linear-gradient(135deg, #2563eb, #1d4ed8); color:white; border:none; padding:5px 12px; border-radius:8px; font-size:0.85rem; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 5px rgba(37,99,235,0.25);" title="مکمل کوائف دیکھیں">
+                                                    <i class="fas fa-eye"></i> تفصیل
+                                                </button>
+                                                <button type="button" onclick="event.stopPropagation(); GraduatesModule.printMadrasaSanad('${g.id}')" class="btn" style="background:#4338ca; color:white; border:none; padding:5px 9px; border-radius:8px; font-size:0.85rem; cursor:pointer;" title="سند پرنٹ کریں">
+                                                    <i class="fas fa-award"></i>
+                                                </button>
+                                                <button type="button" onclick="event.stopPropagation(); GraduatesModule.showGraduateModal('${g.id}')" class="btn" style="background:#f1f5f9; color:#475569; border:none; padding:5px 8px; border-radius:8px; font-size:0.85rem; cursor:pointer;" title="ترمیم">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button type="button" onclick="event.stopPropagation(); GraduatesModule.deleteGraduate('${g.id}')" class="btn" style="background:#fee2e2; color:#b91c1c; border:none; padding:5px 8px; border-radius:8px; font-size:0.85rem; cursor:pointer;" title="حذف">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
+    },
+
+    // 3. SHOW GRADUATE DETAILS MODAL (مکمل تفصیلات کارڈ پاپ اپ)
+    async showGraduateDetails(graduateId, idx = null) {
+        try {
+            let grad = null;
+            if (this.currentGraduates && this.currentGraduates.length) {
+                if (graduateId !== null && graduateId !== undefined && String(graduateId).trim() !== '') {
+                    grad = this.currentGraduates.find(g => String(g.id) === String(graduateId));
+                }
+                if (!grad && idx !== null && idx !== undefined && this.currentGraduates[idx]) {
+                    grad = this.currentGraduates[idx];
+                }
+            }
+            if (!grad && window.MadrassahDB) {
+                try {
+                    grad = await MadrassahDB.getGraduateById(graduateId);
+                } catch (dbErr) {
+                    console.warn('DB getGraduateById error:', dbErr);
+                }
+            }
+
+            if (!grad) {
+                alert('طالب علم کا ریکارڈ نہیں مل سکا!');
+                return;
+            }
+
+            const modalId = 'graduate-details-modal';
+            const existing = document.getElementById(modalId);
+            if (existing) existing.remove();
+
+            // WhatsApp link formatting
+            const rawWa = grad.whatsapp || grad.phone || '';
+            const cleanWa = String(rawWa).replace(/[^0-9]/g, '');
+            const formattedWa = cleanWa.startsWith('0') ? '92' + cleanWa.slice(1) : cleanWa;
+
+            const gradeColor = (grad.wafaqGrade && (grad.wafaqGrade.includes('ممتاز') || grad.wafaqGrade.includes('A+'))) ? '#15803d' : '#0369a1';
+            const gradeBg = (grad.wafaqGrade && (grad.wafaqGrade.includes('ممتاز') || grad.wafaqGrade.includes('A+'))) ? '#dcfce7' : '#e0f2fe';
+            const formattedDate = grad.completionDate ? String(grad.completionDate).split('-').reverse().join('/') : '---';
+
+            const modalHtml = `
+                <div id="${modalId}" onclick="if(event.target === this) this.remove()" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.75); z-index:9999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(6px); padding:1rem;">
+                    <div style="background:white; border-radius:20px; width:100%; max-width:680px; max-height:92vh; overflow-y:auto; box-shadow:0 25px 60px rgba(0,0,0,0.4); border:1.5px solid #cbd5e1; display:flex; flex-direction:column; position:relative;" onclick="event.stopPropagation()">
+                        
+                        <!-- Header Bar -->
+                        <div style="background:linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%); color:white; padding:1.2rem 1.6rem; border-radius:18px 18px 0 0; display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <div style="width:40px; height:40px; border-radius:10px; background:rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center; font-size:1.3rem; color:#fde047;">
+                                    <i class="fas fa-user-graduate"></i>
+                                </div>
+                                <div>
+                                    <h3 style="margin:0; font-family:'Aref Ruqaa', 'Amiri', serif; font-size:1.5rem; color:#ffffff; line-height:1.2;">
+                                        مکمل کوائف فارغ التحصیل طالب علم
+                                    </h3>
+                                    <p style="margin:2px 0 0 0; color:#c7d2fe; font-size:0.85rem;">
+                                        مدرسہ عبد الرحمن بن عوف غفوریہ — سجل الفضلاء
+                                    </p>
+                                </div>
+                            </div>
+                            <button type="button" onclick="document.getElementById('${modalId}').remove()" style="background:rgba(255,255,255,0.15); border:none; color:white; width:34px; height:34px; border-radius:50%; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'" title="بند کریں (Esc)">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+
+                        <!-- Modal Body Content -->
+                        <div style="padding:1.5rem; display:flex; flex-direction:column; gap:1.2rem;">
+
+                            <!-- Top Student Profile Banner -->
+                            <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; padding:1.2rem; border-radius:16px;">
+                                <div style="display:flex; gap:14px; align-items:center;">
+                                    <div style="width:58px; height:58px; border-radius:14px; background:#eef2ff; color:#4338ca; display:flex; align-items:center; justify-content:center; font-size:1.8rem; border:2px solid #c7d2fe; flex-shrink:0;">
+                                        <i class="fas fa-graduation-cap"></i>
+                                    </div>
+                                    <div>
+                                        <h2 style="margin:0; font-size:1.8rem; color:#0f172a; font-family:'Aref Ruqaa', 'Amiri', serif; line-height:1.2;">
+                                            ${grad.name}
+                                        </h2>
+                                        <div style="font-size:1.05rem; color:#475569; margin-top:2px;">
+                                            ${grad.fatherName ? `ولد ${grad.fatherName}` : ''}
+                                            ${grad.studentCode ? `<span style="background:#e2e8f0; color:#334155; font-size:0.8rem; padding:2px 8px; border-radius:6px; margin-right:6px; font-family:monospace;">${grad.studentCode}</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="text-align:left;">
+                                    <span style="background:#fef3c7; color:#92400e; padding:6px 14px; border-radius:24px; font-size:0.95rem; font-weight:bold; display:inline-block; border:1px solid #fde68a;">
+                                        سال ${grad.graduationYear || '---'}ء
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- 1. تعلیمی و فراغت کی تفصیلات -->
+                            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:14px; padding:1.2rem;">
+                                <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; border-bottom:1.5px solid #f1f5f9; padding-bottom:8px;">
+                                    <i class="fas fa-book-quran" style="color:#4338ca; font-size:1.1rem;"></i>
+                                    <h4 style="margin:0; color:#1e1b4b; font-size:1.1rem; font-family:'Aref Ruqaa', serif;">
+                                        شعبہ فراغت و تکمیل کا ریکارڈ
+                                    </h4>
+                                </div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:0.95rem;">
+                                    <div>
+                                        <span style="color:#64748b; font-size:0.85rem; display:block;">شعبہ فراغت:</span>
+                                        <b style="color:#312e81; font-size:1.1rem;">${grad.graduationType || 'حفظِ قرآن کریم'}</b>
+                                    </div>
+                                    <div>
+                                        <span style="color:#64748b; font-size:0.85rem; display:block;">استاد محترم:</span>
+                                        <b style="color:#1e293b; font-size:1.1rem;">${grad.ustadName || '---'}</b>
+                                    </div>
+                                    <div>
+                                        <span style="color:#64748b; font-size:0.85rem; display:block;">تاریخ فراغت / دستار:</span>
+                                        <b style="color:#1e293b; font-size:1.05rem;">${formattedDate}</b>
+                                    </div>
+                                    <div>
+                                        <span style="color:#64748b; font-size:0.85rem; display:block;">دورانیہ:</span>
+                                        <b style="color:#1e293b; font-size:1.05rem;">${grad.durationMonths ? `${grad.durationMonths} ماہ` : '---'}</b>
+                                    </div>
+                                    ${grad.sanadNumber ? `
+                                    <div>
+                                        <span style="color:#64748b; font-size:0.85rem; display:block;">سند نمبر:</span>
+                                        <b style="color:#0284c7; font-family:monospace; font-size:1rem;">${grad.sanadNumber}</b>
+                                    </div>` : ''}
+                                    ${grad.previousClass ? `
+                                    <div>
+                                        <span style="color:#64748b; font-size:0.85rem; display:block;">سابقہ درجہ / کلاس:</span>
+                                        <b style="color:#475569;">${grad.previousClass}</b>
+                                    </div>` : ''}
+                                </div>
+                            </div>
+
+                            <!-- 2. وفاق المدارس امتحانی کوائف -->
+                            <div style="border:1.5px solid #c7d2fe; background:#f5f3ff; border-radius:14px; padding:1.2rem;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1.5px solid #e0e7ff; padding-bottom:8px;">
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <i class="fas fa-landmark" style="color:#4338ca; font-size:1.2rem;"></i>
+                                        <h4 style="margin:0; font-weight:bold; color:#312e81; font-size:1.1rem; font-family:'Aref Ruqaa', serif;">
+                                            وفاق المدارس امتحانی کوائف
+                                        </h4>
+                                    </div>
+                                    ${grad.wafaqGrade ? `
+                                        <span style="background:${gradeBg}; color:${gradeColor}; font-weight:bold; padding:4px 12px; border-radius:8px; font-size:0.92rem; border:1px solid #86efac;">
+                                            ${grad.wafaqGrade}
+                                        </span>
+                                    ` : ''}
+                                </div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:0.95rem; color:#334155;">
+                                    <div>
+                                        <span style="color:#64748b; font-size:0.85rem; display:block;">وفاق رول نمبر:</span>
+                                        <b style="font-family:monospace; font-size:1.2rem; color:#0f172a;">${grad.wafaqRollNo || '---'}</b>
+                                    </div>
+                                    <div>
+                                        <span style="color:#64748b; font-size:0.85rem; display:block;">حاصل کردہ نمبرات:</span>
+                                        <b style="font-family:monospace; font-size:1.2rem; color:#15803d;">
+                                            ${grad.wafaqObtainedMarks ? `${grad.wafaqObtainedMarks} / ${grad.wafaqTotalMarks || 100}` : '---'}
+                                        </b>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 3. منسلک سرکاری اسناد و رزلٹ کارڈز -->
+                            <div>
+                                <div style="font-size:0.95rem; font-weight:bold; color:#1e1b4b; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                                    <i class="fas fa-file-shield" style="color:#0284c7;"></i> منسلک دستاویزات و اسناد
+                                </div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                                    <!-- Wafaq Result Card -->
+                                    <div style="border:2px dashed ${grad.wafaqResultCardDoc ? '#10b981' : '#cbd5e1'}; border-radius:12px; padding:10px; text-align:center; background:${grad.wafaqResultCardDoc ? '#ecfdf5' : '#f8fafc'};">
+                                        <div style="font-size:0.9rem; font-weight:bold; color:${grad.wafaqResultCardDoc ? '#065f46' : '#64748b'}; margin-bottom:6px; display:flex; align-items:center; justify-content:center; gap:5px;">
+                                            <i class="fas fa-file-invoice"></i> وفاق رزلٹ کارڈ
+                                        </div>
+                                        ${grad.wafaqResultCardDoc ? `
+                                            <div onclick="GraduatesModule.viewDocument('${grad.id}', 'wafaq')" style="position:relative; width:100%; height:110px; border-radius:8px; overflow:hidden; cursor:pointer; border:1px solid #a7f3d0;" title="مکمل دیکھنے کے لیے کلک کریں">
+                                                <img src="${grad.wafaqResultCardDoc}" alt="وفاق رزلٹ کارڈ" style="width:100%; height:100%; object-fit:cover;">
+                                                <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.65); color:white; font-size:0.8rem; padding:4px; display:flex; align-items:center; justify-content:center; gap:5px;">
+                                                    <i class="fas fa-eye"></i> کلک کریں (دیکھیں)
+                                                </div>
+                                            </div>
+                                        ` : `
+                                            <div style="height:110px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#94a3b8; font-size:0.85rem;">
+                                                <i class="fas fa-image" style="font-size:2rem; margin-bottom:6px;"></i> اپلوڈ نہیں ہوا
+                                            </div>
+                                        `}
+                                    </div>
+
+                                    <!-- Hifz Sanad Document -->
+                                    <div style="border:2px dashed ${grad.hifzSanadDoc ? '#0284c7' : '#cbd5e1'}; border-radius:12px; padding:10px; text-align:center; background:${grad.hifzSanadDoc ? '#f0f9ff' : '#f8fafc'};">
+                                        <div style="font-size:0.9rem; font-weight:bold; color:${grad.hifzSanadDoc ? '#0369a1' : '#64748b'}; margin-bottom:6px; display:flex; align-items:center; justify-content:center; gap:5px;">
+                                            <i class="fas fa-award"></i> سندِ حفظ / فراغت
+                                        </div>
+                                        ${grad.hifzSanadDoc ? `
+                                            <div onclick="GraduatesModule.viewDocument('${grad.id}', 'sanad')" style="position:relative; width:100%; height:110px; border-radius:8px; overflow:hidden; cursor:pointer; border:1px solid #bae6fd;" title="مکمل دیکھنے کے لیے کلک کریں">
+                                                <img src="${grad.hifzSanadDoc}" alt="سندِ حفظ" style="width:100%; height:100%; object-fit:cover;">
+                                                <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.65); color:white; font-size:0.8rem; padding:4px; display:flex; align-items:center; justify-content:center; gap:5px;">
+                                                    <i class="fas fa-eye"></i> کلک کریں (دیکھیں)
+                                                </div>
+                                            </div>
+                                        ` : `
+                                            <div style="height:110px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#94a3b8; font-size:0.85rem;">
+                                                <i class="fas fa-certificate" style="font-size:2rem; margin-bottom:6px;"></i> اپلوڈ نہیں ہوئی
+                                            </div>
+                                        `}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 4. موجودہ احوال، خدمت و رابطہ -->
+                            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:1.2rem;">
+                                <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; border-bottom:1.5px solid #f1f5f9; padding-bottom:6px;">
+                                    <i class="fas fa-briefcase" style="color:#6366f1; font-size:1.1rem;"></i>
+                                    <h4 style="margin:0; color:#1e1b4b; font-size:1.1rem; font-family:'Aref Ruqaa', serif;">
+                                        موجودہ مصروفیت و رابطہ
+                                    </h4>
+                                </div>
+                                <div style="font-size:0.95rem; color:#334155; line-height:1.6;">
+                                    <div><b>موجودہ مصروفیت:</b> ${grad.currentOccupation || '---'} ${grad.currentInstitution ? `(${grad.currentInstitution})` : ''}</div>
+                                    ${[grad.address, grad.city].filter(Boolean).length ? `<div><b>پتہ / رہائش:</b> ${[grad.address, grad.city].filter(Boolean).join('، ')}</div>` : ''}
+                                    ${grad.phone ? `<div style="margin-top:6px;"><i class="fas fa-phone" style="color:#059669; margin-left:6px;"></i> <span dir="ltr" style="font-weight:bold; font-family:monospace; font-size:1.1rem;">${grad.phone}</span></div>` : ''}
+                                </div>
+                            </div>
+
+                            ${grad.notes ? `
+                            <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 14px; font-size:0.9rem; color:#92400e;">
+                                <b>نوٹ / ریمارکس:</b> ${grad.notes}
+                            </div>
+                            ` : ''}
+
+                        </div>
+
+                        <!-- Modal Actions Footer -->
+                        <div style="background:#f8fafc; border-top:1.5px solid #e2e8f0; padding:1.2rem 1.6rem; border-radius:0 0 18px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                <button type="button" onclick="GraduatesModule.printMadrasaSanad('${grad.id}')" class="btn" style="background:#4338ca; color:white; font-size:0.95rem; font-weight:bold; padding:9px 18px; border-radius:10px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 3px 8px rgba(67,56,202,0.3);">
+                                    <i class="fas fa-award"></i> باضابطہ سند پرنٹ کریں
+                                </button>
+                                ${formattedWa ? `
+                                    <a href="https://wa.me/${formattedWa}" target="_blank" class="btn" style="background:#22c55e; color:white; font-size:0.95rem; font-weight:bold; padding:9px 16px; border-radius:10px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; box-shadow:0 3px 8px rgba(34,197,94,0.3);">
+                                        <i class="fab fa-whatsapp" style="font-size:1.1rem;"></i> واٹس ایپ رابطہ
+                                    </a>
+                                ` : ''}
+                            </div>
+
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <button type="button" onclick="document.getElementById('${modalId}').remove(); GraduatesModule.showGraduateModal('${grad.id}');" class="btn" style="background:#f1f5f9; color:#475569; font-size:0.95rem; font-weight:bold; padding:9px 14px; border-radius:10px; border:1px solid #cbd5e1; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                                    <i class="fas fa-edit"></i> ترمیم
+                                </button>
+                                <button type="button" onclick="document.getElementById('${modalId}').remove(); GraduatesModule.deleteGraduate('${grad.id}');" class="btn" style="background:#fee2e2; color:#b91c1c; font-size:0.95rem; font-weight:bold; padding:9px 14px; border-radius:10px; border:1px solid #fca5a5; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                                    <i class="fas fa-trash-alt"></i> حذف
+                                </button>
+                                <button type="button" onclick="document.getElementById('${modalId}').remove()" class="btn" style="background:#e2e8f0; color:#1e293b; font-size:0.95rem; font-weight:bold; padding:9px 16px; border-radius:10px; border:none; cursor:pointer;">
+                                    بند کریں
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+            // Esc key listener to close modal
+            const escListener = (e) => {
+                if (e.key === 'Escape') {
+                    const m = document.getElementById(modalId);
+                    if (m) m.remove();
+                    document.removeEventListener('keydown', escListener);
+                }
+            };
+            document.addEventListener('keydown', escListener);
+        } catch (err) {
+            console.error('Error showing graduate details:', err);
+            alert('تفصیلات دکھانے میں خرابی پیش آئی: ' + err.message);
+        }
     },
 
     // Navigation & Filters
@@ -452,8 +768,20 @@ const GraduatesModule = {
     async showGraduateModal(graduateId = null) {
         const section = (window.app && window.app.currentSection) ? window.app.currentSection : 'banin';
         let grad = null;
-        if (graduateId) {
-            grad = await MadrassahDB.getGraduateById(graduateId);
+        if (graduateId !== null && graduateId !== undefined && String(graduateId).trim() !== '') {
+            if (this.currentGraduates && this.currentGraduates.length) {
+                grad = this.currentGraduates.find(g => String(g.id) === String(graduateId));
+            }
+            if (!grad && this.allGraduates && this.allGraduates.length) {
+                grad = this.allGraduates.find(g => String(g.id) === String(graduateId));
+            }
+            if (!grad && window.MadrassahDB) {
+                try {
+                    grad = await MadrassahDB.getGraduateById(graduateId);
+                } catch (e) {
+                    console.warn(e);
+                }
+            }
         }
 
         const isEdit = !!grad;
@@ -846,8 +1174,18 @@ const GraduatesModule = {
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
 
-        if (data.id) data.id = parseInt(data.id);
-        if (data.studentId) data.studentId = parseInt(data.studentId);
+        if (data.id && String(data.id).trim() !== '' && !isNaN(data.id) && parseInt(data.id) > 0) {
+            data.id = parseInt(data.id);
+        } else {
+            delete data.id;
+        }
+
+        if (data.studentId && String(data.studentId).trim() !== '' && !isNaN(data.studentId) && parseInt(data.studentId) > 0) {
+            data.studentId = parseInt(data.studentId);
+        } else {
+            delete data.studentId;
+        }
+
         data.graduationYear = parseInt(data.graduationYear) || new Date().getFullYear();
         if (data.wafaqTotalMarks) data.wafaqTotalMarks = parseFloat(data.wafaqTotalMarks) || 100;
         if (data.wafaqObtainedMarks) data.wafaqObtainedMarks = parseFloat(data.wafaqObtainedMarks) || 0;
@@ -882,7 +1220,20 @@ const GraduatesModule = {
     },
 
     async deleteGraduate(id) {
-        const grad = await MadrassahDB.getGraduateById(id);
+        let grad = null;
+        if (this.currentGraduates && this.currentGraduates.length) {
+            grad = this.currentGraduates.find(g => String(g.id) === String(id));
+        }
+        if (!grad && this.allGraduates && this.allGraduates.length) {
+            grad = this.allGraduates.find(g => String(g.id) === String(id));
+        }
+        if (!grad && window.MadrassahDB) {
+            try {
+                grad = await MadrassahDB.getGraduateById(id);
+            } catch (e) {
+                console.warn(e);
+            }
+        }
         if (!grad) return;
 
         if (!confirm(`کیا آپ واقعی "${grad.name}" کا فارغ التحصیل ریکارڈ حذف کرنا چاہتے ہیں؟`)) {
@@ -901,7 +1252,20 @@ const GraduatesModule = {
     // --- DOCUMENT LIGHTBOX / VIEWER MODAL ---
     // ==========================================
     async viewDocument(graduateId, docType) {
-        const grad = await MadrassahDB.getGraduateById(graduateId);
+        let grad = null;
+        if (this.currentGraduates && this.currentGraduates.length) {
+            grad = this.currentGraduates.find(g => String(g.id) === String(graduateId));
+        }
+        if (!grad && this.allGraduates && this.allGraduates.length) {
+            grad = this.allGraduates.find(g => String(g.id) === String(graduateId));
+        }
+        if (!grad && window.MadrassahDB) {
+            try {
+                grad = await MadrassahDB.getGraduateById(graduateId);
+            } catch (e) {
+                console.warn(e);
+            }
+        }
         if (!grad) return;
 
         const isWafaq = docType === 'wafaq';
@@ -999,7 +1363,20 @@ const GraduatesModule = {
     // --- PRINT MADRASA SANAD / CERTIFICATE ---
     // ==========================================
     async printMadrasaSanad(graduateId) {
-        const grad = await MadrassahDB.getGraduateById(graduateId);
+        let grad = null;
+        if (this.currentGraduates && this.currentGraduates.length) {
+            grad = this.currentGraduates.find(g => String(g.id) === String(graduateId));
+        }
+        if (!grad && this.allGraduates && this.allGraduates.length) {
+            grad = this.allGraduates.find(g => String(g.id) === String(graduateId));
+        }
+        if (!grad && window.MadrassahDB) {
+            try {
+                grad = await MadrassahDB.getGraduateById(graduateId);
+            } catch (e) {
+                console.warn(e);
+            }
+        }
         if (!grad) return;
 
         const printWin = window.open('', '_blank');

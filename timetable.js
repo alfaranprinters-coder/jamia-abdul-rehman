@@ -243,8 +243,8 @@ var TimetableModule = {
                                 <i class="fas fa-calendar-alt"></i>
                             </div>
                             <div>
-                                <h2 style="margin:0; font-family:'Aref Ruqaa', 'Amiri', serif; font-size:2rem; letter-spacing:0.5px; color:#ffffff;">
-                                    نظام الاوقات و جدول الاوقات (سہ گانہ سیشنز)
+                                <h2 style="margin:0; font-family:'Jameel Noori Nastaleeq', 'Noto Sans Urdu', 'Amiri', serif; font-size:2.2rem; letter-spacing:0.5px; color:#ffffff;">
+                                    نظام الاوقات و جدول الاوقات (سہ گانہ اوقات)
                                 </h2>
                                 <p style="margin:4px 0 0 0; color:#94a3b8; font-size:1rem;">
                                     وقتِ اول، وقتِ ثانی، اور وقتِ آخر کی خودکار و مینول سیٹنگ مع گھنٹیاں اور اساتذہ
@@ -997,7 +997,7 @@ var TimetableModule = {
 
     <div class="header">
         <h1 class="madrassa-name">مدرسہ عبد الرحمن بن عوف غفوریہ</h1>
-        <div class="subtitle">نظام الاوقات و جدولِ یومیہ برائے طلباء و اساتذہ (سہ گانہ سیشنز)</div>
+        <div class="subtitle">نظام الاوقات و جدولِ یومیہ برائے طلباء و اساتذہ (سہ گانہ اوقات)</div>
     </div>
 
     <div class="shifts-grid">

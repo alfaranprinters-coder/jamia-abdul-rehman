@@ -3,7 +3,8 @@
 // Architecture & Implementation for Madrasa Abdul Rehman Bin Auf
 
 const DonorsModule = {
-    activeTab: 'cards', // 'cards' | 'master' | 'history'
+    activeTab: 'list', // 'list' | 'cards' | 'master' | 'history'
+    selectedDonorDetailsId: null, // null = list view, ID = single donor 12-month ledger details
     selectedYear: new Date().getFullYear(),
     calendarType: 'gregorian', // 'gregorian' | 'hijri'
     searchQuery: '',
@@ -207,8 +208,8 @@ const DonorsModule = {
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
                         <!-- Tab Pills -->
                         <div style="display:flex; gap:8px; background:#f1f5f9; padding:5px; border-radius:12px;">
-                            <button onclick="DonorsModule.switchTab('cards')" class="btn" style="border:none; cursor:pointer; font-weight:bold; border-radius:9px; padding:8px 18px; display:flex; align-items:center; gap:6px; ${this.activeTab === 'cards' ? 'background:var(--primary); color:white; box-shadow:0 2px 6px rgba(0,0,0,0.1);' : 'background:transparent; color:#475569;'}">
-                                <i class="fas fa-address-card"></i> ڈونرز کارڈز و ۱۲ ماہ کا کھاتہ
+                            <button onclick="DonorsModule.switchTab('list')" class="btn" style="border:none; cursor:pointer; font-weight:bold; border-radius:9px; padding:8px 18px; display:flex; align-items:center; gap:6px; ${(this.activeTab === 'list' || this.activeTab === 'cards') ? 'background:var(--primary); color:white; box-shadow:0 2px 6px rgba(0,0,0,0.1);' : 'background:transparent; color:#475569;'}">
+                                <i class="fas fa-list-check"></i> ڈونرز کی فہرست
                             </button>
                             <button onclick="DonorsModule.switchTab('master')" class="btn" style="border:none; cursor:pointer; font-weight:bold; border-radius:9px; padding:8px 18px; display:flex; align-items:center; gap:6px; ${this.activeTab === 'master' ? 'background:var(--primary); color:white; box-shadow:0 2px 6px rgba(0,0,0,0.1);' : 'background:transparent; color:#475569;'}">
                                 <i class="fas fa-table-cells"></i> سالانہ ماسٹر شیٹ
@@ -262,7 +263,7 @@ const DonorsModule = {
 
                 <!-- Main Content Area Based on Tab -->
                 <div id="donors-tab-content">
-                    ${this.activeTab === 'cards' ? this.renderCardsView(filteredDonors, thisYearDonations) : ''}
+                    ${(this.activeTab === 'list' || this.activeTab === 'cards') ? this.renderDonorsMainView(filteredDonors, thisYearDonations, donors) : ''}
                     ${this.activeTab === 'master' ? this.renderMasterView(filteredDonors, thisYearDonations) : ''}
                     ${this.activeTab === 'history' ? this.renderHistoryView(donations, donors) : ''}
                 </div>
@@ -270,178 +271,342 @@ const DonorsModule = {
         `;
     },
 
-    // 1. CARDS & 12 MONTHS MATRIX VIEW
-    renderCardsView(donors, yearDonations) {
+    // Main View Dispatcher (List First, Detail On Click)
+    renderDonorsMainView(filteredDonors, yearDonations, allDonors) {
+        if (this.selectedDonorDetailsId) {
+            const singleDonor = (allDonors || []).find(d => String(d.id) === String(this.selectedDonorDetailsId))
+                || filteredDonors.find(d => String(d.id) === String(this.selectedDonorDetailsId));
+            if (singleDonor) {
+                return this.renderSingleDonorDetailsView(singleDonor, yearDonations);
+            }
+        }
+        return this.renderDonorsListView(filteredDonors, yearDonations);
+    },
+
+    // 1. DONORS LIST DIRECTORY VIEW (پہلے فہرست نظر آئے گی)
+    renderDonorsListView(donors, yearDonations) {
         if (!donors || donors.length === 0) {
             return `
-                <div class="card" style="text-align:center; padding:3.5rem 2rem; background:white; border-radius:14px;">
+                <div class="card" style="text-align:center; padding:3.5rem 2rem; background:white; border-radius:14px; box-shadow:var(--shadow-sm);">
                     <div style="font-size:3.5rem; color:#cbd5e1; margin-bottom:1rem;"><i class="fas fa-hand-holding-heart"></i></div>
                     <h3 style="color:#475569; margin-bottom:0.5rem;">کوئی مستقل ڈونر موجود نہیں ہے</h3>
                     <p style="color:#94a3b8; font-size:0.95rem; margin-bottom:1.5rem;">مدرسہ کے باقاعدہ ماہانہ معاونین کا اندراج شروع کرنے کے لیے نیا ڈونر شامل فرمائیں۔</p>
-                    <button onclick="DonorsModule.showDonorModal()" class="btn btn-primary" style="background:var(--primary); font-weight:bold; padding:10px 24px; border-radius:10px;">
+                    <button onclick="DonorsModule.showDonorModal()" class="btn btn-primary" style="background:var(--primary); font-weight:bold; padding:10px 24px; border-radius:10px; border:none; cursor:pointer;">
                         <i class="fas fa-plus"></i> نیا ڈونر رجسٹر کریں
                     </button>
                 </div>
             `;
         }
 
+        return `
+            <div class="card" style="background:white; border-radius:14px; padding:1.2rem 1.5rem; box-shadow:var(--shadow-sm); overflow-x:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <h3 style="margin:0; font-size:1.35rem; color:#0f172a; font-family:'Aref Ruqaa', 'Amiri', serif;">
+                            <i class="fas fa-list-check" style="color:var(--primary); margin-left:6px;"></i> فہرستِ مستقل معاونین (Donors Directory)
+                        </h3>
+                        <span style="font-size:0.85rem; color:#64748b;">
+                            کل معاونین: <b>${donors.length}</b> | سال ${this.selectedYear}ء | مکمل ۱۲ ماہ کا کھاتہ دیکھنے کے لیے متعلقہ ڈونر کے سامنے <b>"تفصیل چیک کریں"</b> دبائیں
+                        </span>
+                    </div>
+                    <div>
+                        <button onclick="DonorsModule.showDonorModal()" class="btn btn-sm" style="background:#059669; color:white; font-weight:bold; padding:8px 16px; border-radius:8px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; border:none;">
+                            <i class="fas fa-user-plus"></i> نیا ڈونر رجسٹر کریں
+                        </button>
+                    </div>
+                </div>
+
+                <table class="table" style="width:100%; border-collapse:collapse; font-size:0.95rem; text-align:right;">
+                    <thead>
+                        <tr style="background:#f1f5f9; color:#1e293b; border-bottom:2px solid #cbd5e1;">
+                            <th style="padding:11px 10px; text-align:center; width:45px;">#</th>
+                            <th style="padding:11px 10px; text-align:center; width:105px;">کوڈ / نمبر</th>
+                            <th style="padding:11px 14px;">نامِ ڈونر مع ولدیت</th>
+                            <th style="padding:11px 12px;">رابطہ و واٹس ایپ</th>
+                            <th style="padding:11px 12px;">شہر / پتہ</th>
+                            <th style="padding:11px 12px; text-align:center;">مد / فنڈ</th>
+                            <th style="padding:11px 12px; text-align:center;">ماہانہ طے شدہ</th>
+                            <th style="padding:11px 12px; text-align:center;">سالانہ پیش رفت (${this.selectedYear}ء)</th>
+                            <th style="padding:11px 10px; text-align:center;">کیفیت</th>
+                            <th style="padding:11px 14px; text-align:center; min-width:240px;">کارروائی (ایکشنز)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${donors.map((donor, idx) => {
+                            const donorDons = yearDonations.filter(d => String(d.donorId) === String(donor.id) || parseInt(d.donorId) === parseInt(donor.id));
+                            const paidCount = donorDons.length;
+                            const totalDonated = donorDons.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+                            const pledgedAnnual = (Number(donor.monthlyPledge) || 0) * 12;
+                            const completionPct = pledgedAnnual > 0 ? Math.min(100, Math.round((totalDonated / pledgedAnnual) * 100)) : 0;
+                            const formattedWa = this.formatWhatsAppNumber(donor.whatsapp || donor.phone);
+
+                            return `
+                                <tr style="border-bottom:1px solid #f1f5f9; transition:background 0.15s;" onmouseover="this.style.background='#f8fafc';" onmouseout="this.style.background='white';">
+                                    <td style="padding:11px 10px; text-align:center; color:#64748b; font-weight:bold;">${idx + 1}</td>
+                                    <td style="padding:11px 10px; text-align:center;">
+                                        <span style="background:#e0f2fe; color:#0369a1; font-family:monospace; font-size:0.85rem; font-weight:bold; padding:3px 8px; border-radius:6px; border:1px solid #bae6fd;">
+                                            ${donor.donorCode || ('DNR-' + donor.id)}
+                                        </span>
+                                    </td>
+                                    <td style="padding:11px 14px;">
+                                        <div style="font-weight:bold; font-size:1.05rem; color:#0f172a;">
+                                            ${donor.name}
+                                        </div>
+                                        ${donor.fatherName ? `<div style="font-size:0.82rem; color:#64748b;">ولد ${donor.fatherName}</div>` : ''}
+                                    </td>
+                                    <td style="padding:11px 12px; font-size:0.9rem;">
+                                        ${donor.phone ? `<div><i class="fas fa-phone" style="color:#0284c7; font-size:0.8rem; margin-left:4px;"></i> <span dir="ltr">${donor.phone}</span></div>` : ''}
+                                        ${formattedWa ? `
+                                            <div style="margin-top:2px;">
+                                                <a href="https://wa.me/${formattedWa}" target="_blank" rel="noopener noreferrer" style="color:#16a34a; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:bold; font-size:0.85rem;" title="واٹس ایپ پر رابطہ">
+                                                    <i class="fab fa-whatsapp"></i> <span dir="ltr">${donor.whatsapp || donor.phone}</span>
+                                                </a>
+                                            </div>
+                                        ` : ''}
+                                    </td>
+                                    <td style="padding:11px 12px; color:#475569; font-size:0.88rem;">
+                                        ${[donor.city, donor.address].filter(Boolean).join('، ') || '---'}
+                                    </td>
+                                    <td style="padding:11px 12px; text-align:center;">
+                                        <span style="background:#fef3c7; color:#92400e; font-size:0.8rem; font-weight:bold; padding:3px 8px; border-radius:6px; border:1px solid #fde68a;">
+                                            ${donor.fundType || 'عام عطیہ'}
+                                        </span>
+                                    </td>
+                                    <td style="padding:11px 12px; text-align:center; font-family:monospace; font-weight:bold; color:#065f46; font-size:1rem;">
+                                        Rs. ${(Number(donor.monthlyPledge) || 0).toLocaleString('en-US')}
+                                    </td>
+                                    <td style="padding:11px 12px; text-align:center;">
+                                        <div style="font-weight:bold; font-size:0.88rem; color:${paidCount > 0 ? '#059669' : '#94a3b8'};">
+                                            ${paidCount} / ۱۲ ماہ
+                                        </div>
+                                        <div style="font-family:monospace; font-size:0.82rem; color:#64748b;">
+                                            Rs. ${totalDonated.toLocaleString('en-US')}
+                                        </div>
+                                        <div style="width:100px; height:5px; background:#e2e8f0; border-radius:3px; margin:4px auto 0 auto; overflow:hidden;">
+                                            <div style="width:${completionPct}%; height:100%; background:#10b981;"></div>
+                                        </div>
+                                    </td>
+                                    <td style="padding:11px 10px; text-align:center;">
+                                        ${donor.status === 'inactive' ? 
+                                            '<span style="background:#fee2e2; color:#b91c1c; font-size:0.75rem; font-weight:bold; padding:2px 7px; border-radius:5px;">غیر فعال</span>' : 
+                                            '<span style="background:#dcfce7; color:#15803d; font-size:0.75rem; font-weight:bold; padding:2px 7px; border-radius:5px;">فعال</span>'
+                                        }
+                                    </td>
+                                    <td style="padding:11px 14px; text-align:center;">
+                                        <div style="display:inline-flex; gap:6px; align-items:center;">
+                                            <!-- تفصیلی کھاتہ بٹن -->
+                                            <button onclick="DonorsModule.viewDonorDetails('${donor.id}')" class="btn btn-sm" style="background:#0284c7; color:white; font-weight:bold; font-size:0.85rem; padding:6px 12px; border-radius:7px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 5px rgba(2,132,199,0.2);" title="اس ڈونر کا مکمل کھاتہ و ۱۲ ماہ تفصیل دیکھیں">
+                                                <i class="fas fa-eye"></i> تفصیل چیک کریں
+                                            </button>
+
+                                            <!-- رقم وصولی بٹن -->
+                                            <button onclick="DonorsModule.showDonationModal('${donor.id}')" class="btn btn-sm" style="background:#059669; color:white; font-weight:bold; font-size:0.85rem; padding:6px 10px; border-radius:7px; border:none; cursor:pointer;" title="رقم وصول کریں">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+
+                                            <!-- ترمیم بٹن -->
+                                            <button onclick="DonorsModule.showDonorModal('${donor.id}')" class="btn btn-sm" style="background:#f8fafc; color:#475569; border:1px solid #cbd5e1; padding:6px 9px; border-radius:7px; cursor:pointer;" title="کوائف میں ترمیم">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+
+                                            <!-- ڈیلیٹ بٹن -->
+                                            <button onclick="DonorsModule.deleteDonor('${donor.id}')" class="btn btn-sm" style="background:#fff1f2; color:#e11d48; border:1px solid #fecdd3; padding:6px 9px; border-radius:7px; cursor:pointer;" title="ڈونر حذف کریں">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    },
+
+    // 2. SINGLE DONOR DETAILS & 12 MONTHS MATRIX VIEW (جب تفصیل چیک کریں تو یہ آئے)
+    renderSingleDonorDetailsView(donor, yearDonations) {
+        return `
+            <div>
+                <!-- Top Navigation & Return Bar -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; background:white; padding:12px 18px; border-radius:12px; border:1.5px solid #cbd5e1; box-shadow:0 2px 8px rgba(0,0,0,0.04); flex-wrap:wrap; gap:12px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <button onclick="DonorsModule.closeDonorDetails()" class="btn" style="background:#0f172a; color:white; font-weight:bold; padding:8px 18px; border-radius:8px; border:none; display:inline-flex; align-items:center; gap:8px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+                            <i class="fas fa-arrow-right"></i> واپس تمام ڈونرز کی فہرست پر جائیں
+                        </button>
+                        <span style="font-size:1rem; color:#475569;">
+                            ڈونر: <b style="color:#065f46; font-size:1.15rem;">${donor.name}</b> (${donor.donorCode || ('DNR-' + donor.id)}) کا ۱۲ ماہ کا تفصیلی کھاتہ
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <button onclick="DonorsModule.showDonationModal('${donor.id}')" class="btn btn-sm" style="background:#059669; color:white; font-weight:bold; padding:8px 16px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                            <i class="fas fa-hand-holding-dollar"></i> رقم وصول کریں
+                        </button>
+                        <button onclick="DonorsModule.printDonorStatement('${donor.id}', ${this.selectedYear})" class="btn btn-sm" style="background:#0284c7; color:white; font-weight:bold; padding:8px 16px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                            <i class="fas fa-file-invoice"></i> سالانہ اسٹیٹمنٹ پرنٹ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Detailed Single Donor Card -->
+                ${this.renderSingleDonorCard(donor, yearDonations)}
+            </div>
+        `;
+    },
+
+    // Backward compatibility for cards view
+    renderCardsView(donors, yearDonations) {
+        return this.renderDonorsMainView(donors, yearDonations);
+    },
+
+    // Single Donor Card Component (Profile + 12 Months Visual Grid)
+    renderSingleDonorCard(donor, yearDonations) {
         const months = this.getMonths();
+        const donorDons = yearDonations.filter(d => String(d.donorId) === String(donor.id) || parseInt(d.donorId) === parseInt(donor.id));
+        const paidCount = donorDons.length;
+        const totalDonated = donorDons.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+        const pledgedAnnual = (Number(donor.monthlyPledge) || 0) * 12;
+        const completionPct = pledgedAnnual > 0 ? Math.min(100, Math.round((totalDonated / pledgedAnnual) * 100)) : 0;
+        const formattedWa = this.formatWhatsAppNumber(donor.whatsapp || donor.phone);
 
         return `
-            <div style="display:flex; flex-direction:column; gap:1.5rem;">
-                ${donors.map(donor => {
-                    // Filter donations for this donor in selected year
-                    const donorDons = yearDonations.filter(d => String(d.donorId) === String(donor.id) || parseInt(d.donorId) === parseInt(donor.id));
-                    const paidCount = donorDons.length;
-                    const totalDonated = donorDons.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
-                    const pledgedAnnual = (Number(donor.monthlyPledge) || 0) * 12;
-                    const completionPct = pledgedAnnual > 0 ? Math.min(100, Math.round((totalDonated / pledgedAnnual) * 100)) : 0;
+            <div class="card donor-ledger-card" style="background:white; border-radius:16px; border:1px solid #e2e8f0; padding:1.5rem; box-shadow:0 4px 12px rgba(0,0,0,0.05); position:relative; overflow:hidden;">
+                <!-- Top Profile Bar -->
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; border-bottom:1px solid #f1f5f9; padding-bottom:1.2rem; margin-bottom:1.2rem;">
+                    <div style="display:flex; gap:14px; align-items:center;">
+                        <div style="width:52px; height:52px; border-radius:14px; background:${donor.status === 'inactive' ? '#f1f5f9' : '#ecfdf5'}; color:${donor.status === 'inactive' ? '#94a3b8' : '#059669'}; display:flex; align-items:center; justify-content:center; font-size:1.6rem; border:1.5px solid ${donor.status === 'inactive' ? '#cbd5e1' : '#a7f3d0'};">
+                            <i class="fas fa-user-tie"></i>
+                        </div>
+                        <div>
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <h3 style="margin:0; font-size:1.35rem; color:#0f172a; font-family:'Aref Ruqaa', 'Amiri', serif;">
+                                    ${donor.name} ${donor.fatherName ? `<span style="font-size:1rem; color:#64748b; font-family:'Jameel Noori Nastaleeq', sans-serif;">ولد ${donor.fatherName}</span>` : ''}
+                                </h3>
+                                <span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:6px; font-size:0.8rem; font-weight:bold; font-family:monospace;">
+                                    ${donor.donorCode || ('DNR-' + donor.id)}
+                                </span>
+                                ${donor.status === 'inactive' ? '<span style="background:#fee2e2; color:#b91c1c; padding:2px 8px; border-radius:6px; font-size:0.8rem; font-weight:bold;">غیر فعال</span>' : '<span style="background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:6px; font-size:0.8rem; font-weight:bold;">فعال ڈونر</span>'}
+                                ${donor.fundType ? `<span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:6px; font-size:0.8rem; font-weight:bold;">${donor.fundType}</span>` : ''}
+                            </div>
+                            <div style="display:flex; gap:14px; align-items:center; margin-top:5px; flex-wrap:wrap; font-size:0.95rem; color:#475569;">
+                                ${donor.city || donor.address ? `<span><i class="fas fa-map-marker-alt" style="color:#ef4444; margin-left:4px;"></i> ${[donor.address, donor.city].filter(Boolean).join('، ')}</span>` : ''}
+                                ${donor.phone ? `<span><i class="fas fa-phone" style="color:#0284c7; margin-left:4px;"></i> <span dir="ltr">${donor.phone}</span></span>` : ''}
+                                ${formattedWa ? `
+                                    <a href="https://wa.me/${formattedWa}" target="_blank" rel="noopener noreferrer" style="color:#16a34a; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:bold;" title="براہِ راست واٹس ایپ پر رابطہ">
+                                        <i class="fab fa-whatsapp" style="font-size:1.15rem;"></i> <span dir="ltr">${donor.whatsapp || donor.phone}</span>
+                                    </a>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
 
-                    // Clean phone for WhatsApp
-                    const formattedWa = this.formatWhatsAppNumber(donor.whatsapp || donor.phone);
+                    <!-- Financial Commitment Badge -->
+                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px 14px; text-align:left;">
+                            <span style="font-size:0.85rem; color:#64748b; display:block;">طے شدہ ماہانہ تعاون</span>
+                            <span style="font-size:1.25rem; font-weight:bold; color:#065f46;">Rs. ${(Number(donor.monthlyPledge) || 0).toLocaleString('en-US')} <small style="font-size:0.8rem; font-weight:normal; color:#64748b;">/ ماہانہ</small></span>
+                        </div>
+                    </div>
+                </div>
 
-                    return `
-                        <div class="card donor-ledger-card" style="background:white; border-radius:16px; border:1px solid #e2e8f0; padding:1.5rem; box-shadow:0 4px 12px rgba(0,0,0,0.05); position:relative; overflow:hidden;">
-                            <!-- Top Profile Bar -->
-                            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; border-bottom:1px solid #f1f5f9; padding-bottom:1.2rem; margin-bottom:1.2rem;">
-                                <div style="display:flex; gap:14px; align-items:center;">
-                                    <div style="width:52px; height:52px; border-radius:14px; background:${donor.status === 'inactive' ? '#f1f5f9' : '#ecfdf5'}; color:${donor.status === 'inactive' ? '#94a3b8' : '#059669'}; display:flex; align-items:center; justify-content:center; font-size:1.6rem; border:1.5px solid ${donor.status === 'inactive' ? '#cbd5e1' : '#a7f3d0'};">
-                                        <i class="fas fa-user-tie"></i>
-                                    </div>
-                                    <div>
-                                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                                            <h3 style="margin:0; font-size:1.35rem; color:#0f172a; font-family:'Aref Ruqaa', 'Amiri', serif;">
-                                                ${donor.name} ${donor.fatherName ? `<span style="font-size:1rem; color:#64748b; font-family:'Jameel Noori Nastaleeq', sans-serif;">ولد ${donor.fatherName}</span>` : ''}
-                                            </h3>
-                                            <span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:6px; font-size:0.8rem; font-weight:bold; font-family:monospace;">
-                                                ${donor.donorCode || ('DNR-' + donor.id)}
-                                            </span>
-                                            ${donor.status === 'inactive' ? '<span style="background:#fee2e2; color:#b91c1c; padding:2px 8px; border-radius:6px; font-size:0.8rem; font-weight:bold;">غیر فعال</span>' : '<span style="background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:6px; font-size:0.8rem; font-weight:bold;">فعال ڈونر</span>'}
-                                            ${donor.fundType ? `<span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:6px; font-size:0.8rem; font-weight:bold;">${donor.fundType}</span>` : ''}
+                <!-- 12 MONTHS VISUAL GRID -->
+                <div style="margin-bottom: 1.2rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <h4 style="margin:0; font-size:1.05rem; color:#334155; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-calendar-days" style="color:var(--primary);"></i> ۱۲ مہینوں کا کھاتہ و ادائیگیاں (${this.selectedYear}ء)
+                        </h4>
+                        <span style="font-size:0.9rem; color:#64748b;">
+                            وصول شدہ: <b style="color:#059669;">${paidCount} / ۱۲ ماہ</b> (Rs. ${totalDonated.toLocaleString('en-US')})
+                        </span>
+                    </div>
+
+                    <div class="months-12-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px;">
+                        ${months.map(m => {
+                            const don = donorDons.find(d => Number(d.monthIndex) === m.index);
+                            const isPaid = !!don;
+
+                            if (isPaid) {
+                                return `
+                                    <div class="month-box paid" style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:8px 10px; text-align:center; position:relative; box-shadow:0 2px 5px rgba(16,185,129,0.1); transition:transform 0.2s;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #bbf7d0; padding-bottom:4px; margin-bottom:4px;">
+                                            <span style="font-weight:bold; font-size:0.95rem; color:#166534;">${m.name}</span>
+                                            <span style="background:#16a34a; color:white; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:0.65rem;" title="ادا شدہ">✓</span>
                                         </div>
-                                        <div style="display:flex; gap:14px; align-items:center; margin-top:5px; flex-wrap:wrap; font-size:0.95rem; color:#475569;">
-                                            ${donor.city || donor.address ? `<span><i class="fas fa-map-marker-alt" style="color:#ef4444; margin-left:4px;"></i> ${[donor.address, donor.city].filter(Boolean).join('، ')}</span>` : ''}
-                                            ${donor.phone ? `<span><i class="fas fa-phone" style="color:#0284c7; margin-left:4px;"></i> <span dir="ltr">${donor.phone}</span></span>` : ''}
+                                        <div style="font-weight:bold; font-size:1.05rem; color:#15803d; font-family:monospace;">
+                                            Rs. ${Number(don.amount).toLocaleString('en-US')}
+                                        </div>
+                                        <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">
+                                            ${don.paymentDate ? don.paymentDate.split('-').reverse().join('/') : ''}
+                                        </div>
+                                        <!-- Actions on Paid Month -->
+                                        <div style="display:flex; justify-content:center; gap:6px; margin-top:6px; border-top:1px solid #dcfce7; padding-top:4px;">
+                                            <button onclick="DonorsModule.printDonationReceipt('${don.id}')" title="رسید پرنٹ / PDF" style="background:#dcfce7; border:none; color:#15803d; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:0.8rem;">
+                                                <i class="fas fa-print"></i> رسید
+                                            </button>
+                                            <button onclick="DonorsModule.downloadDonationReceipt('${don.id}')" title="رسید تصویر ڈاؤن لوڈ کریں" style="background:#d1fae5; border:none; color:#065f46; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:0.8rem;">
+                                                <i class="fas fa-download"></i>
+                                            </button>
                                             ${formattedWa ? `
-                                                <a href="https://wa.me/${formattedWa}" target="_blank" rel="noopener noreferrer" style="color:#16a34a; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:bold;" title="براہِ راست واٹس ایپ پر رابطہ">
-                                                    <i class="fab fa-whatsapp" style="font-size:1.15rem;"></i> <span dir="ltr">${donor.whatsapp || donor.phone}</span>
-                                                </a>
+                                                <button onclick="DonorsModule.shareReceiptWhatsApp('${don.id}')" title="واٹس ایپ پر رسید بھیجیں" style="background:#22c55e; border:none; color:white; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:0.8rem;">
+                                                    <i class="fab fa-whatsapp"></i>
+                                                </button>
                                             ` : ''}
                                         </div>
                                     </div>
-                                </div>
-
-                                <!-- Financial Commitment Badge -->
-                                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
-                                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px 14px; text-align:left;">
-                                        <span style="font-size:0.85rem; color:#64748b; display:block;">طے شدہ ماہانہ تعاون</span>
-                                        <span style="font-size:1.25rem; font-weight:bold; color:#065f46;">Rs. ${(Number(donor.monthlyPledge) || 0).toLocaleString('en-US')} <small style="font-size:0.8rem; font-weight:normal; color:#64748b;">/ ماہانہ</small></span>
+                                `;
+                            } else {
+                                return `
+                                    <div onclick="DonorsModule.showDonationModal('${donor.id}', ${m.index}, ${this.selectedYear})" class="month-box unpaid" style="background:#f8fafc; border:1.5px dashed #cbd5e1; border-radius:10px; padding:10px 8px; text-align:center; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#fff7ed'; this.style.borderColor='#fb923c';" onmouseout="this.style.background='#f8fafc'; this.style.borderColor='#cbd5e1';" title="اس مہینے کی رقم وصول کرنے کے لیے کلک کریں">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                            <span style="font-weight:bold; font-size:0.95rem; color:#64748b;">${m.name}</span>
+                                            <span style="color:#94a3b8; font-size:0.8rem;">—</span>
+                                        </div>
+                                        <div style="font-size:0.85rem; color:#94a3b8; margin:4px 0;">
+                                            غیر ادا شدہ
+                                        </div>
+                                        <div style="color:var(--primary); font-size:0.8rem; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:4px;">
+                                            <i class="fas fa-plus-circle"></i> وصول کریں
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
+                                `;
+                            }
+                        }).join('')}
+                    </div>
+                </div>
 
-                            <!-- 12 MONTHS VISUAL GRID -->
-                            <div style="margin-bottom: 1.2rem;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                    <h4 style="margin:0; font-size:1.05rem; color:#334155; display:flex; align-items:center; gap:8px;">
-                                        <i class="fas fa-calendar-days" style="color:var(--primary);"></i> ۱۲ مہینوں کا کھاتہ و ادائیگیاں (${this.selectedYear}ء)
-                                    </h4>
-                                    <span style="font-size:0.9rem; color:#64748b;">
-                                        وصول شدہ: <b style="color:#059669;">${paidCount} / ۱۲ ماہ</b> (Rs. ${totalDonated.toLocaleString('en-US')})
-                                    </span>
-                                </div>
-
-                                <div class="months-12-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px;">
-                                    ${months.map(m => {
-                                        // Find donation for this month
-                                        const don = donorDons.find(d => Number(d.monthIndex) === m.index);
-                                        const isPaid = !!don;
-
-                                        if (isPaid) {
-                                            return `
-                                                <div class="month-box paid" style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:8px 10px; text-align:center; position:relative; box-shadow:0 2px 5px rgba(16,185,129,0.1); transition:transform 0.2s;">
-                                                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #bbf7d0; padding-bottom:4px; margin-bottom:4px;">
-                                                        <span style="font-weight:bold; font-size:0.95rem; color:#166534;">${m.name}</span>
-                                                        <span style="background:#16a34a; color:white; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:0.65rem;" title="ادا شدہ">✓</span>
-                                                    </div>
-                                                    <div style="font-weight:bold; font-size:1.05rem; color:#15803d; font-family:monospace;">
-                                                        Rs. ${Number(don.amount).toLocaleString('en-US')}
-                                                    </div>
-                                                    <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">
-                                                        ${don.paymentDate ? don.paymentDate.split('-').reverse().join('/') : ''}
-                                                    </div>
-                                                    <!-- Actions on Paid Month -->
-                                                    <div style="display:flex; justify-content:center; gap:6px; margin-top:6px; border-top:1px solid #dcfce7; padding-top:4px;">
-                                                        <button onclick="DonorsModule.printDonationReceipt('${don.id}')" title="رسید پرنٹ / PDF" style="background:#dcfce7; border:none; color:#15803d; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:0.8rem;">
-                                                            <i class="fas fa-print"></i> رسید
-                                                        </button>
-                                                        <button onclick="DonorsModule.downloadDonationReceipt('${don.id}')" title="رسید تصویر ڈاؤن لوڈ کریں" style="background:#d1fae5; border:none; color:#065f46; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:0.8rem;">
-                                                            <i class="fas fa-download"></i>
-                                                        </button>
-                                                        ${formattedWa ? `
-                                                            <button onclick="DonorsModule.shareReceiptWhatsApp('${don.id}')" title="واٹس ایپ پر رسید بھیجیں" style="background:#22c55e; border:none; color:white; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:0.8rem;">
-                                                                <i class="fab fa-whatsapp"></i>
-                                                            </button>
-                                                        ` : ''}
-                                                    </div>
-                                                </div>
-                                            `;
-                                        } else {
-                                            return `
-                                                <div onclick="DonorsModule.showDonationModal('${donor.id}', ${m.index}, ${this.selectedYear})" class="month-box unpaid" style="background:#f8fafc; border:1.5px dashed #cbd5e1; border-radius:10px; padding:10px 8px; text-align:center; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#fff7ed'; this.style.borderColor='#fb923c';" onmouseout="this.style.background='#f8fafc'; this.style.borderColor='#cbd5e1';" title="اس مہینے کی رقم وصول کرنے کے لیے کلک کریں">
-                                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                                        <span style="font-weight:bold; font-size:0.95rem; color:#64748b;">${m.name}</span>
-                                                        <span style="color:#94a3b8; font-size:0.8rem;">—</span>
-                                                    </div>
-                                                    <div style="font-size:0.85rem; color:#94a3b8; margin:4px 0;">
-                                                        غیر ادا شدہ
-                                                    </div>
-                                                    <div style="color:var(--primary); font-size:0.8rem; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:4px;">
-                                                        <i class="fas fa-plus-circle"></i> وصول کریں
-                                                    </div>
-                                                </div>
-                                            `;
-                                        }
-                                    }).join('')}
-                                </div>
-                            </div>
-
-                            <!-- Bottom Action Bar -->
-                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; background:#f8fafc; margin:-1.5rem; margin-top:0.8rem; padding:10px 1.5rem; border-top:1px solid #e2e8f0;">
-                                <div style="display:flex; align-items:center; gap:8px;">
-                                    <div style="width:120px; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
-                                        <div style="width:${completionPct}%; height:100%; background:linear-gradient(90deg, #10b981, #059669); border-radius:4px;"></div>
-                                    </div>
-                                    <span style="font-size:0.85rem; color:#64748b; font-weight:bold;">${completionPct}% سالانہ ہدف</span>
-                                </div>
-
-                                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                                    <button onclick="DonorsModule.printDonorStatement('${donor.id}', ${this.selectedYear})" class="btn" style="background:#ffffff; border:1.5px solid #cbd5e1; color:#1e293b; font-size:0.88rem; font-weight:bold; padding:6px 12px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:6px;">
-                                        <i class="fas fa-file-invoice" style="color:#0284c7;"></i> سالانہ اسٹیٹمنٹ پرنٹ
-                                    </button>
-
-                                    <button onclick="DonorsModule.showDonationModal('${donor.id}')" class="btn" style="background:#059669; border:none; color:white; font-size:0.88rem; font-weight:bold; padding:6px 14px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:6px;">
-                                        <i class="fas fa-plus"></i> رقم وصول کریں
-                                    </button>
-
-                                    ${formattedWa ? `
-                                        <button onclick="DonorsModule.sendDonorGreeting('${donor.id}')" class="btn" style="background:#22c55e; border:none; color:white; font-size:0.88rem; font-weight:bold; padding:6px 12px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:6px;" title="واٹس ایپ پر رابطہ و دعائیہ پیغام">
-                                            <i class="fab fa-whatsapp"></i> پیغام
-                                        </button>
-                                    ` : ''}
-
-                                    <button onclick="DonorsModule.showDonorModal('${donor.id}')" class="btn" style="background:#ffffff; border:1.5px solid #cbd5e1; color:#475569; font-size:0.88rem; padding:6px 10px; border-radius:8px; cursor:pointer;" title="کوائف میں ترمیم">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-
-                                    <button onclick="DonorsModule.deleteDonor('${donor.id}')" class="btn" style="background:#ffffff; border:1.5px solid #fecdd3; color:#e11d48; font-size:0.88rem; padding:6px 10px; border-radius:8px; cursor:pointer;" title="ڈونر حذف کریں">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </button>
-                                </div>
-                            </div>
+                <!-- Bottom Action Bar -->
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; background:#f8fafc; margin:-1.5rem; margin-top:0.8rem; padding:10px 1.5rem; border-top:1px solid #e2e8f0;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:120px; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
+                            <div style="width:${completionPct}%; height:100%; background:linear-gradient(90deg, #10b981, #059669); border-radius:4px;"></div>
                         </div>
-                    `;
-                }).join('')}
+                        <span style="font-size:0.85rem; color:#64748b; font-weight:bold;">${completionPct}% سالانہ ہدف</span>
+                    </div>
+
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <button onclick="DonorsModule.printDonorStatement('${donor.id}', ${this.selectedYear})" class="btn" style="background:#ffffff; border:1.5px solid #cbd5e1; color:#1e293b; font-size:0.88rem; font-weight:bold; padding:6px 12px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-file-invoice" style="color:#0284c7;"></i> سالانہ اسٹیٹمنٹ پرنٹ
+                        </button>
+
+                        <button onclick="DonorsModule.showDonationModal('${donor.id}')" class="btn" style="background:#059669; border:none; color:white; font-size:0.88rem; font-weight:bold; padding:6px 14px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-plus"></i> رقم وصول کریں
+                        </button>
+
+                        ${formattedWa ? `
+                            <button onclick="DonorsModule.sendDonorGreeting('${donor.id}')" class="btn" style="background:#22c55e; border:none; color:white; font-size:0.88rem; font-weight:bold; padding:6px 12px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:6px;" title="واٹس ایپ پر رابطہ و دعائیہ پیغام">
+                                <i class="fab fa-whatsapp"></i> پیغام
+                            </button>
+                        ` : ''}
+
+                        <button onclick="DonorsModule.showDonorModal('${donor.id}')" class="btn" style="background:#ffffff; border:1.5px solid #cbd5e1; color:#475569; font-size:0.88rem; padding:6px 10px; border-radius:8px; cursor:pointer;" title="کوائف میں ترمیم">
+                            <i class="fas fa-edit"></i>
+                        </button>
+
+                        <button onclick="DonorsModule.deleteDonor('${donor.id}')" class="btn" style="background:#ffffff; border:1.5px solid #fecdd3; color:#e11d48; font-size:0.88rem; padding:6px 10px; border-radius:8px; cursor:pointer;" title="ڈونر حذف کریں">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
         `;
     },
@@ -633,7 +798,21 @@ const DonorsModule = {
     // Navigation & State Helpers
     switchTab(tab) {
         this.activeTab = tab;
+        this.selectedDonorDetailsId = null;
         this.render();
+    },
+
+    viewDonorDetails(donorId) {
+        this.selectedDonorDetailsId = donorId;
+        this.activeTab = 'list';
+        this.render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
+    closeDonorDetails() {
+        this.selectedDonorDetailsId = null;
+        this.render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     },
 
     changeYear(yr) {
@@ -1039,12 +1218,12 @@ const DonorsModule = {
                         type: 'Income',
                         category: data.fundType || 'عطیات و صدقات',
                         amount: data.amount,
-                        name: `${donor.name} (مستقل ڈونر - ${donor.donorCode || ''})`,
+                        name: donor.name,
                         phone: donor.phone || '',
                         address: donor.address || donor.city || '',
                         date: new Date(data.paymentDate || Date.now()).getTime(),
                         receiptNo: data.receiptNo,
-                        description: `ماہانہ معاونت بابت ماہ ${data.monthName} ${data.year}ء [طریقہ: ${data.paymentMethod || 'نقد'}]`
+                        description: `ماہانہ معاونت بابت ماہ ${data.monthName} ${data.year}ء [طریقہ: ${data.paymentMethod || 'نقد'}] (مستقل ڈونر: ${donor.donorCode || ''})`
                     });
                 } catch (accErr) {
                     console.warn('Could not auto-sync transaction to accounts:', accErr);
@@ -1117,12 +1296,12 @@ const DonorsModule = {
 
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                                 <span style="font-size:0.9rem; color:#64748b;">نامِ معاون:</span>
-                                <span style="font-weight:bold; color:#0f172a;">${donor.name} ${donor.fatherName ? `(ولد ${donor.fatherName})` : ''}</span>
+                                <span style="font-weight:bold; color:#0f172a;">${donor.name}</span>
                             </div>
 
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <span style="font-size:0.9rem; color:#64748b;">بابت ماہ:</span>
-                                <span style="font-weight:bold; color:#065f46;">${donation.monthName} ${donation.year}ء [مد: ${donation.fundType || 'عام عطیہ'}]</span>
+                                <span style="font-size:0.9rem; color:#64748b;">بمد:</span>
+                                <span style="font-weight:bold; color:#065f46;">${donation.fundType || 'عام عطیہ'}</span>
                             </div>
 
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -1172,6 +1351,14 @@ const DonorsModule = {
     // ==========================================
 
     async downloadDonationReceipt(donationId) {
+        if (window.app && typeof window.app.hasReceiptTemplate === 'function' && !window.app.hasReceiptTemplate()) {
+            alert('توجہ فرمائیں! پرانی ڈیفالٹ رسید ختم کر دی گئی ہے۔ رسید ڈاؤنلوڈ یا پرنٹ کرنے کے لیے پہلے "سیٹنگز" (Settings) میں جا کر اپنی باضابطہ رسید اپلوڈ فرمائیں۔');
+            if (window.app && typeof window.app.navigate === 'function') {
+                window.app.navigate('settings');
+            }
+            return;
+        }
+
         const donations = await MadrassahDB.getAllDonorDonations();
         const d = donations.find(item => String(item.id) === String(donationId) || parseInt(item.id) === parseInt(donationId));
         if (!d) {
@@ -1181,11 +1368,9 @@ const DonorsModule = {
 
         const donor = await MadrassahDB.getDonorById(d.donorId);
         const donorName = donor ? donor.name : (d.donorName || 'معاون محترم');
-        const fatherName = donor ? donor.fatherName : '';
-        const payee = `${donorName} ${fatherName ? 'ولد ' + fatherName : ''} [${donor ? (donor.donorCode || '') : ''}]`;
+        const payee = donorName;
         const address = donor ? [donor.address, donor.city].filter(Boolean).join('، ') : '';
-        const monthName = d.monthName || this.getMonthName(d.monthIndex);
-        const purpose = `ماہانہ معاونت بابت ماہ ${monthName} ${d.year}ء [مد: ${d.fundType || 'عام عطیہ'}]` + (d.paymentMethod ? ' — بذریعہ: ' + d.paymentMethod : '') + (donor && donor.whatsapp ? ' (واٹس ایپ: ' + donor.whatsapp + ')' : '');
+        const purpose = d.fundType || 'عطیات / صدقات';
 
         const amountWords = (window.app && typeof window.app.numberToUrduWords === 'function') 
             ? window.app.numberToUrduWords(d.amount) 
@@ -1210,6 +1395,14 @@ const DonorsModule = {
     },
 
     async printDonationReceipt(donationId) {
+        if (window.app && typeof window.app.hasReceiptTemplate === 'function' && !window.app.hasReceiptTemplate()) {
+            alert('توجہ فرمائیں! پرانی ڈیفالٹ رسید ختم کر دی گئی ہے۔ رسید ڈاؤنلوڈ یا پرنٹ کرنے کے لیے پہلے "سیٹنگز" (Settings) میں جا کر اپنی باضابطہ رسید اپلوڈ فرمائیں۔');
+            if (window.app && typeof window.app.navigate === 'function') {
+                window.app.navigate('settings');
+            }
+            return;
+        }
+
         const donations = await MadrassahDB.getAllDonorDonations();
         const d = donations.find(item => String(item.id) === String(donationId) || parseInt(item.id) === parseInt(donationId));
         if (!d) {
@@ -1219,11 +1412,9 @@ const DonorsModule = {
 
         const donor = await MadrassahDB.getDonorById(d.donorId);
         const donorName = donor ? donor.name : (d.donorName || 'معاون محترم');
-        const fatherName = donor ? donor.fatherName : '';
-        const payee = `${donorName} ${fatherName ? `ولد ${fatherName}` : ''} [${donor ? (donor.donorCode || '') : ''}]`;
+        const payee = donorName;
         const address = donor ? [donor.address, donor.city].filter(Boolean).join('، ') : '';
-        const monthName = d.monthName || this.getMonthName(d.monthIndex);
-        const purpose = `ماہانہ معاونت بابت ماہ ${monthName} ${d.year}ء [مد: ${d.fundType || 'عام عطیہ'}]` + (d.paymentMethod ? ` — بذریعہ: ${d.paymentMethod}` : '') + (donor && donor.whatsapp ? ` (واٹس ایپ: ${donor.whatsapp})` : '');
+        const purpose = d.fundType || 'عطیات / صدقات';
 
         const amountWords = (window.app && typeof window.app.numberToUrduWords === 'function') 
             ? window.app.numberToUrduWords(d.amount) 

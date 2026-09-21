@@ -25,7 +25,7 @@ assert(gradJs.includes('hifzSanadDoc'), 'hifzSanadDoc supported');
 // 3. Verify index.html
 const indexHtml = fs.readFileSync('index.html', 'utf8');
 assert(indexHtml.includes("navigate('graduates')"), 'index.html navigates to graduates');
-assert(indexHtml.includes('<script src="graduates.js"></script>'), 'index.html includes graduates.js');
+assert(indexHtml.includes('<script src="graduates.js'), 'index.html includes graduates.js');
 
 // 4. Verify app.js
 const appJs = fs.readFileSync('app.js', 'utf8');
