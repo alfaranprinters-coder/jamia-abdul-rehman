@@ -6,8 +6,13 @@ const MadrassahDB = {
     dbVersion: 16, // Added Graduates / Alumni Module object store (graduates)
 
     initDB() {
+        if (this.db) return Promise.resolve(this.db);
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(this.dbName, this.dbVersion);
+
+            request.onblocked = () => {
+                console.warn('[MMS DB] Database open blocked by another open connection.');
+            };
 
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
@@ -157,6 +162,10 @@ const MadrassahDB = {
 
             request.onsuccess = (event) => {
                 this.db = event.target.result;
+                this.db.onversionchange = () => {
+                    try { this.db.close(); } catch(e) {}
+                    this.db = null;
+                };
                 resolve(this.db);
             };
 
@@ -196,35 +205,119 @@ const MadrassahDB = {
     },
 
     // Existing methods kept...
-    saveStudent(data) { 
+    async saveStudent(data) { 
+        if (!this.db) {
+            await this.initDB();
+        }
         return new Promise((resolve, reject) => { 
+            if (!data || !data.name || !String(data.name).trim()) {
+                return reject(new Error('طالب علم کا نام لازمی ہے!'));
+            }
+            if (!data.fatherName || !String(data.fatherName).trim()) {
+                return reject(new Error('طالب علم کی ولدیت لازمی ہے!'));
+            }
+            // Standardize section
+            data.section = (data.section === 'banat' || data.section === 'بنات') ? 'banat' : 'banin';
             const transaction = this.db.transaction(['students'], 'readwrite'); 
             const store = transaction.objectStore('students'); 
-            if (data.id && !data.uniqueCode) {
-                data.uniqueCode = 'STU-' + (1000 + parseInt(data.id));
-            }
-            const request = data.id ? store.put(data) : store.add(data); 
-            request.onsuccess = () => {
-                const insertedId = request.result;
-                if (!data.id && insertedId) {
-                    data.id = insertedId;
-                    if (!data.uniqueCode) {
-                        data.uniqueCode = 'STU-' + (1000 + parseInt(insertedId));
-                        try {
-                            const updateTx = this.db.transaction(['students'], 'readwrite');
-                            updateTx.objectStore('students').put(data);
-                        } catch(err) { console.warn('Could not update student uniqueCode immediately', err); }
-                    }
+            let resultId = data.id ? parseInt(data.id) : null;
+            if (data.id) {
+                data.id = parseInt(data.id);
+                if (!data.uniqueCode) {
+                    data.uniqueCode = 'STU-' + (1000 + parseInt(data.id));
                 }
-                resolve(insertedId);
+                const req = store.put(data); 
+                req.onsuccess = () => { resultId = data.id; };
+            } else {
+                delete data.id;
+                const req = store.add(data); 
+                req.onsuccess = (e) => {
+                    resultId = e.target.result;
+                    data.id = resultId;
+                    if (!data.uniqueCode) {
+                        data.uniqueCode = 'STU-' + (1000 + parseInt(resultId));
+                        store.put(data); // update in the same transaction
+                    }
+                };
+            }
+            transaction.oncomplete = () => resolve(resultId);
+            transaction.onerror = (e) => reject(transaction.error || e.target.error); 
+            transaction.onabort = (e) => reject(transaction.error || new Error('Transaction aborted')); 
+        }); 
+    },
+    async getAllStudents(section) { 
+        if (!this.db) {
+            await this.initDB();
+        }
+        return new Promise((resolve, reject) => { 
+            const transaction = this.db.transaction(['students'], 'readonly'); 
+            const store = transaction.objectStore('students'); 
+            const request = store.getAll(); 
+            request.onsuccess = () => { 
+                const all = request.result || []; 
+                const targetSec = (section === 'banat' || section === 'بنات') ? 'banat' : (section === 'all' ? 'all' : 'banin');
+                let students = all;
+                if (targetSec !== 'all') {
+                    students = all.filter(s => {
+                        const sSec = (s.section === 'banat' || s.section === 'بنات') ? 'banat' : 'banin';
+                        return sSec === targetSec;
+                    });
+                }
+                // Newest first
+                students.sort((a, b) => (parseInt(b.id || 0) - parseInt(a.id || 0)));
+                resolve(students); 
             }; 
             request.onerror = () => reject(request.target.error); 
         }); 
     },
-    getAllStudents(section) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readonly'); const store = transaction.objectStore('students'); const request = store.getAll(); request.onsuccess = () => { const all = request.result || []; const students = (!section || section === 'all') ? all : all.filter(s => (s.section || 'banin') === section); resolve(students); }; request.onerror = () => reject(request.target.error); }); },
-    getAllStudentsAllSections() { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readonly'); const store = transaction.objectStore('students'); const request = store.getAll(); request.onsuccess = () => resolve(request.result || []); request.onerror = () => reject(request.target.error); }); },
-    getStudentById(id) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readonly'); const store = transaction.objectStore('students'); const request = store.get(parseInt(id)); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
-    deleteStudent(id) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['students'], 'readwrite'); const store = transaction.objectStore('students'); const request = store.delete(parseInt(id)); request.onsuccess = () => resolve(); request.onerror = () => reject(request.target.error); }); },
+    async getAllStudentsAllSections() { 
+        if (!this.db) {
+            await this.initDB();
+        }
+        return new Promise((resolve, reject) => { 
+            const transaction = this.db.transaction(['students'], 'readonly'); 
+            const store = transaction.objectStore('students'); 
+            const request = store.getAll(); 
+            request.onsuccess = () => {
+                const all = request.result || [];
+                all.sort((a, b) => (parseInt(b.id || 0) - parseInt(a.id || 0)));
+                resolve(all);
+            }; 
+            request.onerror = () => reject(request.target.error); 
+        }); 
+    },
+    async getStudentById(id) { 
+        if (!this.db) {
+            await this.initDB();
+        }
+        return new Promise((resolve, reject) => { 
+            const numericId = parseInt(id);
+            if (!numericId || isNaN(numericId)) {
+                return resolve(null);
+            }
+            const transaction = this.db.transaction(['students'], 'readonly'); 
+            const store = transaction.objectStore('students'); 
+            const request = store.get(numericId); 
+            request.onsuccess = () => resolve(request.result || null); 
+            request.onerror = () => reject(request.target.error); 
+        }); 
+    },
+    async deleteStudent(id) { 
+        if (!this.db) {
+            await this.initDB();
+        }
+        return new Promise((resolve, reject) => { 
+            const numericId = parseInt(id);
+            if (!numericId || isNaN(numericId)) {
+                return resolve();
+            }
+            const transaction = this.db.transaction(['students'], 'readwrite'); 
+            const store = transaction.objectStore('students'); 
+            const request = store.delete(numericId); 
+            request.onsuccess = () => resolve(); 
+            request.onerror = () => reject(request.target.error); 
+        }); 
+    },
     saveTeacher(data) { 
         return new Promise((resolve, reject) => { 
             const transaction = this.db.transaction(['teachers'], 'readwrite'); 
@@ -315,7 +408,10 @@ const MadrassahDB = {
     // --- Payroll Methods ---
     saveSalary(data) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['salaries'], 'readwrite'); const store = transaction.objectStore('salaries'); const request = store.add(data); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
     getAllSalaries() { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['salaries'], 'readonly'); const store = transaction.objectStore('salaries'); const request = store.getAll(); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
-    getSalariesByMonth(month, year) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['salaries'], 'readonly'); const store = transaction.objectStore('salaries'); const request = store.getAll(); request.onsuccess = () => resolve(request.result.filter(s => s.month === month && s.year === parseInt(year))); request.onerror = () => reject(request.target.error); }); },
+    getSalaryById(id) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['salaries'], 'readonly'); const store = transaction.objectStore('salaries'); const request = store.get(parseInt(id)); request.onsuccess = () => resolve(request.result || null); request.onerror = () => reject(request.target.error); }); },
+    getSalariesByMonth(month, year) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['salaries'], 'readonly'); const store = transaction.objectStore('salaries'); const request = store.getAll(); request.onsuccess = () => resolve((request.result || []).filter(s => s.month === month && parseInt(s.year) === parseInt(year))); request.onerror = () => reject(request.target.error); }); },
+    getStaffSalaries(staffId) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['salaries'], 'readonly'); const store = transaction.objectStore('salaries'); const request = store.getAll(); request.onsuccess = () => { const idNum = parseInt(staffId); resolve((request.result || []).filter(s => parseInt(s.staffId) === idNum)); }; request.onerror = () => reject(request.target.error); }); },
+    deleteSalary(id) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['salaries'], 'readwrite'); const store = transaction.objectStore('salaries'); const request = store.delete(parseInt(id)); request.onsuccess = () => resolve(); request.onerror = () => reject(request.target.error); }); },
     
     saveAdvance(data) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['advances'], 'readwrite'); const store = transaction.objectStore('advances'); const request = store.add(data); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
     getStaffAdvances(staffId) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['advances'], 'readonly'); const store = transaction.objectStore('advances'); const request = store.getAll(); request.onsuccess = () => resolve(request.result.filter(a => a.staffId === parseInt(staffId))); request.onerror = () => reject(request.target.error); }); },
@@ -594,7 +690,8 @@ const MadrassahDB = {
         });
     },
 
-    saveSetting(key, value) {
+    async saveSetting(key, value) {
+        if (!this.db) await this.initDB();
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction(['settings'], 'readwrite');
             const store = transaction.objectStore('settings');
@@ -604,7 +701,8 @@ const MadrassahDB = {
         });
     },
 
-    getSetting(key) {
+    async getSetting(key) {
+        if (!this.db) await this.initDB();
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction(['settings'], 'readonly');
             const store = transaction.objectStore('settings');

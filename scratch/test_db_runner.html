@@ -1,0 +1,66 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <script src='../assets/js/address-data.js'></script>
+    <script src='../assets/js/quran-data.js'></script>
+    <script src='../db.js'></script>
+    <script src='../hifz.js'></script>
+    <script src='../donors.js'></script>
+    <script src='../graduates.js'></script>
+    <script src='../timetable.js'></script>
+    <script src='../app.js'></script>
+</head>
+<body>
+    <div id='main-content'></div>
+    <pre id='log'></pre>
+    <script>
+    async function test() {
+        const logEl = document.getElementById('log');
+        function print(msg) { logEl.textContent += msg + '\n'; }
+        try {
+            print('1. Initializing MadrassahDB...');
+            await MadrassahDB.initDB();
+            print('2. DB open success. version=' + MadrassahDB.db.version);
+            
+            print('3. Saving student in banin...');
+            const id1 = await MadrassahDB.saveStudent({
+                name: 'Ù…Ø­Ù…Ø¯ Ø§Ø­Ù…Ø¯',
+                fatherName: 'Ø¹Ø¨Ø¯ Ø§Ù„Ù„Û',
+                phone: '03001111111',
+                admissionDate: '2026-09-22',
+                department: 'Ø­ÙØ¸',
+                className: 'Ø¯Ø±Ø¬Û Ø§ÙˆÙ„',
+                section: 'banin'
+            });
+            print('Student 1 saved with id=' + id1);
+            
+            print('4. Saving student in banat...');
+            const id2 = await MadrassahDB.saveStudent({
+                name: 'ÙØ§Ø·Ù…Û Ø²ÛØ±Ø§',
+                fatherName: 'Ù…Ø­Ù…Ø¯ Ø¹Ù„ÛŒ',
+                phone: '03002222222',
+                admissionDate: '2026-09-22',
+                department: 'Ù†Ø§Ø¸Ø±Û',
+                className: 'Ù‚Ø§Ø¹Ø¯Û',
+                section: 'banat'
+            });
+            print('Student 2 saved with id=' + id2);
+            
+            print('5. Fetching banin students...');
+            const baninList = await MadrassahDB.getAllStudents('banin');
+            print('Banin count: ' + baninList.length + ' -> ' + JSON.stringify(baninList.map(s => ({id: s.id, name: s.name, sec: s.section}))));
+            
+            print('6. Fetching banat students...');
+            const banatList = await MadrassahDB.getAllStudents('banat');
+            print('Banat count: ' + banatList.length + ' -> ' + JSON.stringify(banatList.map(s => ({id: s.id, name: s.name, sec: s.section}))));
+            
+            print('TEST COMPLETE SUCCESS');
+        } catch(e) {
+            print('ERROR: ' + e.message + '\n' + e.stack);
+        }
+    }
+    test();
+    </script>
+</body>
+</html>

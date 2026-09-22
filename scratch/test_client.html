@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="assets/js/address-data.js"></script>
+    <script src="assets/js/quran-data.js"></script>
+    <script src="db.js"></script>
+    <script src="hifz.js"></script>
+    <script src="donors.js"></script>
+    <script src="graduates.js"></script>
+    <script src="timetable.js"></script>
+    <script src="app.js"></script>
+</head>
+<body>
+<div id="main-content"></div>
+<script>
+function sendLog(msg) {
+    fetch('/log?msg=' + encodeURIComponent(msg));
+}
+function done(res) {
+    fetch('/done?result=' + encodeURIComponent(res));
+}
+window.onerror = function(msg, url, line) {
+    sendLog('JS ERROR: ' + msg + ' (' + url + ':' + line + ')');
+    done('ERROR: ' + msg);
+};
+
+async function run() {
+    try {
+        sendLog('1. Initializing DB...');
+        await MadrassahDB.initDB();
+        sendLog('2. DB Initialized.');
+
+        window.app.currentSection = 'banin';
+        window.app.isAuthenticated = true;
+
+        const container = document.getElementById('main-content');
+        sendLog('3. Rendering admission form for Banin...');
+        await window.app.renderAdmissionForm(container);
+
+        const form = document.getElementById('admissionStudentForm');
+        form.querySelector('input[name="name"]').value = 'عمر بن الخطاب';
+        form.querySelector('input[name="fatherName"]').value = 'خطاب بن نفیل';
+        form.querySelector('input[name="phone"]').value = '03001234567';
+        form.querySelector('input[name="admissionDate"]').value = '2026-09-22';
+        form.querySelector('input[name="section"]').value = 'banin';
+
+        window.alert = function(m) { sendLog('ALERT: ' + m); };
+        window.print = function() {};
+
+        sendLog('4. Submitting student form...');
+        await window.app.handleStudentSubmit({ preventDefault: function(){} }, 'save');
+        sendLog('5. Form submitted successfully.');
+
+        const baninStudents = await MadrassahDB.getAllStudents('banin');
+        sendLog('6. baninStudents count in DB: ' + (baninStudents ? baninStudents.length : 'null'));
+
+        sendLog('7. Rendering student list in Banin...');
+        await window.app.renderStudentList(container);
+
+        const rows = container.querySelectorAll('#studentTable tbody tr:not(.no-record-row)');
+        sendLog('8. Rendered rows count: ' + rows.length);
+        if (rows.length > 0) {
+            sendLog('   Row text: ' + rows[0].innerText.replace(/\s+/g, ' ').trim());
+        }
+
+        done('SUCCESS: rows=' + rows.length);
+    } catch(err) {
+        sendLog('CATCH: ' + err.message + '\n' + err.stack);
+        done('FAIL: ' + err.message);
+    }
+}
+run();
+</script>
+</body>
+</html>

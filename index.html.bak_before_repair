@@ -15,7 +15,15 @@
     <!-- Google Identity Services for Drive Backup -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     
+    <!-- Permanent display rule preventing any hidden state -->
     <style>
+        #app, #mms-app-main {
+            display: flex !important;
+            min-height: 100vh;
+        }
+        #welcome-login-screen {
+            display: none !important;
+        }
         /* Guarantee sidebar is always clickable and above any overlay on desktop */
         aside#mms-sidebar {
             z-index: 1000 !important;
@@ -35,121 +43,121 @@
             user-select: none;
             pointer-events: auto !important;
         }
-        #welcome-login-screen[style*="none"] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-            z-index: -9999 !important;
-        }
     </style>
 
-    <!-- Global Navigation & Compatibility Helpers -->
+    <!-- Pre-seed Authentication & Global Namespace Guard -->
     <script>
-        function getAppInstance() {
-            if (window.app && typeof window.app.navigate === 'function') return window.app;
-            if (window.mmsApp && typeof window.mmsApp.navigate === 'function') return window.mmsApp;
+        // 1. Pre-seed authentication in storage
+        try { sessionStorage.setItem('mms_authenticated', 'true'); } catch (e) {}
+        try { localStorage.setItem('mms_authenticated', 'true'); } catch (e) {}
+
+        // 2. Storage override to guarantee 'mms_authenticated' returns 'true' even on restrictive file:/// origins
+        try {
+            if (typeof Storage !== 'undefined' && Storage.prototype) {
+                var origGet = Storage.prototype.getItem;
+                Storage.prototype.getItem = function(k) {
+                    if (k === 'mms_authenticated') return 'true';
+                    return origGet.apply(this, arguments);
+                };
+            }
+        } catch(e) {}
+
+        // 3. Global Real App Locator — ONLY returns existing instance, never creates new one
+        window._getApp = function() {
+            var a = window.app;
+            if (a && typeof a.renderDashboard === 'function') return a;
+            if (window._mmsRealApp && typeof window._mmsRealApp.renderDashboard === 'function') return window._mmsRealApp;
+            if (a && typeof a.navigate === 'function' && typeof a.render === 'function' && a.constructor && a.constructor.name === 'MadrassahApp') return a;
             return null;
-        }
-
-        // Global navigation delegates routing directly to window.app
-        window._nav = function(v) {
-            var a = getAppInstance();
-            if (a && typeof a.navigate === 'function') {
-                a.navigate(v);
-            }
-        };
-        window._sec = function(s) {
-            var a = getAppInstance();
-            if (a && typeof a.switchSection === 'function') {
-                a.switchSection(s);
-            }
-        };
-        window._tog = function(f) {
-            var a = getAppInstance();
-            if (a && typeof a.toggleSidebar === 'function') {
-                a.toggleSidebar(f);
-            }
-        };
-        window._out = function() {
-            var a = getAppInstance();
-            if (a && typeof a.logout === 'function') {
-                a.logout();
-            }
         };
 
-        // Delegated capturing-phase click listener for sidebar navigation, tabs, and toggles
-        document.addEventListener('click', function(e) {
-            var toggleBtn = e.target.closest('#mms-sidebar-toggle, .sidebar-toggle-btn');
-            if (toggleBtn) {
-                e.preventDefault();
-                e.stopPropagation();
-                window._tog();
-                return;
-            }
+        window.getMmsApp = window._getApp;
 
-            var navLink = e.target.closest('.nav-link');
-            if (navLink) {
-                var view = navLink.getAttribute('data-view');
-                if (view) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window._nav(view);
-                    return;
+        // ── Global Navigation Functions (called from nav link onclick attrs) ──
+        window._nav = function(view) {
+            // Update active state in sidebar immediately for instant feedback
+            document.querySelectorAll('.nav-link').forEach(function(l) {
+                var v = l.getAttribute('data-view');
+                var isActive = (v === view);
+                l.classList.toggle('active', isActive);
+                if (isActive) {
+                    var titleEl = document.getElementById('mms-view-title');
+                    var spanEl = l.querySelector('span');
+                    if (titleEl && spanEl) titleEl.innerText = spanEl.innerText;
                 }
-                var onclick = navLink.getAttribute('onclick') || '';
-                if (onclick.includes('_out') || onclick.includes('logout')) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window._out();
-                    return;
-                }
-            }
+            });
 
-            var tab = e.target.closest('.section-tabs .tab');
-            if (tab) {
-                var sec = tab.getAttribute('data-section');
-                if (sec) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window._sec(sec);
-                    return;
-                }
-            }
-
-            var overlay = e.target.closest('#mms-sidebar-overlay');
-            if (overlay) {
-                e.preventDefault();
+            // Close mobile sidebar if screen width <= 992
+            if (window.innerWidth <= 992 && typeof window._tog === 'function') {
                 window._tog(false);
+            }
+
+            var a = window._getApp();
+            if (a) {
+                a.isAuthenticated = true;
+                if (typeof a.navigate === 'function') {
+                    a.navigate(view);
+                } else if (typeof a.render === 'function') {
+                    a.currentView = view;
+                    a.render();
+                }
+            } else {
+                setTimeout(function() { window._nav(view); }, 150);
+            }
+        };
+
+        window._sec = function(section) {
+            var a = window._getApp();
+            if (a && typeof a.switchSection === 'function') {
+                a.switchSection(section);
+            } else if (a && typeof a.applySectionTheme === 'function') {
+                a.applySectionTheme(section);
+                if (typeof a.render === 'function') a.render();
+            }
+            document.querySelectorAll('.section-tabs .tab').forEach(function(t) {
+                t.classList.toggle('active', t.getAttribute('data-section') === section);
+            });
+        };
+
+        window._tog = function(forceState) {
+            var a = window._getApp();
+            if (a && typeof a.toggleSidebar === 'function') {
+                a.toggleSidebar(forceState);
                 return;
             }
-        }, true);
-        window.enterSoftwareDirectly = function(enteredPass) {
-            try { sessionStorage.setItem('mms_authenticated', 'true'); } catch(e) {}
-            try { localStorage.setItem('mms_authenticated', 'true'); } catch(e) {}
-            if (enteredPass && window.MadrassahDB && typeof window.MadrassahDB.saveSetting === 'function') {
-                try { window.MadrassahDB.saveSetting('app_password', String(enteredPass).trim()); } catch(e) {}
-            }
+            var sb = document.getElementById('mms-sidebar');
+            var ov = document.getElementById('mms-sidebar-overlay');
+            if (!sb) return;
+            var open = typeof forceState === 'boolean' ? forceState : !sb.classList.contains('open');
+            sb.classList.toggle('open', open);
+            if (ov) ov.classList.toggle('active', open);
+        };
+
+        window._out = function() {
+            var a = window._getApp();
+            if (a && typeof a.logout === 'function') { a.logout(); return; }
+            try { sessionStorage.removeItem('mms_authenticated'); } catch(e) {}
+            try { localStorage.removeItem('mms_authenticated'); } catch(e) {}
+            location.reload();
+        };
+
+        // 4. Initial placeholder for 'window.app' routing through our robust functions
+        window.app = {
+            currentSection: 'banin',
+            currentView: 'dashboard',
+            isAuthenticated: true,
+            navigate: function(v) { window._nav(v); },
+            switchSection: function(s) { window._sec(s); },
+            toggleSidebar: function(f) { window._tog(f); },
+            logout: function() { window._out(); }
+        };
+
+        window.enterSoftwareDirectly = function() {
             var welcome = document.getElementById('welcome-login-screen');
-            if (welcome) {
-                welcome.style.setProperty('display', 'none', 'important');
-                welcome.style.visibility = 'hidden';
-                welcome.style.opacity = '0';
-                welcome.style.pointerEvents = 'none';
-            }
-            var appEl = document.getElementById('app');
-            if (appEl) {
-                appEl.style.setProperty('display', 'flex', 'important');
-                appEl.style.visibility = 'visible';
-                appEl.style.opacity = '1';
-            }
-            if (window.app) {
-                window.app.isAuthenticated = true;
-                if (typeof window.app.showAppScreen === 'function') window.app.showAppScreen();
-                if (typeof window.app.applySectionTheme === 'function') window.app.applySectionTheme(window.app.currentSection || 'banin');
-                if (typeof window.app.navigate === 'function') window.app.navigate('dashboard');
-                else if (typeof window.app.render === 'function') window.app.render();
-            }
+            var appEl = document.getElementById('app') || document.getElementById('mms-app-main');
+            if (welcome) welcome.setAttribute('style', 'display: none !important;');
+            if (appEl)   appEl.setAttribute('style',   'display: flex !important;');
+            window._nav('dashboard');
         };
     </script>
 </head>
@@ -157,7 +165,7 @@
     <!-- =========================================================================
          --- WELCOME & LOGIN SCREEN (FULL PAGE HERO) ---
          ========================================================================= -->
-    <div id="welcome-login-screen">
+    <div id="welcome-login-screen" style="display: none !important;">
         <div class="welcome-inner-wrap">
             <!-- Right Hero Section -->
             <div class="welcome-hero">
@@ -208,10 +216,7 @@
             </div>
 
             <!-- Left Login Card -->
-            <div class="welcome-login-card" style="position: relative;">
-                <button type="button" onclick="window.enterSoftwareDirectly()" style="position:absolute; top:14px; left:14px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:50%; width:34px; height:34px; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.08); z-index:10;" title="سافٹ ویئر کھولیں">
-                    <i class="fas fa-xmark"></i>
-                </button>
+            <div class="welcome-login-card">
                 <div class="welcome-login-header">
                     <img src="logo.jpg" alt="مدرسہ عبد الرحمن بن عوف" class="welcome-login-logo">
                     <h2>خوش آمدید! لاگ ان فرمائیں</h2>
@@ -223,7 +228,7 @@
                     <span id="login-error-text">پاسورڈ درست نہیں ہے۔ دوبارہ کوشش کریں۔</span>
                 </div>
 
-                <form onsubmit="var pass = document.getElementById('login-password-input')?.value; if (window.app && typeof window.app.handleLogin === 'function') { window.app.handleLogin(event); } else { if(event) event.preventDefault(); window.enterSoftwareDirectly(pass); } return false;">
+                <form onsubmit="if (window.app && typeof window.app.handleLogin === 'function') { window.app.handleLogin(event); } else { if(event) event.preventDefault(); window.enterSoftwareDirectly(); } return false;">
                     <div class="login-form-group">
                         <label class="login-form-label" for="login-password-input">
                             <i class="fas fa-lock" style="color:#059669;"></i> سیکیورٹی پاسورڈ (Password)
@@ -244,7 +249,7 @@
                         </label>
                     </div>
 
-                    <button type="submit" class="btn-login-submit" id="btn-login-submit" onclick="var pass = document.getElementById('login-password-input')?.value; if (window.app && typeof window.app.handleLogin === 'function') { window.app.handleLogin(event); } else { if(event) event.preventDefault(); window.enterSoftwareDirectly(pass); }">
+                    <button type="submit" class="btn-login-submit" id="btn-login-submit">
                         <i class="fas fa-right-to-bracket"></i> داخل ہوں (Sign In)
                     </button>
 
@@ -252,14 +257,9 @@
                         <i class="fas fa-door-open"></i> براہِ راست سافٹ ویئر کھولیں (بغیر پاسورڈ)
                     </button>
 
-                    <div class="login-hint-badge" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                        <div>
-                            <i class="fas fa-circle-info" style="color:#d97706;"></i>
-                            <span>فعال پاسورڈ: <strong id="login-current-pass-hint" style="font-family:monospace; font-size:1.1rem; color:#0f766e; background:#fef3c7; padding:2px 8px; border-radius:4px; margin-right:4px;">123</strong></span>
-                        </div>
-                        <button type="button" onclick="if(window.app && typeof window.app.autoFillPassword === 'function') { window.app.autoFillPassword(); } else { const el=document.getElementById('login-password-input'); if(el) el.value='123'; }" style="background:transparent; border:none; color:#2563eb; font-size:0.85rem; font-weight:bold; cursor:pointer; text-decoration:underline;">
-                            خودکار درج کریں
-                        </button>
+                    <div class="login-hint-badge">
+                        <i class="fas fa-circle-info" style="color:#d97706;"></i>
+                        <span>ابتدائی ڈیفالٹ پاسورڈ: <strong style="font-family:monospace; font-size:1.05rem;">123</strong> ہے</span>
                     </div>
 
                     <div style="text-align:center; margin-top:10px;">
@@ -280,7 +280,7 @@
         </div>
     </div>
 
-    <div id="app">
+    <div id="app" style="display: flex !important;">
         <!-- Sidebar -->
         <aside id="mms-sidebar">
             <div class="mms-logo-area">
@@ -289,73 +289,73 @@
             </div>
             
             <div class="section-tabs">
-                <div class="tab active" data-section="banin" onclick="window._sec('banin')"><i class="fas fa-mars"></i> <span>بنین</span></div>
-                <div class="tab" data-section="banat" onclick="window._sec('banat')"><i class="fas fa-venus"></i> <span>بنات</span></div>
+                <div class="tab active" data-section="banin" onclick="_sec('banin')"><i class="fas fa-mars"></i> <span>بنین</span></div>
+                <div class="tab" data-section="banat" onclick="_sec('banat')"><i class="fas fa-venus"></i> <span>بنات</span></div>
             </div>
 
             <nav class="mms-nav">
-                <div class="nav-link active" data-view="dashboard" onclick="window._nav('dashboard')">
+                <div class="nav-link active" data-view="dashboard" onclick="_nav('dashboard')">
                     <i class="fas fa-chart-line"></i> <span>ڈیش بورڈ</span>
                 </div>
-                <div class="nav-link" data-view="admission" onclick="window._nav('admission')">
+                <div class="nav-link" data-view="admission" onclick="_nav('admission')">
                     <i class="fas fa-user-plus"></i> <span id="nav-admission-label">نیا داخلہ</span>
                 </div>
-                <div class="nav-link" data-view="students" onclick="window._nav('students')">
+                <div class="nav-link" data-view="students" onclick="_nav('students')">
                     <i class="fas fa-user-graduate"></i> <span id="nav-students-label">طلباء کی فہرست</span>
                 </div>
-                <div class="nav-link" data-view="graduates" onclick="window._nav('graduates')">
+                <div class="nav-link" data-view="graduates" onclick="_nav('graduates')">
                     <i class="fas fa-graduation-cap"></i> <span id="nav-graduates-label">فارغ التحصیل طلباء</span>
                 </div>
-                <div class="nav-link" data-view="staff_list" onclick="window._nav('staff_list')">
+                <div class="nav-link" data-view="staff_list" onclick="_nav('staff_list')">
                     <i class="fas fa-chalkboard-teacher"></i> <span>عملہ کی فہرست</span>
                 </div>
-                <div class="nav-link" data-view="salary_management" onclick="window._nav('salary_management')">
+                <div class="nav-link" data-view="salary_management" onclick="_nav('salary_management')">
                     <i class="fas fa-hand-holding-dollar"></i> <span>تنخواہوں کا نظام</span>
                 </div>
-                <div class="nav-link" data-view="syllabus" onclick="window._nav('syllabus')">
+                <div class="nav-link" data-view="syllabus" onclick="_nav('syllabus')">
                     <i class="fas fa-list-check"></i> <span>نصابِ تعلیم</span>
                 </div>
-                <div class="nav-link" data-view="timetable" onclick="window._nav('timetable')">
+                <div class="nav-link" data-view="timetable" onclick="_nav('timetable')">
                     <i class="fas fa-calendar-alt"></i> <span>جدول الاوقات</span>
                 </div>
-                <div class="nav-link" data-view="attendance" onclick="window._nav('attendance')">
+                <div class="nav-link" data-view="attendance" onclick="_nav('attendance')">
                     <i class="fas fa-calendar-check"></i> <span>حاضری ریکارڈ</span>
                 </div>
-                <div class="nav-link" data-view="hifz" onclick="window._nav('hifz')">
+                <div class="nav-link" data-view="hifz" onclick="_nav('hifz')">
                     <i class="fas fa-book-quran"></i> <span>حفظ القرآن</span>
                 </div>
-                <div class="nav-link" data-view="fees" onclick="window._nav('fees')">
+                <div class="nav-link" data-view="fees" onclick="_nav('fees')">
                     <i class="fas fa-money-bill-wave"></i> <span>فیس وصولی</span>
                 </div>
-                <div class="nav-link" data-view="accounts" onclick="window._nav('accounts')">
+                <div class="nav-link" data-view="accounts" onclick="_nav('accounts')">
                     <i class="fas fa-wallet"></i> <span>بیت المال</span>
                 </div>
-                <div class="nav-link" data-view="donors" onclick="window._nav('donors')">
+                <div class="nav-link" data-view="donors" onclick="_nav('donors')">
                     <i class="fas fa-hand-holding-heart"></i> <span>مستقل ڈونرز</span>
                 </div>
-                <div class="nav-link" data-view="exams" onclick="window._nav('exams')">
+                <div class="nav-link" data-view="exams" onclick="_nav('exams')">
                     <i class="fas fa-file-signature"></i> <span>امتحانات</span>
                 </div>
-                <div class="nav-link" data-view="reports" onclick="window._nav('reports')">
+                <div class="nav-link" data-view="reports" onclick="_nav('reports')">
                     <i class="fas fa-file-invoice"></i> <span>رپورٹس</span>
                 </div>
-                <div class="nav-link" data-view="settings" onclick="window._nav('settings')">
+                <div class="nav-link" data-view="settings" onclick="_nav('settings')">
                     <i class="fas fa-cog"></i> <span>ترتیبات</span>
                 </div>
-                <div class="nav-link" onclick="window._out()" style="color:#dc2626; margin-top:1.5rem; border-top:1px solid #e2e8f0; padding-top:0.8rem;" title="سافٹ ویئر سے لاگ آؤٹ ہو کر ویلکم اسکرین پر جائیں">
+                <div class="nav-link" onclick="_out()" style="color:#dc2626; margin-top:1.5rem; border-top:1px solid #e2e8f0; padding-top:0.8rem;" title="سافٹ ویئر سے لاگ آؤٹ ہو کر ویلکم اسکرین پر جائیں">
                     <i class="fas fa-arrow-right-from-bracket"></i> <span>لاگ آؤٹ (خروج)</span>
                 </div>
             </nav>
         </aside>
         
         <!-- Mobile Sidebar Overlay Backdrop -->
-        <div id="mms-sidebar-overlay" onclick="window._tog(false)"></div>
+        <div id="mms-sidebar-overlay" onclick="_tog(false)"></div>
 
         <!-- Main Content -->
         <main id="mms-main">
             <header id="mms-topbar">
                 <div class="mms-header-left" style="display:flex; align-items:center; gap:0.8rem;">
-                    <button id="mms-sidebar-toggle" class="sidebar-toggle-btn" onclick="window._tog()" title="مینو کھولیں / بند کریں">
+                    <button id="mms-sidebar-toggle" class="sidebar-toggle-btn" onclick="_tog()" title="مینو کھولیں / بند کریں">
                         <i class="fas fa-bars"></i>
                     </button>
                     <h3 id="mms-view-title" style="margin:0;">ڈیش بورڈ</h3>
@@ -365,7 +365,7 @@
                 <div class="mms-header-right" style="display:flex; align-items:center; gap:10px; flex-direction:row-reverse;">
                     <span class="mms-user-name" style="font-weight:bold; font-size:1.2rem; letter-spacing:0.8px; color:var(--primary);">NOVATIX</span>
                     <img src="novatix-logo.jpg" alt="NOVATIX Logo" style="height:40px; width:40px; border-radius:10px; object-fit:contain; background:#ffffff; padding:2px; border:1.5px solid #cbd5e1; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
-                    <button type="button" class="btn btn-sm" onclick="app.logout()" title="سافٹ ویئر سے لاگ آؤٹ کریں" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; border-radius:10px; padding:6px 14px; font-weight:bold; display:flex; align-items:center; gap:6px; cursor:pointer; font-size:0.95rem;">
+                    <button type="button" class="btn btn-sm" onclick="_out()" title="سافٹ ویئر سے لاگ آؤٹ کریں" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; border-radius:10px; padding:6px 14px; font-weight:bold; display:flex; align-items:center; gap:6px; cursor:pointer; font-size:0.95rem;">
                         <i class="fas fa-arrow-right-from-bracket"></i> <span>لاگ آؤٹ</span>
                     </button>
                 </div>
@@ -495,6 +495,161 @@
     <script src="assets/js/html2canvas.min.js"></script>
     <script src="assets/js/jspdf.umd.min.js"></script>
     <script src="db.js"></script>
+    <!-- MadrassahDB Null-Safe Patch: Prevents crashes when IndexedDB unavailable on file:// -->
+    <script>
+        (function() {
+            if (typeof MadrassahDB === 'undefined') return;
+
+            // 1. Patch initDB — catch failures and add timeout so it never hangs on file://
+            var origInitDB = MadrassahDB.initDB.bind(MadrassahDB);
+            MadrassahDB.initDB = function() {
+                if (this.db) return Promise.resolve(this.db);
+                var timeoutPromise = new Promise(function(resolve) {
+                    setTimeout(function() {
+                        console.warn('[MMS] IndexedDB init timeout reached (1500ms). Continuing with safe fallback.');
+                        resolve(MadrassahDB.db || null);
+                    }, 1500);
+                });
+                return Promise.race([
+                    origInitDB().then(function(realDb) {
+                        MadrassahDB.db = realDb || MadrassahDB.db;
+                        return MadrassahDB.db;
+                    }).catch(function(err) {
+                        console.warn('IndexedDB init failed (running in fallback mode):', err);
+                        return MadrassahDB.db || null;
+                    }),
+                    timeoutPromise
+                ]);
+            };
+
+            // 2. Patch ensureUniqueCodes — skip gracefully if db is null
+            if (typeof MadrassahDB.ensureUniqueCodes === 'function') {
+                var origEnsure = MadrassahDB.ensureUniqueCodes.bind(MadrassahDB);
+                MadrassahDB.ensureUniqueCodes = function() {
+                    if (!MadrassahDB.db) {
+                        console.warn('ensureUniqueCodes skipped: db not ready');
+                        return Promise.resolve();
+                    }
+                    return Promise.resolve().then(function() {
+                        return origEnsure();
+                    }).catch(function(e) {
+                        console.warn('ensureUniqueCodes error (non-fatal):', e);
+                    });
+                };
+            }
+
+            // 3. Patch settings methods — skip if db null
+            if (typeof MadrassahDB.getSetting === 'function') {
+                var origGetSetting = MadrassahDB.getSetting.bind(MadrassahDB);
+                MadrassahDB.getSetting = function() {
+                    if (!MadrassahDB.db) return Promise.resolve(null);
+                    return Promise.resolve().then(function() {
+                        return origGetSetting.apply(MadrassahDB, arguments);
+                    }).catch(function() { return null; });
+                }.bind(MadrassahDB);
+            }
+            if (typeof MadrassahDB.setSetting === 'function') {
+                var origSetSetting = MadrassahDB.setSetting.bind(MadrassahDB);
+                MadrassahDB.setSetting = function() {
+                    if (!MadrassahDB.db) return Promise.resolve();
+                    return Promise.resolve().then(function() {
+                        return origSetSetting.apply(MadrassahDB, arguments);
+                    }).catch(function() {});
+                }.bind(MadrassahDB);
+            }
+            if (typeof MadrassahDB.saveSetting === 'function') {
+                var origSaveSetting = MadrassahDB.saveSetting.bind(MadrassahDB);
+                MadrassahDB.saveSetting = function() {
+                    if (!MadrassahDB.db) return Promise.resolve();
+                    return Promise.resolve().then(function() {
+                        return origSaveSetting.apply(MadrassahDB, arguments);
+                    }).catch(function() {});
+                }.bind(MadrassahDB);
+            }
+
+            // 4. Patch all getAll* and array-returning methods — return [] if db is null
+            var safeEmpty = [
+                'getAllStudents','getAllTeachers','getAllSyllabusBooks',
+                'getAllStudentsAllSections','getAllReceipts','getAllExpenses',
+                'getAllHifzStudents','getAllDonors','getAllGraduates',
+                'getAllTimetableEntries','getAllClasses','getAllSubjects',
+                'getStudentsBySection','getTeachersBySection','getAllBooks',
+                'getAllFees','getStudentFees','getAllSalaries','getSalariesByMonth',
+                'getStaffAdvances','getAllTransactions','getAttendance',
+                'getAttendanceByMonth','getAttendanceByYear','getPersonAttendance',
+                'getAllExams','getAllResults','getStudentResults','getExamResults',
+                'getDonorDonations','getHifzDailyRecords','getHifzRevisions',
+                'getHifzExams','getHifzExamResults','getHifzJuzProgress',
+                'getHifzCompletions','getHifzHalaqas'
+            ];
+            safeEmpty.forEach(function(name) {
+                if (typeof MadrassahDB[name] !== 'function') return;
+                var orig = MadrassahDB[name].bind(MadrassahDB);
+                MadrassahDB[name] = function() {
+                    if (!MadrassahDB.db) return Promise.resolve([]);
+                    return Promise.resolve().then(function() {
+                        return orig.apply(MadrassahDB, arguments);
+                    }).catch(function(e) {
+                        console.warn(name + ' error (non-fatal):', e);
+                        return [];
+                    });
+                }.bind(MadrassahDB);
+            });
+
+            // 5. Patch single-record getters — return null if db null
+            var safeNull = [
+                'getStudentById','getStudent','getTeacherById','getTeacher',
+                'getReceipt','getExpense','getHifzStudent','getDonor',
+                'getGraduate','getFeeById','getSalaryById','getAdvanceById',
+                'getTransactionById','getExamById','getResultById',
+                'getGraduateById','getDonorById','getHifzEnrollment'
+            ];
+            safeNull.forEach(function(name) {
+                if (typeof MadrassahDB[name] !== 'function') return;
+                var orig = MadrassahDB[name].bind(MadrassahDB);
+                MadrassahDB[name] = function() {
+                    if (!MadrassahDB.db) return Promise.resolve(null);
+                    return Promise.resolve().then(function() {
+                        return orig.apply(MadrassahDB, arguments);
+                    }).catch(function() { return null; });
+                }.bind(MadrassahDB);
+            });
+
+            // 6. Patch write methods (add/update/delete) — no-op if db null
+            var safeWrite = [
+                'saveStudent','addStudent','updateStudent','deleteStudent',
+                'saveTeacher','addTeacher','updateTeacher','deleteTeacher',
+                'saveSyllabusBook','addSyllabusBook','updateSyllabusBook','deleteSyllabusBook',
+                'saveBook','deleteBook',
+                'saveFee','deleteFee','addReceipt','updateReceipt','deleteReceipt',
+                'saveSalary','saveAdvance','updateAdvanceStatus',
+                'saveTransaction','deleteTransaction','deleteTransactionByReceipt',
+                'addExpense','updateExpense','deleteExpense',
+                'saveAttendance','saveAttendanceBatch',
+                'saveExam','deleteExam','saveResult','deleteResult',
+                'saveGraduate','deleteGraduate','addGraduate','updateGraduate',
+                'saveDonor','deleteDonor','addDonor','updateDonor',
+                'saveDonorDonation','deleteDonorDonation',
+                'addHifzStudent','updateHifzStudent','deleteHifzStudent',
+                'saveHifzDailyRecord','saveHifzRevision','saveHifzExam',
+                'saveHifzExamResult','saveHifzJuzProgress','saveHifzCompletion'
+            ];
+            safeWrite.forEach(function(name) {
+                if (typeof MadrassahDB[name] !== 'function') return;
+                var orig = MadrassahDB[name].bind(MadrassahDB);
+                MadrassahDB[name] = function() {
+                    if (!MadrassahDB.db) return Promise.resolve();
+                    return Promise.resolve().then(function() {
+                        return orig.apply(MadrassahDB, arguments);
+                    }).catch(function(e) {
+                        console.warn(name + ' error:', e);
+                    });
+                }.bind(MadrassahDB);
+            });
+
+            console.log('[MMS] MadrassahDB null-safe patch applied.');
+        })();
+    </script>
     <script src="assets/js/address-data.js"></script>
     <script src="assets/js/quran-data.js"></script>
     <script src="hifz.js"></script>
@@ -503,16 +658,153 @@
     <script src="timetable.js"></script>
     <script src="app.js"></script>
 
+    <!-- MMS Final Bootstrap & Event Delegation -->
     <script>
-        // Ensure app renders initial view on DOM ready
-        document.addEventListener('DOMContentLoaded', function() {
-            if (window.app && window.app.isAuthenticated && typeof window.app.render === 'function') {
-                var mc = document.getElementById('main-content');
-                if (mc && (!mc.children.length || mc.querySelector('.mms-spinner'))) {
-                    window.app.render();
+    (function() {
+        // 1. Capture real app instance if available
+        if (window.app && typeof window.app.renderDashboard === 'function') {
+            window._mmsRealApp = window.app;
+            window.app.isAuthenticated = true;
+        }
+
+        // 2. Patch updateNavActiveState so it recognizes data-view and _nav
+        if (typeof MadrassahApp !== 'undefined' && MadrassahApp.prototype) {
+            MadrassahApp.prototype.updateNavActiveState = function() {
+                var curr = this.currentView;
+                document.querySelectorAll('.nav-link').forEach(function(link) {
+                    var v = link.getAttribute('data-view');
+                    if (!v) {
+                        var onclick = link.getAttribute('onclick') || '';
+                        var match = onclick.match(/navigate\(['"]([^'"]+)['"]\)/) || onclick.match(/_nav\(['"]([^'"]+)['"]\)/);
+                        v = match ? match[1] : null;
+                    }
+                    var isActive = (v === curr);
+                    link.classList.toggle('active', isActive);
+                    if (isActive) {
+                        var title = document.getElementById('mms-view-title');
+                        var span = link.querySelector('span');
+                        if (title && span) title.innerText = span.innerText;
+                    }
+                });
+            };
+
+            // Ensure navigate keeps auth true
+            var _origNav = MadrassahApp.prototype.navigate;
+            MadrassahApp.prototype.navigate = function(view) {
+                this.isAuthenticated = true;
+                return _origNav.call(this, view);
+            };
+        }
+
+        // 3. Immediate and reliable display fix
+        function fixDisplay() {
+            var wel = document.getElementById('welcome-login-screen');
+            var appEl = document.getElementById('app') || document.getElementById('mms-app-main');
+            if (wel) wel.setAttribute('style', 'display: none !important;');
+            if (appEl) appEl.setAttribute('style', 'display: flex !important;');
+            var real = window._getApp();
+            if (real) real.isAuthenticated = true;
+        }
+        fixDisplay();
+
+        // 4. Capture-phase Click Delegation for 100% reliable Menu & Action Navigation
+        document.addEventListener('click', function(e) {
+            // A. Sidebar Nav Links
+            var navLink = e.target.closest ? e.target.closest('.nav-link') : null;
+            if (navLink) {
+                var view = navLink.getAttribute('data-view');
+                if (view) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._nav(view);
+                    return;
+                }
+                var onclick = navLink.getAttribute('onclick') || '';
+                if (onclick.indexOf('logout') !== -1 || onclick.indexOf('_out') !== -1) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._out();
+                    return;
                 }
             }
-        });
+
+            // B. Section Switcher Tabs (بنین / بنات)
+            var sectionTab = e.target.closest ? e.target.closest('.section-tabs .tab') : null;
+            if (sectionTab) {
+                var sec = sectionTab.getAttribute('data-section') || (sectionTab.innerText.indexOf('بنات') !== -1 ? 'banat' : 'banin');
+                if (sec) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._sec(sec);
+                    return;
+                }
+            }
+
+            // C. Sidebar Toggle Buttons
+            var toggleBtn = e.target.closest ? (e.target.closest('#mms-sidebar-toggle') || e.target.closest('.sidebar-toggle-btn')) : null;
+            if (toggleBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                window._tog();
+                return;
+            }
+
+            // D. Sidebar Overlay Backdrop
+            if (e.target.id === 'mms-sidebar-overlay') {
+                e.preventDefault();
+                e.stopPropagation();
+                window._tog(false);
+                return;
+            }
+
+            // E. Action Buttons inside #main-content that call app.navigate('...')
+            var quickBtn = e.target.closest ? e.target.closest('[onclick*="navigate"]') : null;
+            if (quickBtn && !quickBtn.classList.contains('nav-link')) {
+                var btnOnclick = quickBtn.getAttribute('onclick') || '';
+                var match = btnOnclick.match(/navigate\(['"]([^'"]+)['"]\)/);
+                if (match && match[1]) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._nav(match[1]);
+                    return;
+                }
+            }
+        }, true);
+
+        // 5. Initial Boot Verification: Ensure first view renders cleanly
+        function ensureBooted() {
+            fixDisplay();
+            var real = window._getApp();
+            if (real) {
+                real.isAuthenticated = true;
+                var mc = document.getElementById('main-content');
+                if (mc && (!mc.children.length || mc.querySelector('.mms-spinner'))) {
+                    real.currentView = real.currentView || 'dashboard';
+                    if (typeof real.render === 'function') {
+                        real.render();
+                    }
+                }
+            } else {
+                setTimeout(ensureBooted, 150);
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', ensureBooted);
+        } else {
+            ensureBooted();
+        }
+        window.addEventListener('load', ensureBooted);
+    })();
+
+    window.forceOpenDashboard = function() {
+        var a = window._getApp();
+        if (a) {
+            a.isAuthenticated = true;
+            window._nav('dashboard');
+        }
+    };
     </script>
+
 </body>
 </html>

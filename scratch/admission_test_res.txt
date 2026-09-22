@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html><head>
+    <script>
+    window.errors = [];
+    window.onerror = function(msg, url, line, col, err) {
+        window.errors.push({msg: msg, url: url, line: line, col: col, stack: err ? err.stack : ''});
+        return false;
+    };
+    </script>
+    <script src="../assets/js/address-data.js"></script>
+    <script src="../assets/js/quran-data.js"></script>
+    <script src="../db.js"></script>
+    <script src="../hifz.js"></script>
+    <script src="../donors.js"></script>
+    <script src="../graduates.js"></script>
+    <script src="../timetable.js"></script>
+    <script src="../app.js"></script>
+</head>
+<body>
+    <div id="main-content"></div>
+    <div id="debug-out">PENDING</div>
+    <script>
+    async function runTest() {
+        const logs = [];
+        try {
+            logs.push('Initializing DB...');
+            await MadrassahDB.initDB();
+            logs.push('DB Initialized. Setting currentSection = banin');
+            window.app.currentSection = 'banin';
+            window.app.isAuthenticated = true;
+
+            const container = document.getElementById('main-content');
+            await window.app.renderAdmissionForm(container);
+            logs.push('Admission form rendered.');
+
+            // Fill form fields
+            const form = document.getElementById('admissionStudentForm');
+            if (!form) throw new Error('Form not found!');
+
+            form.querySelector('input[name="name"]').value = 'Ø¹Ù…Ø± Ø¨Ù† Ø§Ù„Ø®Ø·Ø§Ø¨';
+            form.querySelector('input[name="fatherName"]').value = 'Ø®Ø·Ø§Ø¨ Ø¨Ù† Ù†ÙÛŒÙ„';
+            form.querySelector('input[name="phone"]').value = '03001234567';
+            form.querySelector('input[name="admissionDate"]').value = '2026-09-22';
+            form.querySelector('select[name="department"]').value = 'Ø­ÙØ¸';
+
+            logs.push('Submitting form...');
+            // Mock alert
+            window.alert = function(msg) { logs.push('ALERT: ' + msg); };
+
+            await window.app.handleStudentSubmit({ preventDefault: function(){} }, 'save');
+            logs.push('handleStudentSubmit completed.');
+
+            // Now check DB
+            const allStudents = await MadrassahDB.getAllStudents('banin');
+            logs.push('getAllStudents(banin) count: ' + (allStudents ? allStudents.length : 'null'));
+            if (allStudents && allStudents.length > 0) {
+                logs.push('First student: ' + JSON.stringify(allStudents[0]));
+            }
+
+            // Now check student list render
+            await window.app.renderStudentList(container);
+            const rows = container.querySelectorAll('#studentTable tbody tr');
+            logs.push('Rendered student table row count: ' + rows.length);
+            if (rows.length > 0) {
+                logs.push('Row 1 text: ' + rows[0].innerText.replace(/\s+/g, ' ').trim());
+            }
+
+            document.getElementById('debug-out').textContent = JSON.stringify({ success: true, logs, errors: window.errors }, null, 2);
+        } catch (err) {
+            logs.push('EXCEPTION: ' + err.toString() + ' | Stack: ' + (err.stack || 'No stack'));
+            document.getElementById('debug-out').textContent = JSON.stringify({ success: false, logs, error: err.toString(), stack: err.stack, errors: window.errors }, null, 2);
+        }
+    }
+
+    runTest();
+    </script>
+
+</body></html>

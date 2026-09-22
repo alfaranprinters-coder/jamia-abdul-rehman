@@ -1,0 +1,45 @@
+﻿<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<pre id="out"></pre>
+<script>
+const out = document.getElementById("out");
+function log(msg) { out.textContent += msg + "\n"; }
+
+log("Starting direct indexedDB test...");
+try {
+    log("indexedDB exists: " + (typeof indexedDB !== "undefined"));
+    const req = indexedDB.open("TestMadrassahDB", 1);
+    log("Open requested...");
+    req.onupgradeneeded = function(e) {
+        log("onupgradeneeded triggered");
+        const db = e.target.result;
+        db.createObjectStore("test_store", { keyPath: "id", autoIncrement: true });
+    };
+    req.onsuccess = function(e) {
+        log("onsuccess triggered! db version=" + e.target.result.version);
+        const db = e.target.result;
+        const tx = db.transaction(["test_store"], "readwrite");
+        const store = tx.objectStore("test_store");
+        const addReq = store.add({ name: "Testing 123" });
+        addReq.onsuccess = function() {
+            log("Record added with id=" + addReq.result);
+            const getReq = store.getAll();
+            getReq.onsuccess = function() {
+                log("Retrieved count: " + getReq.result.length);
+            };
+        };
+    };
+    req.onerror = function(e) {
+        log("onerror triggered: " + (e.target.error ? e.target.error.message : "unknown"));
+    };
+    req.onblocked = function(e) {
+        log("onblocked triggered!");
+    };
+} catch(err) {
+    log("Caught exception: " + err.message);
+}
+</script>
+</body>
+</html>

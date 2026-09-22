@@ -8,6 +8,13 @@ const HifzModule = {
     selectedStudentId: null,
     bulkDate: new Date().toISOString().split('T')[0],
     dailyDate: new Date().toISOString().split('T')[0],
+    examSubTab: 'list',
+    activeExamId: null,
+    collectiveSearch: '',
+    collectiveStatusFilter: 'all',
+    collectiveHalaqaFilter: 'all',
+    collectiveSort: 'position',
+    showPositions: true,
 
     // Main Entry Point
     async render(container) {
@@ -1912,238 +1919,268 @@ const HifzModule = {
     },
 
     // ==========================================
-    // 8. HIFZ EXAMS MODULE
+    // 8. HIFZ EXAMS & RESULTS MANAGEMENT MODULE
     // ==========================================
+    getHifzGrade(percentage, isPass = true) {
+        if (!isPass) {
+            return { grade: 'F', title: 'راسب / ناکام', color: '#dc2626', bg: '#fee2e2' };
+        }
+        if (percentage >= 90) return { grade: 'A+', title: 'ممتاز', color: '#15803d', bg: '#dcfce7' };
+        if (percentage >= 80) return { grade: 'A', title: 'جید جداً', color: '#16a34a', bg: '#dcfce7' };
+        if (percentage >= 70) return { grade: 'B', title: 'جید', color: '#0284c7', bg: '#e0f2fe' };
+        if (percentage >= 60) return { grade: 'C', title: 'مقبول', color: '#d97706', bg: '#fef3c7' };
+        if (percentage >= 50) return { grade: 'D', title: 'پاس', color: '#b45309', bg: '#fef3c7' };
+        return { grade: 'F', title: 'راسب / ناکام', color: '#dc2626', bg: '#fee2e2' };
+    },
+
+    getUrduPosition(rank) {
+        const titles = {
+            1: 'اول (1st)',
+            2: 'دوم (2nd)',
+            3: 'سوم (3rd)',
+            4: 'چہارم (4th)',
+            5: 'پنجم (5th)',
+            6: 'ششم (6th)',
+            7: 'ہفتم (7th)',
+            8: 'ہشتم (8th)',
+            9: 'نہم (9th)',
+            10: 'دہم (10th)'
+        };
+        return titles[rank] || `${rank}واں`;
+    },
+
     async renderExamsModule(container) {
+        if (!container) return;
         const exams = await MadrassahDB.getAllHifzExams();
-        const teachers = await MadrassahDB.getAllTeachers();
-        const teacherMap = new Map(teachers.map(t => [t.id, t.name]));
+        
+        let activeExam = null;
+        if (this.activeExamId) {
+            activeExam = exams.find(e => e.id === this.activeExamId);
+            if (!activeExam) {
+                this.activeExamId = null;
+                this.examSubTab = 'list';
+            }
+        }
+        if (!this.activeExamId && this.examSubTab !== 'list') {
+            this.examSubTab = 'list';
+        }
 
         container.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:10px;">
-                <div>
-                    <h3 style="color:var(--primary); margin:0; font-size:1.4rem;">
-                        <i class="fas fa-file-signature"></i> حفظ امتحانات (Hifz Exams System)
-                    </h3>
-                    <p style="margin:0.2rem 0 0 0; color:var(--text-muted); font-size:0.95rem;">
-                        ماہانہ و ششماہی حفظ امتحانات، نمبرات، تجوید و روانی کا تجزیہ
-                    </p>
-                </div>
-                <button class="btn btn-primary" onclick="HifzModule.showCreateExamModal()">
-                    <i class="fas fa-plus"></i> نیا امتحان بنائیں
-                </button>
-            </div>
-
-            <div class="card" style="padding:0; overflow:hidden; border-radius:16px;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>امتحان کا عنوان</th>
-                            <th>تاریخ</th>
-                            <th>حصہ / نصاب</th>
-                            <th>حلقہ</th>
-                            <th>ممتحن / استاد</th>
-                            <th>کل نمبر</th>
-                            <th>ایکشن</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${exams.map(ex => `
-                            <tr>
-                                <td style="font-weight:bold; color:var(--primary);">${ex.title}</td>
-                                <td>${ex.date}</td>
-                                <td><span style="background:#f1f5f9; padding:2px 8px; border-radius:6px; font-weight:600;">${ex.portion}</span></td>
-                                <td>${ex.halaqa || 'تمام'}</td>
-                                <td>${teacherMap.get(ex.examinerTeacherId) || '---'}</td>
-                                <td style="font-weight:bold;">${ex.maxMarks || 100}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary" onclick="HifzModule.showEnterExamMarks(${ex.id})" style="padding:4px 10px;">
-                                        <i class="fas fa-marker"></i> نمبرات درج کریں
-                                    </button>
-                                    <button class="btn btn-sm" onclick="HifzModule.deleteHifzExam(${ex.id})" style="background:#fef2f2; color:#ef4444; padding:4px 8px; margin-right:4px;">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        `).join('') || '<tr><td colspan="7" style="text-align:center; padding:3rem; color:var(--text-muted);">کوئی امتحان درج نہیں۔ اوپر "نیا امتحان بنائیں" پر کلک کریں۔</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-
-            <div id="examMarksContainer" style="margin-top:1.5rem;"></div>
-        `;
-    },
-
-    async showCreateExamModal() {
-        const teachers = await MadrassahDB.getAllTeachers();
-        const halaqas = await MadrassahDB.getAllHifzHalaqas();
-
-        const modalDiv = document.createElement('div');
-        modalDiv.id = 'createHifzExamModal';
-        modalDiv.className = 'mms-modal-backdrop';
-
-        modalDiv.innerHTML = `
-            <div class="mms-modal-box" style="max-width: 520px;">
-                <div class="mms-modal-header">
-                    <h3 style="margin:0; color:var(--primary);"><i class="fas fa-file-circle-plus"></i> نیا حفظ امتحان بنائیں</h3>
-                    <button type="button" onclick="document.getElementById('createHifzExamModal').remove()" class="mms-close-btn">&times;</button>
+            <div class="hifz-exams-wrapper" style="animation:fadeIn 0.3s ease;">
+                <!-- Header Banner -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; flex-wrap:wrap; gap:12px; background:#ffffff; padding:1.2rem 1.5rem; border-radius:16px; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                    <div>
+                        <h3 style="color:var(--primary); margin:0; font-size:1.45rem; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-file-signature"></i> نظامِ امتحانات و نتائج حفظ القرآن
+                            ${activeExam ? `<span style="background:var(--primary-subtle); color:var(--primary); font-size:0.85rem; padding:3px 12px; border-radius:20px; font-weight:bold; border:1px solid var(--primary-border);">${activeExam.title}</span>` : ''}
+                        </h3>
+                        <p style="margin:0.25rem 0 0 0; color:var(--text-muted); font-size:0.95rem;">
+                            امتحانات کا انعقاد، تفصیلی نمبرات کا اندراج، خودکار نتائج، گزیٹ اور انفرادی رزلٹ کارڈز
+                        </p>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <button class="btn btn-primary" onclick="HifzModule.showCreateExamModal()" style="display:flex; align-items:center; gap:6px; padding:8px 18px; border-radius:10px; font-weight:bold; box-shadow:0 3px 10px rgba(6,95,70,0.25);">
+                            <i class="fas fa-plus-circle"></i> نیا امتحان بنائیں
+                        </button>
+                    </div>
                 </div>
 
-                <form onsubmit="HifzModule.handleCreateExamSubmit(event)">
-                    <div style="margin-top:1rem; display:flex; flex-direction:column; gap:0.9rem;">
-                        <div class="form-group-horizontal">
-                            <label>امتحان کا عنوان</label>
-                            <input type="text" name="title" placeholder="مثلاً: ماہانہ حفظ امتحان - ستمبر" required>
-                        </div>
+                <!-- Sub Navigation Tabs for Exams -->
+                <div style="display:flex; gap:8px; margin-bottom:1.5rem; border-bottom:2px solid #e2e8f0; padding-bottom:4px; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-sm" onclick="HifzModule.switchExamSubTab('list')" 
+                            style="background:${this.examSubTab === 'list' ? 'var(--primary)' : '#f8fafc'}; color:${this.examSubTab === 'list' ? '#ffffff' : '#475569'}; border:${this.examSubTab === 'list' ? 'none' : '1px solid #cbd5e1'}; border-radius:10px 10px 0 0; padding:8px 18px; font-weight:bold; cursor:pointer;">
+                        <i class="fas fa-list-check"></i> تمام امتحانات کی فہرست (${exams.length})
+                    </button>
+                    ${activeExam ? `
+                        <button type="button" class="btn btn-sm" onclick="HifzModule.switchExamSubTab('marks', ${activeExam.id})" 
+                                style="background:${this.examSubTab === 'marks' ? 'var(--primary)' : '#f8fafc'}; color:${this.examSubTab === 'marks' ? '#ffffff' : '#475569'}; border:${this.examSubTab === 'marks' ? 'none' : '1px solid #cbd5e1'}; border-radius:10px 10px 0 0; padding:8px 18px; font-weight:bold; cursor:pointer;">
+                            <i class="fas fa-marker"></i> نمبرات کا اندراج (${activeExam.title})
+                        </button>
+                        <button type="button" class="btn btn-sm" onclick="HifzModule.switchExamSubTab('collective', ${activeExam.id})" 
+                                style="background:${this.examSubTab === 'collective' ? 'var(--primary)' : '#f8fafc'}; color:${this.examSubTab === 'collective' ? '#ffffff' : '#475569'}; border:${this.examSubTab === 'collective' ? 'none' : '1px solid #cbd5e1'}; border-radius:10px 10px 0 0; padding:8px 18px; font-weight:bold; cursor:pointer;">
+                            <i class="fas fa-chart-column"></i> اجتماعی نتیجہ و گزیٹ
+                        </button>
+                    ` : ''}
+                </div>
 
-                        <div class="form-group-horizontal">
-                            <label>تاریخِ امتحان</label>
-                            <input type="date" name="date" value="${new Date().toISOString().split('T')[0]}" required>
-                        </div>
-
-                        <div class="form-group-horizontal">
-                            <label>حصہ / پارہ جات</label>
-                            <input type="text" name="portion" placeholder="مثلاً: پارہ 1 تا 5" required>
-                        </div>
-
-                        <div class="form-group-horizontal">
-                            <label>حلقہ</label>
-                            <select name="halaqa">
-                                <option value="تمام حلقہ جات">تمام حلقہ جات</option>
-                                ${halaqas.map(h => `<option value="${h.name}">${h.name}</option>`).join('')}
-                            </select>
-                        </div>
-
-                        <div class="form-group-horizontal">
-                            <label>ممتحن (Examiner)</label>
-                            <select name="examinerTeacherId" required>
-                                <option value="">ممتحن کا انتخاب کریں</option>
-                                ${teachers.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
-                            </select>
-                        </div>
-
-                        <div class="form-group-horizontal">
-                            <label>کل نمبر (Total Marks)</label>
-                            <input type="number" name="maxMarks" value="100" required>
-                        </div>
-                    </div>
-
-                    <div style="margin-top:1.5rem; text-align:center; display:flex; justify-content:center; gap:10px;">
-                        <button type="submit" class="btn btn-primary" style="min-width:140px;">محفوظ کریں</button>
-                        <button type="button" class="btn" style="background:#e2e8f0;" onclick="document.getElementById('createHifzExamModal').remove()">منسوخ</button>
-                    </div>
-                </form>
+                <!-- Subview Container -->
+                <div id="hifz-exam-subview-area"></div>
             </div>
         `;
-        document.body.appendChild(modalDiv);
-    },
 
-    async handleCreateExamSubmit(e) {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = {
-            title: formData.get('title'),
-            date: formData.get('date'),
-            portion: formData.get('portion'),
-            halaqa: formData.get('halaqa'),
-            examinerTeacherId: parseInt(formData.get('examinerTeacherId')),
-            maxMarks: parseInt(formData.get('maxMarks')) || 100
-        };
+        const subArea = document.getElementById('hifz-exam-subview-area');
+        if (!subArea) return;
 
-        await MadrassahDB.saveHifzExam(data);
-        const modal = document.getElementById('createHifzExamModal');
-        if (modal) modal.remove();
-        alert('امتحان کا اندراج کامیابی سے ہو گیا۔');
-        await this.renderExamsModule(document.getElementById('hifz-subview-container'));
-    },
-
-    async deleteHifzExam(id) {
-        if (confirm('کیا آپ واقعی یہ امتحان حذف کرنا چاہتے ہیں؟')) {
-            await MadrassahDB.deleteHifzExam(id);
-            await this.renderExamsModule(document.getElementById('hifz-subview-container'));
+        if (this.examSubTab === 'marks' && activeExam) {
+            await this.renderMarksEntryTab(subArea, activeExam);
+        } else if (this.examSubTab === 'collective' && activeExam) {
+            await this.renderCollectiveResultTab(subArea, activeExam);
+        } else {
+            await this.renderExamsListTab(subArea, exams);
         }
     },
 
-    async showEnterExamMarks(examId) {
-        const exam = await MadrassahDB.getHifzExamById(examId);
-        if (!exam) return;
+    async switchExamSubTab(tab, examId = null) {
+        this.examSubTab = tab;
+        if (examId !== null) {
+            this.activeExamId = parseInt(examId);
+        }
+        const subContainer = document.getElementById('hifz-subview-container');
+        if (subContainer) {
+            await this.renderExamsModule(subContainer);
+        }
+    },
 
-        const enrollments = await MadrassahDB.getAllHifzEnrollments();
-        const allStudents = await MadrassahDB.getAllStudents(window.app ? window.app.currentSection : 'banin');
-        const studentMap = new Map(allStudents.map(s => [s.id, s]));
-        const examResults = await MadrassahDB.getHifzExamResults(examId);
-        const resultMap = new Map(examResults.map(r => [r.studentId, r]));
+    async renderExamsListTab(container, exams) {
+        const teachers = await MadrassahDB.getAllTeachers();
+        const teacherMap = new Map(teachers.map(t => [t.id, t.name]));
 
-        const targetEnrollments = enrollments.filter(e => {
-            if (!studentMap.has(e.studentId)) return false;
-            if (!exam.halaqa || exam.halaqa === 'تمام حلقہ جات') return true;
-            return e.halaqa === exam.halaqa;
-        });
+        // Gather statistics across exams
+        let totalResultsCount = 0;
+        let totalPassedCount = 0;
+        const examStats = new Map();
 
-        const container = document.getElementById('examMarksContainer');
-        if (!container) return;
+        for (const ex of exams) {
+            const results = await MadrassahDB.getHifzExamResults(ex.id);
+            const passed = results.filter(r => (r.obtainedMarks || 0) >= (ex.passingMarks || 50)).length;
+            examStats.set(ex.id, {
+                total: results.length,
+                passed,
+                rate: results.length > 0 ? Math.round((passed / results.length) * 100) : 0
+            });
+            totalResultsCount += results.length;
+            totalPassedCount += passed;
+        }
+
+        const overallPassRate = totalResultsCount > 0 ? Math.round((totalPassedCount / totalResultsCount) * 100) : 0;
 
         container.innerHTML = `
-            <div class="card" style="padding:1.5rem; border-top:4px solid var(--primary); border-radius:18px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:10px;">
-                    <div>
-                        <h3 style="color:var(--primary); margin:0;">
-                            <i class="fas fa-marker"></i> نمبرات برائے: ${exam.title} (${exam.portion})
-                        </h3>
-                        <p style="margin:0.2rem 0 0 0; color:var(--text-muted); font-size:0.9rem;">
-                            معیارات: حفظ کی مضبوطی (30)، روانی (20)، اغلاط و اعراب (20)، متشابہات (15)، تجوید و کارکردگی (15) = کل 100 نمبر
-                        </p>
+            <!-- Metric Highlights -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+                <div style="background:#ffffff; padding:1.2rem; border-radius:14px; border:1px solid #e2e8f0; display:flex; align-items:center; gap:14px; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+                    <div style="width:48px; height:48px; border-radius:12px; background:#ecfdf5; color:#059669; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
+                        <i class="fas fa-file-signature"></i>
                     </div>
-                    <button class="btn btn-sm" onclick="document.getElementById('examMarksContainer').innerHTML=''" style="background:#f1f5f9; color:#64748b;">
-                        بند کریں
-                    </button>
+                    <div>
+                        <div style="color:#64748b; font-size:0.88rem; font-weight:600;">کل امتحانات</div>
+                        <div style="font-size:1.6rem; font-weight:800; color:#0f172a;">${exams.length}</div>
+                    </div>
+                </div>
+
+                <div style="background:#ffffff; padding:1.2rem; border-radius:14px; border:1px solid #e2e8f0; display:flex; align-items:center; gap:14px; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+                    <div style="width:48px; height:48px; border-radius:12px; background:#e0f2fe; color:#0284c7; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
+                        <i class="fas fa-user-check"></i>
+                    </div>
+                    <div>
+                        <div style="color:#64748b; font-size:0.88rem; font-weight:600;">شریک حفاظ / نتائج</div>
+                        <div style="font-size:1.6rem; font-weight:800; color:#0f172a;">${totalResultsCount}</div>
+                    </div>
+                </div>
+
+                <div style="background:#ffffff; padding:1.2rem; border-radius:14px; border:1px solid #e2e8f0; display:flex; align-items:center; gap:14px; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+                    <div style="width:48px; height:48px; border-radius:12px; background:#fef3c7; color:#d97706; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
+                        <i class="fas fa-trophy"></i>
+                    </div>
+                    <div>
+                        <div style="color:#64748b; font-size:0.88rem; font-weight:600;">کامیاب امیدواران</div>
+                        <div style="font-size:1.6rem; font-weight:800; color:#0f172a;">${totalPassedCount}</div>
+                    </div>
+                </div>
+
+                <div style="background:#ffffff; padding:1.2rem; border-radius:14px; border:1px solid #e2e8f0; display:flex; align-items:center; gap:14px; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+                    <div style="width:48px; height:48px; border-radius:12px; background:#f3e8ff; color:#7e22ce; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
+                        <i class="fas fa-percent"></i>
+                    </div>
+                    <div>
+                        <div style="color:#64748b; font-size:0.88rem; font-weight:600;">مجموعی شرحِ کامیابی</div>
+                        <div style="font-size:1.6rem; font-weight:800; color:#0f172a;">${overallPassRate}%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Exams Table Card -->
+            <div class="card" style="padding:0; overflow:hidden; border-radius:16px; border:1px solid #e2e8f0;">
+                <div style="padding:1rem 1.5rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div style="font-weight:bold; color:var(--primary); font-size:1.1rem; display:flex; align-items:center; gap:8px;">
+                        <i class="fas fa-table-list"></i> منعقدہ امتحانات کی فہرست
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="hifz-exams-search" placeholder="امتحان یا نصاب تلاش کریں..." oninput="HifzModule.filterExamsListTable(this.value)"
+                               style="padding:6px 14px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.92rem; width:220px;">
+                    </div>
                 </div>
 
                 <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse; font-size:0.92rem;">
+                    <table id="hifz-exams-table" style="width:100%; border-collapse:collapse; text-align:right;">
                         <thead>
-                            <tr style="background:#f8fafc;">
-                                <th>طالب علم</th>
-                                <th>مضبوطی (30)</th>
-                                <th>روانی (20)</th>
-                                <th>اغلاط و اعراب (20)</th>
-                                <th>متشابہات (15)</th>
-                                <th>تجوید (15)</th>
-                                <th>کل (100)</th>
-                                <th>گریڈ</th>
-                                <th>ایکشن</th>
+                            <tr style="background:#f1f5f9; color:#475569; font-size:0.95rem;">
+                                <th style="padding:12px; text-align:center; width:40px;">#</th>
+                                <th style="padding:12px;">امتحان کا عنوان</th>
+                                <th style="padding:12px;">سیشن / سال</th>
+                                <th style="padding:12px;">نوعیت</th>
+                                <th style="padding:12px;">تاریخِ امتحان</th>
+                                <th style="padding:12px;">امتحانی حصہ / نصاب</th>
+                                <th style="padding:12px;">حلقہ</th>
+                                <th style="padding:12px;">ممتحن</th>
+                                <th style="padding:12px; text-align:center;">کل / پاسنگ</th>
+                                <th style="padding:12px; text-align:center;">شرکاء و شرح</th>
+                                <th style="padding:12px; text-align:center; min-width:200px;">ایکشنز</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${targetEnrollments.map(en => {
-                                const st = studentMap.get(en.studentId);
-                                if (!st) return '';
-                                const res = resultMap.get(st.id) || {};
-                                const m1 = res.memorizationMarks !== undefined ? res.memorizationMarks : 25;
-                                const m2 = res.fluencyMarks !== undefined ? res.fluencyMarks : 16;
-                                const m3 = res.mistakesMarks !== undefined ? res.mistakesMarks : 18;
-                                const m4 = res.mutashabihatMarks !== undefined ? res.mutashabihatMarks : 12;
-                                const m5 = res.tajweedMarks !== undefined ? res.tajweedMarks : 13;
-                                const tot = m1 + m2 + m3 + m4 + m5;
-                                const gr = res.grade || (tot >= 80 ? 'A+' : tot >= 70 ? 'A' : tot >= 60 ? 'B' : tot >= 50 ? 'C' : 'D');
-
+                            ${exams.length === 0 ? `
+                                <tr>
+                                    <td colspan="11" style="text-align:center; padding:3.5rem; color:#64748b;">
+                                        <i class="fas fa-folder-open" style="font-size:2.5rem; color:#cbd5e1; margin-bottom:0.8rem; display:block;"></i>
+                                        کوئی امتحان درج نہیں ہے۔ نیا امتحان بنانے کے لیے اوپر <b>"نیا امتحان بنائیں"</b> بٹن پر کلک کریں۔
+                                    </td>
+                                </tr>
+                            ` : exams.map((ex, idx) => {
+                                const st = examStats.get(ex.id) || { total: 0, passed: 0, rate: 0 };
+                                const examinerName = teacherMap.get(ex.examinerTeacherId) || ex.examinerName || '---';
                                 return `
-                                    <tr data-student-id="${st.id}" data-exam-id="${examId}">
-                                        <td style="font-weight:bold; color:var(--primary);">${st.name}</td>
-                                        <td><input type="number" max="30" min="0" class="ex-m1" value="${m1}" oninput="HifzModule.calcExamRowTotal(this)" style="width:60px; text-align:center; padding:4px;"></td>
-                                        <td><input type="number" max="20" min="0" class="ex-m2" value="${m2}" oninput="HifzModule.calcExamRowTotal(this)" style="width:60px; text-align:center; padding:4px;"></td>
-                                        <td><input type="number" max="20" min="0" class="ex-m3" value="${m3}" oninput="HifzModule.calcExamRowTotal(this)" style="width:60px; text-align:center; padding:4px;"></td>
-                                        <td><input type="number" max="15" min="0" class="ex-m4" value="${m4}" oninput="HifzModule.calcExamRowTotal(this)" style="width:60px; text-align:center; padding:4px;"></td>
-                                        <td><input type="number" max="15" min="0" class="ex-m5" value="${m5}" oninput="HifzModule.calcExamRowTotal(this)" style="width:60px; text-align:center; padding:4px;"></td>
-                                        <td style="font-weight:bold; font-size:1.1rem; color:var(--primary);" class="ex-total">${tot}</td>
-                                        <td style="font-weight:bold;" class="ex-grade">${gr}</td>
-                                        <td>
-                                            <button type="button" class="btn btn-sm btn-primary" onclick="HifzModule.saveSingleExamResult(this)" style="padding:3px 10px;">
-                                                محفوظ کریں
-                                            </button>
-                                            <button type="button" class="btn btn-sm" onclick="HifzModule.printExamResultCard(${st.id}, ${examId})" style="padding:3px 8px; background:var(--primary-subtle); color:var(--primary); margin-right:4px;">
-                                                <i class="fas fa-print"></i>
-                                            </button>
+                                    <tr style="border-bottom:1px solid #f1f5f9; transition:background 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+                                        <td style="text-align:center; font-weight:bold; color:#64748b;">${idx + 1}</td>
+                                        <td style="font-weight:bold; color:var(--primary);">
+                                            <a href="javascript:void(0)" onclick="HifzModule.switchExamSubTab('marks', ${ex.id})" style="text-decoration:none; color:var(--primary);">
+                                                ${ex.title}
+                                            </a>
+                                            ${ex.notes ? `<div style="font-size:0.75rem; color:#64748b; font-weight:normal;">${ex.notes}</div>` : ''}
+                                        </td>
+                                        <td><span style="background:#f1f5f9; padding:2px 8px; border-radius:6px; font-size:0.85rem; font-weight:600;">${ex.session || '1446-1447ھ'}</span></td>
+                                        <td><span style="background:#eff6ff; color:#1d4ed8; padding:2px 8px; border-radius:6px; font-size:0.85rem; font-weight:600;">${ex.examType || 'ماہانہ'}</span></td>
+                                        <td style="font-family:monospace; font-weight:600; color:#334155;">${ex.date}</td>
+                                        <td><span style="background:#ecfdf5; color:#065f46; padding:3px 10px; border-radius:6px; font-weight:bold; font-size:0.9rem;">${ex.portion}</span></td>
+                                        <td><span style="color:#475569; font-weight:600;">${ex.halaqa || 'تمام'}</span></td>
+                                        <td><span style="color:#0f172a; font-weight:600;"><i class="fas fa-user-tie" style="color:#64748b; font-size:0.85rem; margin-left:4px;"></i>${examinerName}</span></td>
+                                        <td style="text-align:center; font-weight:bold; font-size:0.95rem;">
+                                            <span style="color:#0f172a;">${ex.maxMarks || 100}</span> / <span style="color:#b45309;">${ex.passingMarks || 50}</span>
+                                        </td>
+                                        <td style="text-align:center;">
+                                            <div style="font-weight:bold; font-size:0.92rem; color:#0f172a;">${st.total} حفاظ</div>
+                                            <div style="font-size:0.78rem; font-weight:bold; color:${st.rate >= 70 ? '#15803d' : (st.rate >= 50 ? '#d97706' : '#dc2626')};">
+                                                کامیابی: ${st.rate}%
+                                            </div>
+                                        </td>
+                                        <td style="text-align:center;">
+                                            <div style="display:flex; justify-content:center; align-items:center; gap:6px; flex-wrap:wrap;">
+                                                <button class="btn btn-sm btn-primary" onclick="HifzModule.switchExamSubTab('marks', ${ex.id})" 
+                                                        style="padding:5px 12px; font-size:0.85rem; border-radius:8px; display:inline-flex; align-items:center; gap:4px;" title="نمبرات درج یا ترمیم کریں">
+                                                    <i class="fas fa-marker"></i> نمبرات
+                                                </button>
+                                                <button class="btn btn-sm" onclick="HifzModule.switchExamSubTab('collective', ${ex.id})" 
+                                                        style="background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:5px 10px; font-size:0.85rem; border-radius:8px; display:inline-flex; align-items:center; gap:4px;" title="اجتماعی رزلٹ گزیٹ">
+                                                    <i class="fas fa-chart-column"></i> گزیٹ
+                                                </button>
+                                                <button class="btn btn-sm" onclick="HifzModule.showCreateExamModal(${ex.id})" 
+                                                        style="background:#f8fafc; color:#334155; border:1px solid #cbd5e1; padding:5px 8px; font-size:0.85rem; border-radius:8px;" title="ترمیم کریں">
+                                                    <i class="fas fa-pen-to-square"></i>
+                                                </button>
+                                                <button class="btn btn-sm" onclick="HifzModule.deleteHifzExam(${ex.id})" 
+                                                        style="background:#fef2f2; color:#ef4444; border:1px solid #fecaca; padding:5px 8px; font-size:0.85rem; border-radius:8px;" title="امتحان حذف کریں">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 `;
@@ -2155,22 +2192,488 @@ const HifzModule = {
         `;
     },
 
+    filterExamsListTable(query) {
+        const trs = document.querySelectorAll('#hifz-exams-table tbody tr');
+        const q = (query || '').toLowerCase().trim();
+        trs.forEach(tr => {
+            const text = tr.innerText.toLowerCase();
+            tr.style.display = text.includes(q) ? '' : 'none';
+        });
+    },
+
+    async showCreateExamModal(examId = null) {
+        const teachers = await MadrassahDB.getAllTeachers();
+        const halaqas = await MadrassahDB.getAllHifzHalaqas();
+        let exam = null;
+        if (examId) {
+            exam = await MadrassahDB.getHifzExamById(examId);
+        }
+
+        const isEdit = !!exam;
+        const modalDiv = document.createElement('div');
+        modalDiv.id = 'createHifzExamModal';
+        modalDiv.className = 'mms-modal-backdrop';
+
+        modalDiv.innerHTML = `
+            <div class="mms-modal-box" style="max-width: 600px; max-height:92vh; overflow-y:auto; border-radius:20px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
+                <div class="mms-modal-header" style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:1.2rem 1.5rem; border-radius:20px 20px 0 0;">
+                    <h3 style="margin:0; color:var(--primary); font-size:1.3rem; display:flex; align-items:center; gap:8px;">
+                        <i class="fas ${isEdit ? 'fa-pen-to-square' : 'fa-file-circle-plus'}"></i>
+                        ${isEdit ? 'حفظ امتحان میں ترمیم کریں' : 'نیا حفظ امتحان بنائیں'}
+                    </h3>
+                    <button type="button" onclick="document.getElementById('createHifzExamModal').remove()" class="mms-close-btn" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:#64748b;">&times;</button>
+                </div>
+
+                <form onsubmit="HifzModule.handleCreateExamSubmit(event, ${examId || 'null'})" style="padding:1.5rem;">
+                    <div style="display:flex; flex-direction:column; gap:1rem;">
+                        <div class="form-group-horizontal">
+                            <label style="font-weight:bold; color:#1e293b;">امتحان کا عنوان <span style="color:#dc2626;">*</span></label>
+                            <input type="text" name="title" value="${isEdit ? (exam.title || '') : ''}" placeholder="مثلاً: ششماہی امتحان حفظ القرآن 1446ھ" required
+                                   style="padding:10px 14px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:1rem;">
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                            <div class="form-group-horizontal">
+                                <label style="font-weight:bold; color:#1e293b;">تاریخِ امتحان <span style="color:#dc2626;">*</span></label>
+                                <input type="date" name="date" value="${isEdit ? exam.date : new Date().toISOString().split('T')[0]}" required
+                                       style="padding:10px 14px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:1rem;">
+                            </div>
+                            <div class="form-group-horizontal">
+                                <label style="font-weight:bold; color:#1e293b;">تعلیمی سال / سیشن</label>
+                                <input type="text" name="session" value="${isEdit ? (exam.session || '') : '1446-1447ھ'}" placeholder="مثلاً: 1446-1447ھ"
+                                       style="padding:10px 14px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:1rem;">
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                            <div class="form-group-horizontal">
+                                <label style="font-weight:bold; color:#1e293b;">نوعیتِ امتحان</label>
+                                <select name="examType" style="padding:10px 14px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:1rem;">
+                                    <option value="ماہانہ امتحان" ${isEdit && exam.examType === 'ماہانہ امتحان' ? 'selected' : ''}>ماہانہ امتحان</option>
+                                    <option value="سہ ماہی امتحان" ${isEdit && exam.examType === 'سہ ماہی امتحان' ? 'selected' : ''}>سہ ماہی امتحان</option>
+                                    <option value="ششماہی امتحان" ${isEdit && (exam.examType === 'ششماہی امتحان' || !exam.examType) ? 'selected' : ''}>ششماہی امتحان</option>
+                                    <option value="سالانہ امتحان" ${isEdit && exam.examType === 'سالانہ امتحان' ? 'selected' : ''}>سالانہ امتحان</option>
+                                    <option value="اختتامی جائزہ / تکمیل" ${isEdit && exam.examType === 'اختتامی جائزہ / تکمیل' ? 'selected' : ''}>اختتامی جائزہ / تکمیل</option>
+                                </select>
+                            </div>
+                            <div class="form-group-horizontal">
+                                <label style="font-weight:bold; color:#1e293b;">متعلقہ حلقہ / کلاس</label>
+                                <select name="halaqa" style="padding:10px 14px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:1rem;">
+                                    <option value="تمام حلقہ جات" ${!isEdit || exam.halaqa === 'تمام حلقہ جات' ? 'selected' : ''}>تمام حلقہ جات (شعبہ حفظ)</option>
+                                    ${halaqas.map(h => `<option value="${h.name}" ${isEdit && exam.halaqa === h.name ? 'selected' : ''}>${h.name}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group-horizontal">
+                            <label style="font-weight:bold; color:#1e293b;">امتحانی حصہ / نصاب <span style="color:#dc2626;">*</span></label>
+                            <input type="text" name="portion" value="${isEdit ? (exam.portion || '') : 'پارہ 1 تا 5'}" placeholder="مثلاً: پارہ 1 تا 5 یا حسبِ پیش رفت" required
+                                   style="padding:10px 14px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:1rem;">
+                        </div>
+
+                        <div class="form-group-horizontal">
+                            <label style="font-weight:bold; color:#1e293b;">ممتحن (Examiner) <span style="color:#dc2626;">*</span></label>
+                            <select name="examinerTeacherId" required style="padding:10px 14px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:1rem;">
+                                <option value="">ممتحن استاد کا انتخاب کریں</option>
+                                ${teachers.map(t => `<option value="${t.id}" ${isEdit && exam.examinerTeacherId === t.id ? 'selected' : ''}>${t.name} (${t.designation || 'استاد'})</option>`).join('')}
+                            </select>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                            <div class="form-group-horizontal">
+                                <label style="font-weight:bold; color:#1e293b;">کل نمبر (Total Marks)</label>
+                                <input type="number" name="maxMarks" value="${isEdit ? (exam.maxMarks || 100) : 100}" min="10" required
+                                       style="padding:10px 14px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:1rem;">
+                            </div>
+                            <div class="form-group-horizontal">
+                                <label style="font-weight:bold; color:#1e293b;">پاسنگ مارکس (Passing)</label>
+                                <input type="number" name="passingMarks" value="${isEdit ? (exam.passingMarks || 50) : 50}" min="1" required
+                                       style="padding:10px 14px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:1rem;">
+                            </div>
+                        </div>
+
+                        <div class="form-group-horizontal">
+                            <label style="font-weight:bold; color:#1e293b;">ہدایات و نوٹس</label>
+                            <textarea name="notes" placeholder="امتحان سے متعلق خصوصی ہدایات..." rows="2"
+                                      style="padding:10px 14px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:1rem; font-family:inherit;">${isEdit ? (exam.notes || '') : ''}</textarea>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:1.8rem; display:flex; justify-content:flex-end; gap:10px;">
+                        <button type="button" class="btn" style="background:#f1f5f9; color:#475569; padding:8px 20px;" onclick="document.getElementById('createHifzExamModal').remove()">منسوخ کریں</button>
+                        <button type="submit" class="btn btn-primary" style="padding:8px 26px; font-weight:bold;">
+                            <i class="fas fa-save"></i> ${isEdit ? 'تبدیلیاں محفوظ کریں' : 'امتحان بنائیں'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modalDiv);
+    },
+
+    async handleCreateExamSubmit(e, examId = null) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = {
+            title: (formData.get('title') || '').trim(),
+            date: formData.get('date'),
+            session: (formData.get('session') || '').trim(),
+            examType: formData.get('examType'),
+            portion: (formData.get('portion') || '').trim(),
+            halaqa: formData.get('halaqa'),
+            examinerTeacherId: parseInt(formData.get('examinerTeacherId')) || 0,
+            maxMarks: parseInt(formData.get('maxMarks')) || 100,
+            passingMarks: parseInt(formData.get('passingMarks')) || 50,
+            notes: (formData.get('notes') || '').trim()
+        };
+
+        if (examId) {
+            data.id = parseInt(examId);
+        }
+
+        const savedId = await MadrassahDB.saveHifzExam(data);
+        const modal = document.getElementById('createHifzExamModal');
+        if (modal) modal.remove();
+
+        if (window.app && typeof window.app.showToast === 'function') {
+            window.app.showToast(examId ? 'امتحان کی تفصیلات کامیابی سے اپڈیٹ ہو گئیں۔' : 'نیا امتحان کامیابی سے تیار ہو گیا۔', 'success');
+        } else {
+            alert('امتحان کامیابی سے محفوظ ہو گیا۔');
+        }
+
+        this.activeExamId = examId ? parseInt(examId) : parseInt(savedId);
+        this.examSubTab = 'marks';
+        const subContainer = document.getElementById('hifz-subview-container');
+        if (subContainer) {
+            await this.renderExamsModule(subContainer);
+        }
+    },
+
+    async deleteHifzExam(id) {
+        if (confirm('کیا آپ واقعی یہ امتحان حذف کرنا چاہتے ہیں؟ اس سے منسلک تمام نمبرات و ریکارڈ بھی حذف ہو جائیں گے۔')) {
+            await MadrassahDB.deleteHifzExam(id);
+            if (this.activeExamId === parseInt(id)) {
+                this.activeExamId = null;
+                this.examSubTab = 'list';
+            }
+            if (window.app && typeof window.app.showToast === 'function') {
+                window.app.showToast('امتحان حذف کر دیا گیا ہے۔', 'info');
+            }
+            const subContainer = document.getElementById('hifz-subview-container');
+            if (subContainer) {
+                await this.renderExamsModule(subContainer);
+            }
+        }
+    },
+
+    async renderMarksEntryTab(container, exam) {
+        const enrollments = await MadrassahDB.getAllHifzEnrollments();
+        const banin = await MadrassahDB.getAllStudents('banin');
+        const banat = await MadrassahDB.getAllStudents('banat');
+        const allStudents = [...banin, ...banat];
+        const studentMap = new Map();
+        allStudents.forEach(s => { if (s && s.id && !studentMap.has(s.id)) studentMap.set(s.id, s); });
+
+        const teachers = await MadrassahDB.getAllTeachers();
+        const teacherMap = new Map(teachers.map(t => [t.id, t.name]));
+        const examinerName = teacherMap.get(exam.examinerTeacherId) || '---';
+
+        const examResults = await MadrassahDB.getHifzExamResults(exam.id);
+        const resultMap = new Map(examResults.map(r => [r.studentId, r]));
+
+        const targetStudents = [];
+        const seenIds = new Set();
+
+        // 1. All enrollments matching halaqa (or all halaqas)
+        enrollments.forEach(en => {
+            const st = studentMap.get(en.studentId);
+            if (st && !seenIds.has(st.id)) {
+                if (!exam.halaqa || exam.halaqa === 'تمام حلقہ جات' || en.halaqa === exam.halaqa) {
+                    seenIds.add(st.id);
+                    targetStudents.push({ student: st, enrollment: en });
+                }
+            }
+        });
+
+        // 2. Any students in Banin/Banat whose department or class includes 'حفظ'
+        allStudents.forEach(st => {
+            if (st && !seenIds.has(st.id)) {
+                const dept = (st.department || '').trim();
+                const cls = (st.className || st.class || '').trim();
+                if (dept.includes('حفظ') || cls.includes('حفظ')) {
+                    if (!exam.halaqa || exam.halaqa === 'تمام حلقہ جات') {
+                        seenIds.add(st.id);
+                        targetStudents.push({
+                            student: st,
+                            enrollment: { studentId: st.id, halaqa: st.className || 'عام حلقہ', currentJuz: 1, currentPage: 1 }
+                        });
+                    }
+                }
+            }
+        });
+
+        targetStudents.sort((a, b) => parseInt(a.student.id || 0) - parseInt(b.student.id || 0));
+
+        container.innerHTML = `
+            <!-- Exam Info Top Card -->
+            <div class="card" style="padding:1.2rem 1.5rem; margin-bottom:1.5rem; border-top:4px solid var(--primary); border-radius:16px; background:#ffffff; box-shadow:0 2px 10px rgba(0,0,0,0.03);">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                    <div>
+                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                            <h3 style="margin:0; color:var(--primary); font-size:1.35rem;">
+                                <i class="fas fa-marker"></i> ${exam.title}
+                            </h3>
+                            <span style="background:#dcfce7; color:#15803d; font-size:0.85rem; padding:3px 12px; border-radius:20px; font-weight:bold;">
+                                کل امیدواران: ${targetStudents.length}
+                            </span>
+                            <span style="background:#e0f2fe; color:#0369a1; font-size:0.85rem; padding:3px 12px; border-radius:20px; font-weight:bold;">
+                                کل نمبر: ${exam.maxMarks || 100} | پاسنگ: ${exam.passingMarks || 50}
+                            </span>
+                        </div>
+                        <div style="font-size:0.9rem; color:#475569; margin-top:6px; display:flex; gap:16px; flex-wrap:wrap;">
+                            <span><b>تاریخ:</b> ${exam.date}</span>
+                            <span><b>سیشن:</b> ${exam.session || '1446-1447ھ'}</span>
+                            <span><b>نوعیت:</b> ${exam.examType || 'ماہانہ'}</span>
+                            <span><b>حصہ/نصاب:</b> ${exam.portion}</span>
+                            <span><b>ممتحن:</b> ${examinerName}</span>
+                            <span><b>حلقہ:</b> ${exam.halaqa || 'تمام'}</span>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="btn btn-sm" onclick="HifzModule.switchExamSubTab('collective', ${exam.id})" 
+                                style="background:#f0fdf4; color:#166534; border:1.5px solid #86efac; border-radius:10px; padding:7px 16px; font-weight:bold; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                            <i class="fas fa-chart-column"></i> اجتماعی نتیجہ / گزیٹ
+                        </button>
+                        <button class="btn btn-sm" onclick="HifzModule.switchExamSubTab('list')" 
+                                style="background:#f1f5f9; color:#475569; border:none; border-radius:10px; padding:7px 16px; font-weight:bold; cursor:pointer;">
+                            <i class="fas fa-arrow-right"></i> تمام امتحانات
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Marks Breakdown Criteria Helper Banner -->
+                <div style="margin-top:1rem; background:#f8fafc; border-radius:10px; padding:8px 14px; border:1px dashed #cbd5e1; font-size:0.88rem; color:#065f46; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>
+                        <i class="fas fa-circle-info"></i> <b>معیارات و تقویمِ نمبرات:</b>
+                        حفظ و پختگی (30) + حسنِ صوت و روانی (20) + اغلاط و اعراب (20) + متشابہات (15) + تجوید و مخارج (15) = کل 100 نمبر
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input type="text" id="marks-candidate-search" placeholder="امیدوار تلاش کریں..." oninput="HifzModule.filterCandidatesMarksTable(this.value)"
+                               style="padding:4px 10px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.85rem; width:180px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Marks Entry Table Card -->
+            <div class="card" style="padding:0; overflow:hidden; border-radius:16px; border:1px solid #e2e8f0;">
+                <div style="overflow-x:auto;">
+                    <table id="hifz-marks-entry-table" style="width:100%; border-collapse:collapse; font-size:0.92rem; text-align:right;">
+                        <thead>
+                            <tr style="background:#f1f5f9; color:#334155;">
+                                <th style="padding:10px; text-align:center; width:35px;">#</th>
+                                <th style="padding:10px; min-width:140px;">طالب علم / رجسٹریشن</th>
+                                <th style="padding:10px; min-width:100px;">حلقہ و منزل</th>
+                                <th style="padding:10px; background:#ecfdf5; color:#166534; text-align:center; min-width:130px;">امتحانی سبق (انفرادی)</th>
+                                <th style="padding:10px; text-align:center; width:65px;">حفظ (30)</th>
+                                <th style="padding:10px; text-align:center; width:65px;">روانی (20)</th>
+                                <th style="padding:10px; text-align:center; width:65px;">اعراب (20)</th>
+                                <th style="padding:10px; text-align:center; width:65px;">متشابہ (15)</th>
+                                <th style="padding:10px; text-align:center; width:65px;">تجوید (15)</th>
+                                <th style="padding:10px; text-align:center; width:60px;">حاصل</th>
+                                <th style="padding:10px; text-align:center; width:55px;">فیصد</th>
+                                <th style="padding:10px; text-align:center; width:60px;">گریڈ</th>
+                                <th style="padding:10px; text-align:center; width:70px;">نتیجہ</th>
+                                <th style="padding:10px; min-width:120px;">ریمارکس / کیفیت</th>
+                                <th style="padding:10px; text-align:center; min-width:120px;">ایکشن</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${targetStudents.length === 0 ? `
+                                <tr>
+                                    <td colspan="15" style="text-align:center; padding:3rem; color:#dc2626; font-weight:bold;">
+                                        اس حلقے یا شعبے میں کوئی امیدوار طالب علم نہیں ملا۔
+                                    </td>
+                                </tr>
+                            ` : targetStudents.map((item, idx) => {
+                                const st = item.student;
+                                const en = item.enrollment;
+                                const res = resultMap.get(st.id) || {};
+                                
+                                const m1 = res.memorizationMarks !== undefined ? res.memorizationMarks : 25;
+                                const m2 = res.fluencyMarks !== undefined ? res.fluencyMarks : 16;
+                                const m3 = res.mistakesMarks !== undefined ? res.mistakesMarks : 18;
+                                const m4 = res.mutashabihatMarks !== undefined ? res.mutashabihatMarks : 12;
+                                const m5 = res.tajweedMarks !== undefined ? res.tajweedMarks : 13;
+                                const tot = m1 + m2 + m3 + m4 + m5;
+                                const maxM = exam.maxMarks || 100;
+                                const passM = exam.passingMarks || 50;
+                                const pct = Math.round((tot / maxM) * 100 * 10) / 10;
+                                const isPass = tot >= passM;
+                                const grObj = HifzModule.getHifzGrade(pct, isPass);
+                                const defaultPortion = res.portion || (en ? `پارہ ${en.currentJuz || 1}` : (exam.portion || 'مکمل قرآن'));
+                                const isBanat = st.section === 'banat' || st.section === 'بنات';
+
+                                return `
+                                    <tr data-student-id="${st.id}" data-exam-id="${exam.id}" data-max-marks="${maxM}" data-pass-marks="${passM}"
+                                        style="border-bottom:1px solid #f1f5f9; transition:background 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+                                        <td style="text-align:center; font-weight:bold; color:#64748b; padding:8px 4px;">${idx + 1}</td>
+                                        <td style="padding:8px;">
+                                            <div style="font-weight:bold; color:var(--primary);">${st.name}</div>
+                                            <div style="font-size:0.75rem; color:#64748b;">
+                                                #${st.id} | ${st.fatherName ? `ولد ${st.fatherName} | ` : ''}${isBanat ? 'بنات' : 'بنین'}
+                                            </div>
+                                        </td>
+                                        <td style="font-size:0.85rem; padding:8px;">
+                                            <div><span style="background:#f1f5f9; padding:1px 6px; border-radius:4px; font-weight:600;">${en.halaqa || 'عام'}</span></div>
+                                            <div style="color:#065f46; font-weight:600;">پارہ ${en.currentJuz || 1}</div>
+                                        </td>
+                                        <td style="background:#f0fdf4; text-align:center; padding:8px;">
+                                            <input type="text" class="ex-portion" value="${defaultPortion}" placeholder="پارہ 1 تا 3" 
+                                                   style="width:115px; text-align:center; padding:5px; font-weight:bold; color:#065f46; border:1.5px solid #10b981; border-radius:6px; background:#ffffff;">
+                                        </td>
+                                        <td style="text-align:center; padding:8px;">
+                                            <input type="number" max="30" min="0" class="ex-m1" value="${m1}" oninput="HifzModule.calcExamRowTotal(this)" 
+                                                   style="width:52px; text-align:center; padding:5px; border:1px solid #cbd5e1; border-radius:6px; font-weight:bold;">
+                                        </td>
+                                        <td style="text-align:center; padding:8px;">
+                                            <input type="number" max="20" min="0" class="ex-m2" value="${m2}" oninput="HifzModule.calcExamRowTotal(this)" 
+                                                   style="width:52px; text-align:center; padding:5px; border:1px solid #cbd5e1; border-radius:6px; font-weight:bold;">
+                                        </td>
+                                        <td style="text-align:center; padding:8px;">
+                                            <input type="number" max="20" min="0" class="ex-m3" value="${m3}" oninput="HifzModule.calcExamRowTotal(this)" 
+                                                   style="width:52px; text-align:center; padding:5px; border:1px solid #cbd5e1; border-radius:6px; font-weight:bold;">
+                                        </td>
+                                        <td style="text-align:center; padding:8px;">
+                                            <input type="number" max="15" min="0" class="ex-m4" value="${m4}" oninput="HifzModule.calcExamRowTotal(this)" 
+                                                   style="width:50px; text-align:center; padding:5px; border:1px solid #cbd5e1; border-radius:6px; font-weight:bold;">
+                                        </td>
+                                        <td style="text-align:center; padding:8px;">
+                                            <input type="number" max="15" min="0" class="ex-m5" value="${m5}" oninput="HifzModule.calcExamRowTotal(this)" 
+                                                   style="width:50px; text-align:center; padding:5px; border:1px solid #cbd5e1; border-radius:6px; font-weight:bold;">
+                                        </td>
+                                        <td style="font-weight:bold; font-size:1.05rem; color:var(--primary); text-align:center;" class="ex-total">${tot}</td>
+                                        <td style="font-weight:bold; font-size:0.92rem; text-align:center; color:#334155;" class="ex-pct">${pct}%</td>
+                                        <td style="text-align:center;" class="ex-grade">
+                                            <span class="badge" style="background:${grObj.bg}; color:${grObj.color}; padding:2px 8px; border-radius:6px; font-weight:bold;">
+                                                ${grObj.grade}
+                                            </span>
+                                        </td>
+                                        <td style="text-align:center;" class="ex-status">
+                                            <span class="badge" style="background:${isPass ? '#dcfce7' : '#fee2e2'}; color:${isPass ? '#15803d' : '#dc2626'}; padding:2px 8px; border-radius:6px; font-weight:bold; font-size:0.85rem;">
+                                                ${isPass ? 'کامیاب' : 'ناکام'}
+                                            </span>
+                                        </td>
+                                        <td style="padding:8px;">
+                                            <input type="text" class="ex-remarks" value="${res.remarks || ''}" placeholder="کیفیت..." 
+                                                   style="width:100%; min-width:110px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem;">
+                                        </td>
+                                        <td style="text-align:center; padding:8px;">
+                                            <div style="display:flex; justify-content:center; align-items:center; gap:4px;">
+                                                <button type="button" class="btn btn-sm btn-primary" onclick="HifzModule.saveSingleExamResult(this)" 
+                                                        style="padding:4px 8px; font-size:0.82rem; border-radius:6px;" title="محفوظ کریں">
+                                                    <i class="fas fa-save"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm" onclick="HifzModule.showIndividualResultModal(${st.id}, ${exam.id})" 
+                                                        style="padding:4px 8px; font-size:0.82rem; border-radius:6px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;" title="رزلٹ کارڈ دیکھیں">
+                                                    <i class="fas fa-id-card"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm" onclick="HifzModule.downloadIndividualResultPDF(${st.id}, ${exam.id})" 
+                                                        style="padding:4px 8px; font-size:0.82rem; border-radius:6px; background:#fef2f2; color:#dc2626; border:1px solid #fecaca;" title="پی ڈی ایف ڈاؤن لوڈ">
+                                                    <i class="fas fa-file-pdf"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                ${targetStudents.length > 0 ? `
+                    <div style="padding:1.2rem; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                        <div style="font-size:0.9rem; color:#64748b;">
+                            <i class="fas fa-check-double" style="color:#059669;"></i> نمبرات داخل کرنے کے بعد <b>"تمام طلباء کے نمبرات محفوظ کریں"</b> پر کلک فرمائیں۔
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <button type="button" class="btn btn-primary" onclick="HifzModule.saveAllExamResults(${exam.id})" 
+                                    style="padding:9px 24px; font-size:1.02rem; border-radius:10px; font-weight:bold; box-shadow:0 3px 10px rgba(6,95,70,0.25);">
+                                <i class="fas fa-floppy-disk"></i> تمام طلباء کے نمبرات و نتائج محفوظ کریں
+                            </button>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    },
+
+    filterCandidatesMarksTable(query) {
+        const trs = document.querySelectorAll('#hifz-marks-entry-table tbody tr');
+        const q = (query || '').toLowerCase().trim();
+        trs.forEach(tr => {
+            const text = tr.innerText.toLowerCase();
+            tr.style.display = text.includes(q) ? '' : 'none';
+        });
+    },
+
     calcExamRowTotal(input) {
         const tr = input.closest('tr');
         if (!tr) return;
-        const m1 = parseInt(tr.querySelector('.ex-m1')?.value) || 0;
-        const m2 = parseInt(tr.querySelector('.ex-m2')?.value) || 0;
-        const m3 = parseInt(tr.querySelector('.ex-m3')?.value) || 0;
-        const m4 = parseInt(tr.querySelector('.ex-m4')?.value) || 0;
-        const m5 = parseInt(tr.querySelector('.ex-m5')?.value) || 0;
-        const total = m1 + m2 + m3 + m4 + m5;
+
+        const parseVal = (sel, maxVal) => {
+            const el = tr.querySelector(sel);
+            if (!el) return 0;
+            let val = parseInt(el.value);
+            if (isNaN(val) || val < 0) val = 0;
+            if (val > maxVal) {
+                el.style.borderColor = '#ef4444';
+                el.style.backgroundColor = '#fef2f2';
+                el.title = `زیادہ سے زیادہ اجازت یافتہ نمبر: ${maxVal}`;
+            } else {
+                el.style.borderColor = '#cbd5e1';
+                el.style.backgroundColor = '#ffffff';
+                el.title = '';
+            }
+            return val;
+        };
+
+        const m1 = parseVal('.ex-m1', 30);
+        const m2 = parseVal('.ex-m2', 20);
+        const m3 = parseVal('.ex-m3', 20);
+        const m4 = parseVal('.ex-m4', 15);
+        const m5 = parseVal('.ex-m5', 15);
+
+        const tot = m1 + m2 + m3 + m4 + m5;
+        const maxMarks = parseInt(tr.getAttribute('data-max-marks')) || 100;
+        const passMarks = parseInt(tr.getAttribute('data-pass-marks')) || 50;
+
+        const pct = Math.round((tot / maxMarks) * 100 * 10) / 10;
+        const isPass = tot >= passMarks;
+        const grObj = this.getHifzGrade(pct, isPass);
 
         const totalCell = tr.querySelector('.ex-total');
-        if (totalCell) totalCell.innerText = total;
+        if (totalCell) totalCell.innerText = tot;
 
-        const grade = total >= 80 ? 'A+' : total >= 70 ? 'A' : total >= 60 ? 'B' : total >= 50 ? 'C' : 'D';
+        const pctCell = tr.querySelector('.ex-pct');
+        if (pctCell) pctCell.innerText = `${pct}%`;
+
         const gradeCell = tr.querySelector('.ex-grade');
-        if (gradeCell) gradeCell.innerText = grade;
+        if (gradeCell) {
+            gradeCell.innerHTML = `
+                <span class="badge" style="background:${grObj.bg}; color:${grObj.color}; padding:2px 8px; border-radius:6px; font-weight:bold;">
+                    ${grObj.grade}
+                </span>
+            `;
+        }
+
+        const statusCell = tr.querySelector('.ex-status');
+        if (statusCell) {
+            statusCell.innerHTML = `
+                <span class="badge" style="background:${isPass ? '#dcfce7' : '#fee2e2'}; color:${isPass ? '#15803d' : '#dc2626'}; padding:2px 8px; border-radius:6px; font-weight:bold; font-size:0.85rem;">
+                    ${isPass ? 'کامیاب' : 'ناکام'}
+                </span>
+            `;
+        }
     },
 
     async saveSingleExamResult(btn) {
@@ -2178,117 +2681,787 @@ const HifzModule = {
         if (!tr) return;
         const examId = parseInt(tr.getAttribute('data-exam-id'));
         const studentId = parseInt(tr.getAttribute('data-student-id'));
+        const maxMarks = parseInt(tr.getAttribute('data-max-marks')) || 100;
+        const passMarks = parseInt(tr.getAttribute('data-pass-marks')) || 50;
 
         const m1 = parseInt(tr.querySelector('.ex-m1')?.value) || 0;
         const m2 = parseInt(tr.querySelector('.ex-m2')?.value) || 0;
         const m3 = parseInt(tr.querySelector('.ex-m3')?.value) || 0;
         const m4 = parseInt(tr.querySelector('.ex-m4')?.value) || 0;
         const m5 = parseInt(tr.querySelector('.ex-m5')?.value) || 0;
-        const totalMarks = 100;
+        const portion = (tr.querySelector('.ex-portion')?.value || '').trim();
+        const remarks = (tr.querySelector('.ex-remarks')?.value || '').trim();
+
         const obtainedMarks = m1 + m2 + m3 + m4 + m5;
-        const grade = tr.querySelector('.ex-grade')?.innerText || 'A';
+        const percentage = Math.round((obtainedMarks / maxMarks) * 100 * 10) / 10;
+        const isPass = obtainedMarks >= passMarks;
+        const grObj = this.getHifzGrade(percentage, isPass);
+
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.disabled = true;
 
         await MadrassahDB.saveHifzExamResult({
             examId,
             studentId,
+            portion,
             memorizationMarks: m1,
             fluencyMarks: m2,
             mistakesMarks: m3,
             mutashabihatMarks: m4,
             tajweedMarks: m5,
-            totalMarks,
+            totalMarks: maxMarks,
+            passingMarks: passMarks,
             obtainedMarks,
-            grade
+            percentage,
+            grade: grObj.grade,
+            gradeTitle: grObj.title,
+            isPass,
+            status: isPass ? 'کامیاب' : 'ناکام',
+            remarks,
+            updatedAt: new Date().toISOString()
         });
 
-        alert('نمبرات کامیابی سے محفوظ کر لیے گئے۔');
+        btn.innerHTML = '<i class="fas fa-check"></i>';
+        setTimeout(() => {
+            btn.innerHTML = origHtml;
+            btn.disabled = false;
+        }, 1200);
+
+        if (window.app && typeof window.app.showToast === 'function') {
+            window.app.showToast('طالب علم کے نمبرات محفوظ ہو گئے ہیں۔', 'success');
+        }
     },
+
+    async saveAllExamResults(examId) {
+        const rows = document.querySelectorAll('#hifz-marks-entry-table tr[data-student-id]');
+        if (rows.length === 0) return;
+
+        for (const tr of rows) {
+            const sId = parseInt(tr.getAttribute('data-student-id'));
+            const maxMarks = parseInt(tr.getAttribute('data-max-marks')) || 100;
+            const passMarks = parseInt(tr.getAttribute('data-pass-marks')) || 50;
+
+            const m1 = parseInt(tr.querySelector('.ex-m1')?.value) || 0;
+            const m2 = parseInt(tr.querySelector('.ex-m2')?.value) || 0;
+            const m3 = parseInt(tr.querySelector('.ex-m3')?.value) || 0;
+            const m4 = parseInt(tr.querySelector('.ex-m4')?.value) || 0;
+            const m5 = parseInt(tr.querySelector('.ex-m5')?.value) || 0;
+            const portion = (tr.querySelector('.ex-portion')?.value || '').trim();
+            const remarks = (tr.querySelector('.ex-remarks')?.value || '').trim();
+
+            const obtainedMarks = m1 + m2 + m3 + m4 + m5;
+            const percentage = Math.round((obtainedMarks / maxMarks) * 100 * 10) / 10;
+            const isPass = obtainedMarks >= passMarks;
+            const grObj = this.getHifzGrade(percentage, isPass);
+
+            await MadrassahDB.saveHifzExamResult({
+                examId: parseInt(examId),
+                studentId: sId,
+                portion,
+                memorizationMarks: m1,
+                fluencyMarks: m2,
+                mistakesMarks: m3,
+                mutashabihatMarks: m4,
+                tajweedMarks: m5,
+                totalMarks: maxMarks,
+                passingMarks: passMarks,
+                obtainedMarks,
+                percentage,
+                grade: grObj.grade,
+                gradeTitle: grObj.title,
+                isPass,
+                status: isPass ? 'کامیاب' : 'ناکام',
+                remarks,
+                updatedAt: new Date().toISOString()
+            });
+        }
+
+        if (window.app && typeof window.app.showToast === 'function') {
+            window.app.showToast('تمام طلباء کے امتحانی نمبرات و نتائج کامیابی سے محفوظ ہو گئے ہیں۔', 'success');
+        } else {
+            alert('تمام طلباء کے امتحانی نمبرات و نتائج کامیابی سے محفوظ ہو گئے۔');
+        }
+    },
+
+    async renderCollectiveResultTab(container, exam) {
+        const rawResults = await MadrassahDB.getHifzExamResults(exam.id);
+        const banin = await MadrassahDB.getAllStudents('banin');
+        const banat = await MadrassahDB.getAllStudents('banat');
+        const allStudents = [...banin, ...banat];
+        const studentMap = new Map();
+        allStudents.forEach(s => { if (s && s.id && !studentMap.has(s.id)) studentMap.set(s.id, s); });
+
+        const halaqas = await MadrassahDB.getAllHifzHalaqas();
+        const teachers = await MadrassahDB.getAllTeachers();
+        const teacherMap = new Map(teachers.map(t => [t.id, t.name]));
+        const examinerName = teacherMap.get(exam.examinerTeacherId) || '---';
+
+        // Prepare records
+        const records = rawResults.map(r => {
+            const st = studentMap.get(r.studentId) || { name: `طالب علم #${r.studentId}`, fatherName: '---', className: '---' };
+            const tot = r.obtainedMarks || 0;
+            const maxM = r.totalMarks || exam.maxMarks || 100;
+            const passM = r.passingMarks || exam.passingMarks || 50;
+            const pct = r.percentage !== undefined ? r.percentage : (Math.round((tot / maxM) * 100 * 10) / 10);
+            const isPass = r.isPass !== undefined ? r.isPass : (tot >= passM);
+            const grObj = this.getHifzGrade(pct, isPass);
+            return {
+                result: r,
+                student: st,
+                obtainedMarks: tot,
+                totalMarks: maxM,
+                percentage: pct,
+                isPass,
+                grade: r.grade || grObj.grade,
+                gradeTitle: r.gradeTitle || grObj.title,
+                portion: r.portion || exam.portion || '---',
+                remarks: r.remarks || '---'
+            };
+        });
+
+        // Compute rankings / positions based on obtained marks (descending)
+        records.sort((a, b) => b.obtainedMarks - a.obtainedMarks);
+        let currentRank = 0;
+        let lastMarks = null;
+        records.forEach((rec, i) => {
+            if (rec.isPass) {
+                if (rec.obtainedMarks !== lastMarks) {
+                    currentRank = i + 1;
+                    lastMarks = rec.obtainedMarks;
+                }
+                rec.rank = currentRank;
+                rec.positionTitle = this.getUrduPosition(currentRank);
+            } else {
+                rec.rank = 9999;
+                rec.positionTitle = '---';
+            }
+        });
+
+        // Calculate Collective Statistics
+        const totalCandidates = records.length;
+        const passedCandidates = records.filter(r => r.isPass).length;
+        const failedCandidates = totalCandidates - passedCandidates;
+        const passPercentage = totalCandidates > 0 ? Math.round((passedCandidates / totalCandidates) * 100 * 10) / 10 : 0;
+        
+        let highestMarks = 0;
+        let lowestMarks = totalCandidates > 0 ? records[0].obtainedMarks : 0;
+        let sumMarks = 0;
+        let sumPercentage = 0;
+
+        records.forEach(r => {
+            if (r.obtainedMarks > highestMarks) highestMarks = r.obtainedMarks;
+            if (r.obtainedMarks < lowestMarks) lowestMarks = r.obtainedMarks;
+            sumMarks += r.obtainedMarks;
+            sumPercentage += r.percentage;
+        });
+
+        const avgMarks = totalCandidates > 0 ? Math.round((sumMarks / totalCandidates) * 10) / 10 : 0;
+        const avgPercentage = totalCandidates > 0 ? Math.round((sumPercentage / totalCandidates) * 10) / 10 : 0;
+
+        // Apply Filters
+        let filteredRecords = [...records];
+        if (this.collectiveStatusFilter === 'pass') {
+            filteredRecords = filteredRecords.filter(r => r.isPass);
+        } else if (this.collectiveStatusFilter === 'fail') {
+            filteredRecords = filteredRecords.filter(r => !r.isPass);
+        }
+
+        if (this.collectiveHalaqaFilter && this.collectiveHalaqaFilter !== 'all') {
+            filteredRecords = filteredRecords.filter(r => (r.student.className || '').includes(this.collectiveHalaqaFilter));
+        }
+
+        if (this.collectiveSearch) {
+            const q = this.collectiveSearch.toLowerCase().trim();
+            filteredRecords = filteredRecords.filter(r => 
+                (r.student.name || '').toLowerCase().includes(q) ||
+                (r.student.fatherName || '').toLowerCase().includes(q) ||
+                String(r.student.id || '').includes(q)
+            );
+        }
+
+        // Apply Sorting
+        if (this.collectiveSort === 'marks') {
+            filteredRecords.sort((a, b) => b.obtainedMarks - a.obtainedMarks);
+        } else if (this.collectiveSort === 'name') {
+            filteredRecords.sort((a, b) => (a.student.name || '').localeCompare(b.student.name || ''));
+        } else if (this.collectiveSort === 'roll') {
+            filteredRecords.sort((a, b) => parseInt(a.student.id || 0) - parseInt(b.student.id || 0));
+        } else {
+            // position
+            filteredRecords.sort((a, b) => a.rank - b.rank);
+        }
+
+        container.innerHTML = `
+            <div id="hifz-collective-report-root">
+                <!-- Exam Header Top Card -->
+                <div class="card" style="padding:1.2rem 1.5rem; margin-bottom:1.5rem; border-top:4px solid var(--primary); border-radius:16px; background:#ffffff; box-shadow:0 2px 10px rgba(0,0,0,0.03);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                <h3 style="margin:0; color:var(--primary); font-size:1.35rem;">
+                                    <i class="fas fa-chart-column"></i> اجتماعی نتیجہ و گزیٹ — ${exam.title}
+                                </h3>
+                                <span style="background:#dcfce7; color:#15803d; font-size:0.85rem; padding:3px 12px; border-radius:20px; font-weight:bold;">
+                                    سیشن: ${exam.session || '1446-1447ھ'}
+                                </span>
+                            </div>
+                            <div style="font-size:0.9rem; color:#475569; margin-top:6px; display:flex; gap:16px; flex-wrap:wrap;">
+                                <span><b>تاریخ:</b> ${exam.date}</span>
+                                <span><b>نوعیت:</b> ${exam.examType || 'ماہانہ'}</span>
+                                <span><b>حصہ / نصاب:</b> ${exam.portion}</span>
+                                <span><b>ممتحن:</b> ${examinerName}</span>
+                                <span><b>کل نمبر:</b> ${exam.maxMarks || 100} | <b>پاسنگ:</b> ${exam.passingMarks || 50}</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button class="btn btn-sm" onclick="HifzModule.printCollectiveGazette(${exam.id})" 
+                                    style="background:#065f46; color:#ffffff; border:none; border-radius:10px; padding:7px 16px; font-weight:bold; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                <i class="fas fa-print"></i> گزیٹ پرنٹ کریں (A4)
+                            </button>
+                            <button class="btn btn-sm btn-pdf-download" onclick="HifzModule.downloadCollectiveResultPDF(${exam.id})" 
+                                    style="background:#dc2626; color:#ffffff; border:none; border-radius:10px; padding:7px 16px; font-weight:bold; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ
+                            </button>
+                            <button class="btn btn-sm" onclick="HifzModule.switchExamSubTab('marks', ${exam.id})" 
+                                    style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:10px; padding:7px 14px; font-weight:bold; cursor:pointer;">
+                                <i class="fas fa-marker"></i> نمبرات میں ترمیم
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 8 Analytic Summary Cards -->
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(135px, 1fr)); gap:10px; margin-bottom:1.5rem;">
+                    <div style="background:#ffffff; padding:1rem; border-radius:12px; border:1px solid #e2e8f0; text-align:center;">
+                        <div style="font-size:0.82rem; color:#64748b; font-weight:bold;">کل شریک طلباء</div>
+                        <div style="font-size:1.5rem; font-weight:800; color:#0f172a; margin-top:4px;">${totalCandidates}</div>
+                    </div>
+                    <div style="background:#ffffff; padding:1rem; border-radius:12px; border:1px solid #bbf7d0; text-align:center; background:#f0fdf4;">
+                        <div style="font-size:0.82rem; color:#166534; font-weight:bold;">کامیاب حفاظ</div>
+                        <div style="font-size:1.5rem; font-weight:800; color:#15803d; margin-top:4px;">${passedCandidates}</div>
+                    </div>
+                    <div style="background:#ffffff; padding:1rem; border-radius:12px; border:1px solid #fecaca; text-align:center; background:#fef2f2;">
+                        <div style="font-size:0.82rem; color:#991b1b; font-weight:bold;">ناکام طلباء</div>
+                        <div style="font-size:1.5rem; font-weight:800; color:#dc2626; margin-top:4px;">${failedCandidates}</div>
+                    </div>
+                    <div style="background:#ffffff; padding:1rem; border-radius:12px; border:1px solid #fed7aa; text-align:center; background:#fff7ed;">
+                        <div style="font-size:0.82rem; color:#9a3412; font-weight:bold;">شرحِ کامیابی</div>
+                        <div style="font-size:1.5rem; font-weight:800; color:#ea580c; margin-top:4px;">${passPercentage}%</div>
+                    </div>
+                    <div style="background:#ffffff; padding:1rem; border-radius:12px; border:1px solid #bae6fd; text-align:center; background:#f0f9ff;">
+                        <div style="font-size:0.82rem; color:#0369a1; font-weight:bold;">اعلیٰ ترین نمبر</div>
+                        <div style="font-size:1.5rem; font-weight:800; color:#0284c7; margin-top:4px;">${highestMarks}</div>
+                    </div>
+                    <div style="background:#ffffff; padding:1rem; border-radius:12px; border:1px solid #e2e8f0; text-align:center;">
+                        <div style="font-size:0.82rem; color:#64748b; font-weight:bold;">کم ترین نمبر</div>
+                        <div style="font-size:1.5rem; font-weight:800; color:#475569; margin-top:4px;">${lowestMarks}</div>
+                    </div>
+                    <div style="background:#ffffff; padding:1rem; border-radius:12px; border:1px solid #e9d5ff; text-align:center; background:#faf5ff;">
+                        <div style="font-size:0.82rem; color:#6b21a8; font-weight:bold;">اوسط نمبرات</div>
+                        <div style="font-size:1.5rem; font-weight:800; color:#7e22ce; margin-top:4px;">${avgMarks}</div>
+                    </div>
+                    <div style="background:#ffffff; padding:1rem; border-radius:12px; border:1px solid #ddd6fe; text-align:center; background:#f5f3ff;">
+                        <div style="font-size:0.82rem; color:#5b21b6; font-weight:bold;">اوسط فیصد</div>
+                        <div style="font-size:1.5rem; font-weight:800; color:#6d28d9; margin-top:4px;">${avgPercentage}%</div>
+                    </div>
+                </div>
+
+                <!-- Filter & Controls Toolbar -->
+                <div class="card" style="padding:1rem 1.2rem; margin-bottom:1.5rem; border-radius:14px; background:#ffffff; border:1px solid #e2e8f0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                            <input type="text" placeholder="نام یا رول نمبر تلاش کریں..." value="${this.collectiveSearch || ''}" 
+                                   oninput="HifzModule.collectiveSearch = this.value; HifzModule.renderCollectiveResultTab(document.getElementById('hifz-exam-subview-area'), { id:${exam.id}, title:'${exam.title}', date:'${exam.date}', portion:'${exam.portion}', maxMarks:${exam.maxMarks || 100}, passingMarks:${exam.passingMarks || 50}, session:'${exam.session || ''}', examType:'${exam.examType || ''}', examinerTeacherId:${exam.examinerTeacherId || 0} })"
+                                   style="padding:6px 12px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.9rem; width:190px;">
+
+                            <select onchange="HifzModule.collectiveStatusFilter = this.value; HifzModule.renderCollectiveResultTab(document.getElementById('hifz-exam-subview-area'), { id:${exam.id}, title:'${exam.title}', date:'${exam.date}', portion:'${exam.portion}', maxMarks:${exam.maxMarks || 100}, passingMarks:${exam.passingMarks || 50}, session:'${exam.session || ''}', examType:'${exam.examType || ''}', examinerTeacherId:${exam.examinerTeacherId || 0} })"
+                                    style="padding:6px 12px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.9rem;">
+                                <option value="all" ${this.collectiveStatusFilter === 'all' ? 'selected' : ''}>تمام نتائج</option>
+                                <option value="pass" ${this.collectiveStatusFilter === 'pass' ? 'selected' : ''}>صرف کامیاب حفاظ</option>
+                                <option value="fail" ${this.collectiveStatusFilter === 'fail' ? 'selected' : ''}>صرف ناکام امیدواران</option>
+                            </select>
+
+                            <select onchange="HifzModule.collectiveSort = this.value; HifzModule.renderCollectiveResultTab(document.getElementById('hifz-exam-subview-area'), { id:${exam.id}, title:'${exam.title}', date:'${exam.date}', portion:'${exam.portion}', maxMarks:${exam.maxMarks || 100}, passingMarks:${exam.passingMarks || 50}, session:'${exam.session || ''}', examType:'${exam.examType || ''}', examinerTeacherId:${exam.examinerTeacherId || 0} })"
+                                    style="padding:6px 12px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.9rem;">
+                                <option value="position" ${this.collectiveSort === 'position' ? 'selected' : ''}>ترتیب: پوزیشن کے لحاظ سے</option>
+                                <option value="marks" ${this.collectiveSort === 'marks' ? 'selected' : ''}>ترتیب: نمبرات (زیادہ سے کم)</option>
+                                <option value="name" ${this.collectiveSort === 'name' ? 'selected' : ''}>ترتیب: نام طالب علم</option>
+                                <option value="roll" ${this.collectiveSort === 'roll' ? 'selected' : ''}>ترتیب: رول نمبر</option>
+                            </select>
+                        </div>
+
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <label style="display:flex; align-items:center; gap:6px; font-size:0.9rem; font-weight:600; cursor:pointer; color:#334155; user-select:none;">
+                                <input type="checkbox" ${this.showPositions ? 'checked' : ''} 
+                                       onchange="HifzModule.showPositions = this.checked; HifzModule.renderCollectiveResultTab(document.getElementById('hifz-exam-subview-area'), { id:${exam.id}, title:'${exam.title}', date:'${exam.date}', portion:'${exam.portion}', maxMarks:${exam.maxMarks || 100}, passingMarks:${exam.passingMarks || 50}, session:'${exam.session || ''}', examType:'${exam.examType || ''}', examinerTeacherId:${exam.examinerTeacherId || 0} })">
+                                <span>پوزیشن کالم دکھائیں</span>
+                            </label>
+                            <span style="font-size:0.88rem; color:#64748b; font-weight:bold;">
+                                نمائش: <b>${filteredRecords.length}</b> از ${totalCandidates}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gazette Printable Report Box -->
+                <div class="card report-box" id="hifz-gazette-print-target" style="padding:0; overflow:hidden; border-radius:16px; border:1px solid #e2e8f0; background:#ffffff;">
+                    <div style="padding:1.2rem 1.5rem; background:#f8fafc; border-bottom:2px solid #e2e8f0; text-align:center;">
+                        <h2 style="margin:0; color:var(--primary); font-family:'Aref Ruqaa', 'Amiri', serif; font-size:1.8rem;">
+                            مدرسہ عبد الرحمن بن عوف غفوریہ (خانیوال)
+                        </h2>
+                        <div style="font-size:1.2rem; font-weight:bold; color:#b45309; margin-top:2px;">
+                            شعبہ تحفیظ القرآن الکریم — باضابطہ اجتماعی امتحانی گزیٹ و نتیجہ
+                        </div>
+                        <div style="font-size:0.95rem; color:#475569; margin-top:4px;">
+                            امتحان: <b>${exam.title}</b> | سیشن: <b>${exam.session || '1446-1447ھ'}</b> | تاریخ: <b>${exam.date}</b> | ممتحن: <b>${examinerName}</b>
+                        </div>
+                    </div>
+
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; text-align:right; font-size:0.92rem;">
+                            <thead>
+                                <tr style="background:#f1f5f9; color:#334155; border-bottom:2px solid #cbd5e1;">
+                                    ${this.showPositions ? `<th style="padding:10px; text-align:center; width:85px;">پوزیشن</th>` : ''}
+                                    <th style="padding:10px; text-align:center; width:40px;">#</th>
+                                    <th style="padding:10px; text-align:center; width:70px;">رول نمبر</th>
+                                    <th style="padding:10px;">نام طالب علم</th>
+                                    <th style="padding:10px;">ولدیت</th>
+                                    <th style="padding:10px;">حلقہ</th>
+                                    <th style="padding:10px; text-align:center;">امتحانی حصہ</th>
+                                    <th style="padding:10px; text-align:center; width:65px;">کل نمبر</th>
+                                    <th style="padding:10px; text-align:center; width:75px;">حاصل کردہ</th>
+                                    <th style="padding:10px; text-align:center; width:65px;">فیصد</th>
+                                    <th style="padding:10px; text-align:center; width:70px;">گریڈ</th>
+                                    <th style="padding:10px; text-align:center; width:75px;">نتیجہ</th>
+                                    <th style="padding:10px; text-align:center; min-width:110px;" class="no-print">ایکشن</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${filteredRecords.length === 0 ? `
+                                    <tr>
+                                        <td colspan="${this.showPositions ? 13 : 12}" style="text-align:center; padding:3rem; color:#64748b;">
+                                            کوئی نتیجہ دستیاب نہیں ہے۔
+                                        </td>
+                                    </tr>
+                                ` : filteredRecords.map((rec, idx) => {
+                                    const st = rec.student;
+                                    const isTop3 = rec.rank <= 3 && rec.isPass;
+                                    return `
+                                        <tr style="border-bottom:1px solid #f1f5f9; background:${isTop3 ? '#fefce8' : 'transparent'};">
+                                            ${this.showPositions ? `
+                                                <td style="text-align:center; font-weight:bold;">
+                                                    ${rec.isPass ? `
+                                                        <span style="display:inline-block; padding:3px 8px; border-radius:6px; font-size:0.85rem; font-weight:bold; background:${rec.rank === 1 ? '#fef08a' : (rec.rank === 2 ? '#e2e8f0' : (rec.rank === 3 ? '#fed7aa' : '#f1f5f9'))}; color:#0f172a; border:1px solid #cbd5e1;">
+                                                            ${rec.positionTitle}
+                                                        </span>
+                                                    ` : '<span style="color:#94a3b8;">---</span>'}
+                                                </td>
+                                            ` : ''}
+                                            <td style="text-align:center; font-weight:bold; color:#64748b;">${idx + 1}</td>
+                                            <td style="text-align:center; font-family:monospace; font-weight:bold; color:#475569;">#${st.id}</td>
+                                            <td style="font-weight:bold; color:var(--primary); font-size:0.98rem;">
+                                                <a href="javascript:void(0)" onclick="HifzModule.showIndividualResultModal(${st.id}, ${exam.id})" style="text-decoration:none; color:var(--primary);">
+                                                    ${st.name}
+                                                </a>
+                                            </td>
+                                            <td>${st.fatherName || '---'}</td>
+                                            <td><span style="background:#f1f5f9; padding:2px 8px; border-radius:4px; font-size:0.85rem; font-weight:600;">${st.className || 'عام'}</span></td>
+                                            <td style="text-align:center;"><span style="background:#ecfdf5; color:#065f46; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:0.85rem;">${rec.portion}</span></td>
+                                            <td style="text-align:center; font-weight:bold; color:#475569;">${rec.totalMarks}</td>
+                                            <td style="text-align:center; font-weight:bold; font-size:1.05rem; color:${rec.isPass ? '#15803d' : '#dc2626'};">${rec.obtainedMarks}</td>
+                                            <td style="text-align:center; font-weight:bold; color:#334155;">${rec.percentage}%</td>
+                                            <td style="text-align:center;">
+                                                <span class="badge" style="background:${this.getGradeBg(rec.grade)}; color:${this.getGradeColor(rec.grade)}; padding:2px 8px; border-radius:6px; font-weight:bold;">
+                                                    ${rec.gradeTitle || rec.grade}
+                                                </span>
+                                            </td>
+                                            <td style="text-align:center;">
+                                                <span class="badge" style="background:${rec.isPass ? '#dcfce7' : '#fee2e2'}; color:${rec.isPass ? '#15803d' : '#dc2626'}; padding:2px 8px; border-radius:6px; font-weight:bold;">
+                                                    ${rec.isPass ? 'کامیاب' : 'ناکام'}
+                                                </span>
+                                            </td>
+                                            <td style="text-align:center;" class="no-print">
+                                                <div style="display:flex; justify-content:center; gap:4px;">
+                                                    <button type="button" class="btn btn-sm" onclick="HifzModule.showIndividualResultModal(${st.id}, ${exam.id})" 
+                                                            style="padding:3px 8px; font-size:0.8rem; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px;" title="رزلٹ کارڈ دیکھیں">
+                                                        <i class="fas fa-id-card"></i> کارڈ
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm" onclick="HifzModule.downloadIndividualResultPDF(${st.id}, ${exam.id})" 
+                                                            style="padding:3px 8px; font-size:0.8rem; background:#fef2f2; color:#dc2626; border:1px solid #fecaca; border-radius:6px;" title="پی ڈی ایف ڈاؤن لوڈ">
+                                                        <i class="fas fa-file-pdf"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Gazette Footer Signatures -->
+                    <div style="padding:2rem 2rem 1.5rem; display:flex; justify-content:space-between; margin-top:1.5rem; font-weight:bold; color:#334155; border-top:1px dashed #cbd5e1;">
+                        <div style="text-align:center; min-width:140px;">
+                            <div style="border-top:1.5px solid #64748b; padding-top:6px;">دستخط ممتحن / ناظم امتحان</div>
+                        </div>
+                        <div style="text-align:center; min-width:140px;">
+                            <div style="border-top:1.5px solid #64748b; padding-top:6px;">دستخط نگرانِ شعبہ حفظ</div>
+                        </div>
+                        <div style="text-align:center; min-width:140px;">
+                            <div style="border-top:1.5px solid #64748b; padding-top:6px;">مہر و دستخط مہتمم ادارہ</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    async showIndividualResultModal(studentId, examId) {
+        const student = await MadrassahDB.getStudentById(studentId);
+        const exam = await MadrassahDB.getHifzExamById(examId);
+        const results = await MadrassahDB.getHifzExamResults(examId);
+        const teachers = await MadrassahDB.getAllTeachers();
+        const teacherMap = new Map(teachers.map(t => [t.id, t.name]));
+        const examinerName = teacherMap.get(exam.examinerTeacherId) || '---';
+
+        const res = results.find(r => r.studentId === studentId) || {
+            memorizationMarks: 25, fluencyMarks: 18, mistakesMarks: 18, mutashabihatMarks: 12, tajweedMarks: 15,
+            obtainedMarks: 88, totalMarks: exam.maxMarks || 100, passingMarks: exam.passingMarks || 50, percentage: 88, grade: 'A', isPass: true, portion: exam.portion
+        };
+
+        const maxM = res.totalMarks || exam.maxMarks || 100;
+        const passM = res.passingMarks || exam.passingMarks || 50;
+        const tot = res.obtainedMarks || 0;
+        const pct = res.percentage !== undefined ? res.percentage : (Math.round((tot / maxM) * 100 * 10) / 10);
+        const isPass = res.isPass !== undefined ? res.isPass : (tot >= passM);
+        const grObj = this.getHifzGrade(pct, isPass);
+
+        // Calculate Position
+        const passedSorted = results.filter(r => (r.obtainedMarks || 0) >= passM).sort((a, b) => (b.obtainedMarks || 0) - (a.obtainedMarks || 0));
+        let myRank = '---';
+        if (isPass) {
+            const idx = passedSorted.findIndex(r => r.studentId === studentId);
+            if (idx !== -1) {
+                myRank = this.getUrduPosition(idx + 1);
+            }
+        }
+
+        const modalDiv = document.createElement('div');
+        modalDiv.id = 'hifzIndividualResultModal';
+        modalDiv.className = 'mms-modal-backdrop';
+
+        modalDiv.innerHTML = `
+            <div class="mms-modal-box" style="max-width: 720px; max-height:92vh; overflow-y:auto; border-radius:20px; padding:0;">
+                <div style="padding:1rem 1.5rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; border-radius:20px 20px 0 0;">
+                    <div style="font-weight:bold; color:var(--primary); font-size:1.15rem; display:flex; align-items:center; gap:8px;">
+                        <i class="fas fa-id-card"></i> انفرادی رزلٹ کارڈ پیش منظر (Preview)
+                    </div>
+                    <button type="button" onclick="document.getElementById('hifzIndividualResultModal').remove()" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:#64748b;">&times;</button>
+                </div>
+
+                <!-- Printable/Downloadable Card Area -->
+                <div id="hifz-single-result-card-element" style="padding:25px 30px; background:#ffffff; position:relative; font-family:'Jameel Noori Nastaleeq', 'Noto Sans Urdu', 'Amiri', serif;">
+                    <!-- Double Border Frame -->
+                    <div style="border:5px double #065f46; border-radius:16px; padding:24px 28px; position:relative; background:#ffffff;">
+                        <!-- Subtle Watermark Logo -->
+                        <img src="logo.jpg" alt="Watermark" 
+                             style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:260px; max-width:80%; opacity:0.06; pointer-events:none; z-index:0;">
+
+                        <div style="position:relative; z-index:1;">
+                            <!-- Header -->
+                            <div style="text-align:center; border-bottom:2px solid #065f46; padding-bottom:12px; margin-bottom:18px;">
+                                <div style="font-size:1.05rem; color:#b45309; font-weight:bold; margin-bottom:2px;">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
+                                <h1 style="margin:0; font-family:'Aref Ruqaa', 'Amiri', serif; font-size:2.2rem; color:#065f46; line-height:1.2;">
+                                    مدرسہ عبد الرحمن بن عوف غفوریہ (خانیوال)
+                                </h1>
+                                <div style="font-size:1.2rem; color:#b45309; font-weight:bold; margin-top:2px;">
+                                    شعبہ تحفیظ القرآن الکریم — امتحانی رزلٹ کارڈ و سندِ کارکردگی
+                                </div>
+                                <div style="font-size:0.95rem; color:#475569; margin-top:4px;">
+                                    امتحان: <b>${exam.title}</b> | سیشن: <b>${exam.session || '1446-1447ھ'}</b> | تاریخ: <b>${exam.date}</b>
+                                </div>
+                            </div>
+
+                            <!-- Student Info Grid -->
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:1.08rem; margin-bottom:18px; background:#f8fafc; padding:12px 16px; border-radius:10px; border:1px solid #e2e8f0;">
+                                <div><b>نام طالب علم:</b> <span style="color:#065f46; font-weight:bold; font-size:1.18rem;">${student.name}</span></div>
+                                <div><b>رجسٹریشن / رول نمبر:</b> <span style="font-family:monospace; font-weight:bold; color:#0f172a;">#${student.id}</span></div>
+                                <div><b>ولدیت:</b> <span>${student.fatherName || '---'}</span></div>
+                                <div><b>حلقہ / درجہ:</b> <span>${student.className || exam.halaqa || 'عام'}</span></div>
+                                <div><b>ممتحن استاد:</b> <span>${examinerName}</span></div>
+                                <div><b>امتحانی سبق / حصہ:</b> <span style="background:#ecfdf5; color:#065f46; padding:2px 8px; border-radius:4px; font-weight:bold;">${res.portion || exam.portion}</span></div>
+                            </div>
+
+                            <!-- Detailed Marks Breakdown Table -->
+                            <table style="width:100%; border-collapse:collapse; text-align:center; font-size:1rem; margin-bottom:18px;">
+                                <thead>
+                                    <tr style="background:#ecfdf5; color:#065f46;">
+                                        <th style="border:1.5px solid #065f46; padding:8px 12px; text-align:right;">امتحانی جائزہ و معیارات</th>
+                                        <th style="border:1.5px solid #065f46; padding:8px; width:110px;">کل نمبر</th>
+                                        <th style="border:1.5px solid #065f46; padding:8px; width:130px;">حاصل کردہ نمبر</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style="border:1px solid #cbd5e1; padding:7px 12px; text-align:right;">1. حفظ کی مضبوطی و پختگی (Memorization)</td>
+                                        <td style="border:1px solid #cbd5e1; padding:7px;">30</td>
+                                        <td style="border:1px solid #cbd5e1; padding:7px; font-weight:bold; color:#0f172a;">${res.memorizationMarks !== undefined ? res.memorizationMarks : 0}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="border:1px solid #cbd5e1; padding:7px 12px; text-align:right;">2. حسنِ صوت، روانی و ترتیل (Fluency)</td>
+                                        <td style="border:1px solid #cbd5e1; padding:7px;">20</td>
+                                        <td style="border:1px solid #cbd5e1; padding:7px; font-weight:bold; color:#0f172a;">${res.fluencyMarks !== undefined ? res.fluencyMarks : 0}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="border:1px solid #cbd5e1; padding:7px 12px; text-align:right;">3. اغلاط، بھول اور اعراب پر گرفت (Accuracy & I'raab)</td>
+                                        <td style="border:1px solid #cbd5e1; padding:7px;">20</td>
+                                        <td style="border:1px solid #cbd5e1; padding:7px; font-weight:bold; color:#0f172a;">${res.mistakesMarks !== undefined ? res.mistakesMarks : 0}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="border:1px solid #cbd5e1; padding:7px 12px; text-align:right;">4. متشابہاتِ قرآنی میں تمیز (Mutashabihat)</td>
+                                        <td style="border:1px solid #cbd5e1; padding:7px;">15</td>
+                                        <td style="border:1px solid #cbd5e1; padding:7px; font-weight:bold; color:#0f172a;">${res.mutashabihatMarks !== undefined ? res.mutashabihatMarks : 0}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="border:1px solid #cbd5e1; padding:7px 12px; text-align:right;">5. قواعدِ تجوید، صفات و مخارج (Tajweed & Makharij)</td>
+                                        <td style="border:1px solid #cbd5e1; padding:7px;">15</td>
+                                        <td style="border:1px solid #cbd5e1; padding:7px; font-weight:bold; color:#0f172a;">${res.tajweedMarks !== undefined ? res.tajweedMarks : 0}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <!-- Results Summary Box -->
+                            <div style="background:#ecfdf5; border:2px solid #065f46; border-radius:10px; padding:12px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; font-size:1.15rem; font-weight:bold; margin-bottom:16px;">
+                                <div>کل حاصل کردہ نمبر: <span style="color:#065f46; font-size:1.35rem;">${tot}</span> / ${maxM}</div>
+                                <div>فیصد: <span style="color:#0284c7;">${pct}%</span></div>
+                                <div>تقدیر / گریڈ: <span style="color:${grObj.color};">${grObj.title}</span></div>
+                                <div>نتیجہ: <span style="color:${isPass ? '#15803d' : '#dc2626'};">${isPass ? 'کامیاب' : 'ناکام'}</span></div>
+                                <div>پوزیشن: <span style="color:#b45309;">${myRank}</span></div>
+                            </div>
+
+                            ${res.remarks ? `
+                                <div style="font-size:0.95rem; color:#475569; margin-bottom:16px; background:#f8fafc; padding:8px 12px; border-radius:8px; border-right:4px solid #065f46;">
+                                    <b>کیفیت و تاثراتِ ممتحن:</b> ${res.remarks}
+                                </div>
+                            ` : ''}
+
+                            <!-- Official Signatures -->
+                            <div style="display:flex; justify-content:space-between; margin-top:40px; font-size:1.05rem; font-weight:bold; color:#334155;">
+                                <div style="text-align:center; min-width:130px;">
+                                    <div style="border-top:1.5px solid #475569; padding-top:4px;">دستخط ممتحن</div>
+                                </div>
+                                <div style="text-align:center; min-width:130px;">
+                                    <div style="border-top:1.5px solid #475569; padding-top:4px;">دستخط نگرانِ حفظ</div>
+                                </div>
+                                <div style="text-align:center; min-width:130px;">
+                                    <div style="border-top:1.5px solid #475569; padding-top:4px;">مہر و دستخط مہتمم</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Actions -->
+                <div style="padding:1rem 1.5rem; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:center; gap:12px; flex-wrap:wrap; border-radius:0 0 20px 20px;">
+                    <button type="button" class="btn" onclick="HifzModule.printExamResultCard(${studentId}, ${examId})" 
+                            style="background:#065f46; color:#ffffff; padding:9px 24px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:6px;">
+                        <i class="fas fa-print"></i> پرنٹ کریں (A4)
+                    </button>
+                    <button type="button" class="btn btn-pdf-download" onclick="HifzModule.downloadIndividualResultPDF(${studentId}, ${examId})" 
+                            style="background:#dc2626; color:#ffffff; padding:9px 24px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:6px;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ
+                    </button>
+                    <button type="button" class="btn" onclick="document.getElementById('hifzIndividualResultModal').remove(); HifzModule.switchExamSubTab('marks', ${examId});" 
+                            style="background:#f1f5f9; color:#475569; padding:9px 18px; border-radius:10px; font-weight:bold;">
+                        <i class="fas fa-marker"></i> نمبرات میں ترمیم
+                    </button>
+                    <button type="button" class="btn" onclick="document.getElementById('hifzIndividualResultModal').remove()" 
+                            style="background:#e2e8f0; color:#334155; padding:9px 18px; border-radius:10px; font-weight:bold;">
+                        بند کریں
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modalDiv);
+    },
+
+    async downloadIndividualResultPDF(studentId, examId) {
+        const student = await MadrassahDB.getStudentById(studentId);
+        const exam = await MadrassahDB.getHifzExamById(examId);
+        let cardEl = document.getElementById('hifz-single-result-card-element');
+
+        const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+        const origHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+
+        const safeStudent = (student ? student.name : 'طالب_علم').replace(/['"\\s]+/g, '_');
+        const safeExam = (exam ? exam.title : 'امتحان').replace(/['"\\s]+/g, '_');
+        const filename = `Hifz-Result-${safeStudent}-${safeExam}.pdf`;
+
+        const doExport = (canvas) => {
+            try {
+                if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+                    alert('PDF لائبریری لوڈ نہیں ہوئی۔ صفحہ دوبارہ لوڈ کریں۔');
+                    return;
+                }
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const { jsPDF } = window.jspdf;
+                // --- SINGLE PAGE FIX ---
+                // Create a PDF page whose dimensions exactly match the image aspect ratio.
+                // This guarantees only ONE page regardless of card height.
+                const pWidth = 210; // A4 width in mm
+                const margin = 8;
+                const printableW = pWidth - (margin * 2);
+                const imgAspect = canvas.height / canvas.width;
+                const printableH = printableW * imgAspect;
+                const pHeight = printableH + (margin * 2);
+
+                const pdf = new jsPDF({
+                    orientation: pHeight > pWidth ? 'portrait' : 'landscape',
+                    unit: 'mm',
+                    format: [pWidth, pHeight]
+                });
+                // Image fills the single page exactly — no overflow, no second page
+                pdf.addImage(imgData, 'JPEG', margin, margin, printableW, printableH);
+                pdf.save(filename);
+            } catch (err) {
+                console.error('PDF export error:', err);
+                alert('پی ڈی ایف بنانے میں خرابی: ' + (err.message || err));
+            } finally {
+                if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+            }
+        };
+
+        if (typeof html2canvas !== 'undefined' && cardEl) {
+            // --- TAINTED CANVAS FIX ---
+            // Local file:// images (like logo.jpg watermark) cause canvas taint
+            // which blocks toDataURL(). Hide all imgs before capture, restore after.
+            const imgs = Array.from(cardEl.querySelectorAll('img'));
+            imgs.forEach(img => { img._savedDisplay = img.style.display; img.style.display = 'none'; });
+
+            html2canvas(cardEl, { scale: 2, useCORS: false, allowTaint: false, logging: false, backgroundColor: '#ffffff' })
+                .then(canvas => {
+                    // Restore hidden images
+                    imgs.forEach(img => { img.style.display = img._savedDisplay || ''; delete img._savedDisplay; });
+                    doExport(canvas);
+                })
+                .catch(err => {
+                    // Restore hidden images on error too
+                    imgs.forEach(img => { img.style.display = img._savedDisplay || ''; delete img._savedDisplay; });
+                    console.error('html2canvas error:', err);
+                    if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                    alert('PDF بنانے میں خرابی۔ دوبارہ کوشش کریں۔');
+                });
+        } else {
+            if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+            alert('PDF لائبریری یا رزلٹ کارڈ نہیں ملا۔');
+        }
+    },
+
+
 
     async printExamResultCard(studentId, examId) {
         const student = await MadrassahDB.getStudentById(studentId);
         const exam = await MadrassahDB.getHifzExamById(examId);
         const results = await MadrassahDB.getHifzExamResults(examId);
+        const teachers = await MadrassahDB.getAllTeachers();
+        const teacherMap = new Map(teachers.map(t => [t.id, t.name]));
+        const examinerName = teacherMap.get(exam.examinerTeacherId) || '---';
+
         const res = results.find(r => r.studentId === studentId) || {
             memorizationMarks: 25, fluencyMarks: 18, mistakesMarks: 18, mutashabihatMarks: 12, tajweedMarks: 15,
-            obtainedMarks: 88, totalMarks: 100, grade: 'A'
+            obtainedMarks: 88, totalMarks: exam.maxMarks || 100, passingMarks: exam.passingMarks || 50, percentage: 88, grade: 'A', isPass: true, portion: exam.portion
         };
+
+        const maxM = res.totalMarks || exam.maxMarks || 100;
+        const passM = res.passingMarks || exam.passingMarks || 50;
+        const tot = res.obtainedMarks || 0;
+        const pct = res.percentage !== undefined ? res.percentage : (Math.round((tot / maxM) * 100 * 10) / 10);
+        const isPass = res.isPass !== undefined ? res.isPass : (tot >= passM);
+        const grObj = this.getHifzGrade(pct, isPass);
+
+        // Position
+        const passedSorted = results.filter(r => (r.obtainedMarks || 0) >= passM).sort((a, b) => (b.obtainedMarks || 0) - (a.obtainedMarks || 0));
+        let myRank = '---';
+        if (isPass) {
+            const idx = passedSorted.findIndex(r => r.studentId === studentId);
+            if (idx !== -1) myRank = this.getUrduPosition(idx + 1);
+        }
 
         const printWin = window.open('', '_blank');
         printWin.document.write(`
+            <!DOCTYPE html>
             <html lang="ur" dir="rtl">
             <head>
                 <meta charset="UTF-8">
                 <title>امتحانی رزلٹ کارڈ - ${student.name}</title>
                 <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
                 <style>
-                    body { font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif; padding: 25px; direction: rtl; }
-                    .card-border { border: 8px double #065f46; padding: 30px; max-width: 680px; margin: 0 auto; border-radius: 12px; }
-                    .header { text-align: center; border-bottom: 2px solid #065f46; padding-bottom: 15px; margin-bottom: 20px; }
-                    .title { font-size: 2.2rem; color: #065f46; margin: 0; }
-                    .sub { font-size: 1.3rem; color: #b45309; }
-                    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 1.2rem; margin-bottom: 25px; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 1.15rem; }
-                    th, td { border: 1px solid #065f46; padding: 10px; text-align: center; }
-                    th { background: #ecfdf5; color: #065f46; }
-                    .total-box { margin-top: 25px; background: #ecfdf5; border: 2px solid #065f46; padding: 12px; font-size: 1.3rem; font-weight: bold; display: flex; justify-content: space-between; border-radius: 8px; }
-                    .footer { display: flex; justify-content: space-between; margin-top: 60px; font-size: 1.15rem; font-weight: bold; }
-                    @media print { .no-print { display: none; } }
+                    body { font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif; padding: 25px; direction: rtl; background:#ffffff; color:#000; }
+                    .card-border { border: 6px double #065f46; padding: 25px 30px; max-width: 680px; margin: 0 auto; border-radius: 12px; position: relative; }
+                    .header { text-align: center; border-bottom: 2px solid #065f46; padding-bottom: 12px; margin-bottom: 16px; }
+                    .title { font-size: 2.1rem; color: #065f46; margin: 0; }
+                    .sub { font-size: 1.25rem; color: #b45309; font-weight: bold; }
+                    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 1.12rem; margin-bottom: 20px; background:#f8fafc; padding:10px 14px; border-radius:8px; border:1px solid #e2e8f0; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1.05rem; }
+                    th, td { border: 1px solid #065f46; padding: 8px; text-align: center; }
+                    th { background: #ecfdf5; color: #065f46; font-weight: bold; }
+                    .total-box { margin-top: 20px; background: #ecfdf5; border: 2px solid #065f46; padding: 10px 16px; font-size: 1.18rem; font-weight: bold; display: flex; justify-content: space-between; border-radius: 8px; flex-wrap:wrap; gap:8px; }
+                    .footer { display: flex; justify-content: space-between; margin-top: 45px; font-size: 1.08rem; font-weight: bold; }
+                    @media print {
+                        .no-print { display: none !important; }
+                        body { padding: 0; }
+                        .card-border { border: 4px double #065f46; }
+                    }
                 </style>
-                <script>
-                function downloadDoc(filename) {
-                    const clone = document.documentElement.cloneNode(true);
-                    clone.querySelectorAll('.no-print').forEach(el => el.remove());
-                    const htmlContent = '<!DOCTYPE html>\n' + clone.outerHTML;
-                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = (filename || 'دستاویز') + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                }
-                </script>
             </head>
             <body>
-                <div class="card-border" style="position:relative;">
-                    <img src="${typeof LOGO_DATA_URI !== 'undefined' ? LOGO_DATA_URI : ''}" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:320px; max-width:85%; opacity:0.12; pointer-events:none; z-index:0;" alt="Watermark">
+                <div class="card-border">
+                    <img src="logo.jpg" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:300px; max-width:85%; opacity:0.08; pointer-events:none; z-index:0;" alt="Watermark">
                     <div style="position:relative; z-index:1;">
                         <div class="header">
-                            <h1 class="title">مدرسہ عبد الرحمن بن عوف</h1>
-                            <div class="sub">شعبہ تحفیظ القرآن الکریم — امتحانی رزلٹ کارڈ</div>
-                            <div style="font-size:1.1rem; color:#475569; margin-top:5px;">امتحان: ${exam.title} (${exam.date})</div>
+                            <div style="font-size:1rem; color:#b45309; font-weight:bold;">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
+                            <h1 class="title">مدرسہ عبد الرحمن بن عوف غفوریہ (خانیوال)</h1>
+                            <div class="sub">شعبہ تحفیظ القرآن الکریم — امتحانی رزلٹ کارڈ و سندِ کارکردگی</div>
+                            <div style="font-size:0.95rem; color:#475569; margin-top:4px;">امتحان: <b>${exam.title}</b> | سیشن: <b>${exam.session || '1446-1447ھ'}</b> | تاریخ: <b>${exam.date}</b></div>
                         </div>
 
                         <div class="info-grid">
-                            <div><b>نام طالب علم:</b> ${student.name}</div>
-                            <div><b>رجسٹریشن نمبر:</b> #${student.id}</div>
-                            <div><b>ولدیت:</b> ${student.fatherName}</div>
-                            <div><b>امتحانی حصہ:</b> ${exam.portion}</div>
+                            <div><b>نام طالب علم:</b> <span style="color:#065f46; font-weight:bold;">${student.name}</span></div>
+                            <div><b>رجسٹریشن / رول نمبر:</b> #${student.id}</div>
+                            <div><b>ولدیت:</b> ${student.fatherName || '---'}</div>
+                            <div><b>حلقہ / درجہ:</b> ${student.className || exam.halaqa || 'عام'}</div>
+                            <div><b>ممتحن استاد:</b> ${examinerName}</div>
+                            <div><b>امتحانی حصہ / سبق:</b> <span style="color:#065f46; font-weight:bold;">${res.portion || exam.portion}</span></div>
                         </div>
 
                         <table>
                             <thead>
                                 <tr>
-                                    <th>معیار جائزہ</th>
-                                    <th>کل نمبر</th>
-                                    <th>حاصل کردہ نمبر</th>
+                                    <th style="text-align:right;">معیار جائزہ و امتحان</th>
+                                    <th style="width:100px;">کل نمبر</th>
+                                    <th style="width:120px;">حاصل کردہ نمبر</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><td style="text-align:right;">حفظ کی مضبوطی و پختگی</td><td>30</td><td>${res.memorizationMarks || 0}</td></tr>
-                                <tr><td style="text-align:right;">حسنِ صوت و روانی</td><td>20</td><td>${res.fluencyMarks || 0}</td></tr>
-                                <tr><td style="text-align:right;">اغلاط و اعراب پر گرفت</td><td>20</td><td>${res.mistakesMarks || 0}</td></tr>
-                                <tr><td style="text-align:right;">متشابہات میں امتیاز</td><td>15</td><td>${res.mutashabihatMarks || 0}</td></tr>
-                                <tr><td style="text-align:right;">قواعدِ تجوید و مخارج</td><td>15</td><td>${res.tajweedMarks || 0}</td></tr>
+                                <tr><td style="text-align:right;">1. حفظ کی مضبوطی و پختگی</td><td>30</td><td>${res.memorizationMarks !== undefined ? res.memorizationMarks : 0}</td></tr>
+                                <tr><td style="text-align:right;">2. حسنِ صوت و روانی</td><td>20</td><td>${res.fluencyMarks !== undefined ? res.fluencyMarks : 0}</td></tr>
+                                <tr><td style="text-align:right;">3. اغلاط، بھول و اعراب پر گرفت</td><td>20</td><td>${res.mistakesMarks !== undefined ? res.mistakesMarks : 0}</td></tr>
+                                <tr><td style="text-align:right;">4. متشابہات میں تمیز</td><td>15</td><td>${res.mutashabihatMarks !== undefined ? res.mutashabihatMarks : 0}</td></tr>
+                                <tr><td style="text-align:right;">5. قواعدِ تجوید و مخارج</td><td>15</td><td>${res.tajweedMarks !== undefined ? res.tajweedMarks : 0}</td></tr>
                             </tbody>
                         </table>
 
                         <div class="total-box">
-                            <span>کل حاصل کردہ نمبر: ${res.obtainedMarks} / ${res.totalMarks || 100}</span>
-                            <span>تقدیر (Grade): ${res.grade}</span>
+                            <div>حاصل کردہ: ${tot} / ${maxM}</div>
+                            <div>فیصد: ${pct}%</div>
+                            <div>تقدیر / گریڈ: ${grObj.title}</div>
+                            <div>نتیجہ: ${isPass ? 'کامیاب' : 'ناکام'}</div>
+                            <div>پوزیشن: ${myRank}</div>
                         </div>
+
+                        ${res.remarks ? `<div style="margin-top:12px; font-size:0.95rem; color:#334155;"><b>کیفیت / تاثرات:</b> ${res.remarks}</div>` : ''}
 
                         <div class="footer">
                             <div>دستخط ممتحن</div>
@@ -2298,12 +3471,219 @@ const HifzModule = {
                     </div>
                 </div>
 
-                <div class="no-print" style="text-align:center; margin-top:25px; display:flex; justify-content:center; gap:15px;">
-                    <button onclick="window.print()" style="padding:10px 35px; background:#065f46; color:white; border:none; border-radius:25px; font-size:1.2rem; cursor:pointer;">
-                        <i class="fas fa-print"></i> پرنٹ کریں (Print)
+                <div class="no-print" style="text-align:center; margin-top:20px; display:flex; justify-content:center; gap:12px;">
+                    <button onclick="window.print()" style="padding:9px 30px; background:#065f46; color:white; border:none; border-radius:20px; font-size:1.1rem; cursor:pointer; font-weight:bold;">
+                        پرنٹ کریں (Print)
                     </button>
-                    <button onclick="downloadDoc('حفظ_رزلٹ_کارڈ_${student.name ? student.name.replace(/['&quot;\s]+/g, '_') : 'ResultCard'}')" style="padding:10px 35px; background:#0284c7; color:white; border:none; border-radius:25px; font-size:1.2rem; cursor:pointer;">
-                        <i class="fas fa-download"></i> ڈاؤن لوڈ کریں (Download)
+                    <button onclick="window.close()" style="padding:9px 24px; background:#f1f5f9; color:#475569; border:none; border-radius:20px; font-size:1.1rem; cursor:pointer;">
+                        بند کریں
+                    </button>
+                </div>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+    },
+
+    async downloadCollectiveResultPDF(examId) {
+        const exam = await MadrassahDB.getHifzExamById(examId);
+        const targetEl = document.getElementById('hifz-gazette-print-target');
+        const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+        const origHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+
+        const safeExam = (exam ? exam.title : 'اجتماعی_گزیٹ').replace(/['"\\s]+/g, '_');
+        const filename = `اجتماعی_گزیٹ_${safeExam}.pdf`;
+
+        const doExport = (canvas) => {
+            try {
+                if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+                    window.print();
+                    return;
+                }
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                const pWidth = 297;
+                const pHeight = 210;
+                const imgProps = pdf.getImageProperties(imgData);
+                const margin = 8;
+                const maxW = pWidth - (margin * 2);
+                const maxH = pHeight - (margin * 2);
+                let finalW = maxW;
+                let finalH = (imgProps.height * maxW) / imgProps.width;
+                if (finalH > maxH) {
+                    finalH = maxH;
+                    finalW = (imgProps.width * maxH) / imgProps.height;
+                }
+                const x = (pWidth - finalW) / 2;
+                const y = (pHeight - finalH) / 2;
+                pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
+                pdf.save(filename);
+            } catch (err) {
+                console.error('Collective PDF export error:', err);
+                window.print();
+            } finally {
+                if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+            }
+        };
+
+        if (typeof html2canvas !== 'undefined') {
+            html2canvas(targetEl || document.body, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' })
+                .then(doExport)
+                .catch(err => {
+                    console.error('html2canvas error:', err);
+                    if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                    window.print();
+                });
+        } else {
+            if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+            window.print();
+        }
+    },
+
+    async printCollectiveGazette(examId) {
+        const exam = await MadrassahDB.getHifzExamById(examId);
+        const rawResults = await MadrassahDB.getHifzExamResults(examId);
+        const banin = await MadrassahDB.getAllStudents('banin');
+        const banat = await MadrassahDB.getAllStudents('banat');
+        const allStudents = [...banin, ...banat];
+        const studentMap = new Map();
+        allStudents.forEach(s => { if (s && s.id && !studentMap.has(s.id)) studentMap.set(s.id, s); });
+
+        const teachers = await MadrassahDB.getAllTeachers();
+        const teacherMap = new Map(teachers.map(t => [t.id, t.name]));
+        const examinerName = teacherMap.get(exam.examinerTeacherId) || '---';
+
+        const records = rawResults.map(r => {
+            const st = studentMap.get(r.studentId) || { name: `طالب علم #${r.studentId}`, fatherName: '---', className: '---' };
+            const tot = r.obtainedMarks || 0;
+            const maxM = r.totalMarks || exam.maxMarks || 100;
+            const passM = r.passingMarks || exam.passingMarks || 50;
+            const pct = r.percentage !== undefined ? r.percentage : (Math.round((tot / maxM) * 100 * 10) / 10);
+            const isPass = r.isPass !== undefined ? r.isPass : (tot >= passM);
+            const grObj = this.getHifzGrade(pct, isPass);
+            return {
+                result: r,
+                student: st,
+                obtainedMarks: tot,
+                totalMarks: maxM,
+                percentage: pct,
+                isPass,
+                grade: r.grade || grObj.grade,
+                gradeTitle: r.gradeTitle || grObj.title,
+                portion: r.portion || exam.portion || '---'
+            };
+        });
+
+        records.sort((a, b) => b.obtainedMarks - a.obtainedMarks);
+        let rank = 0;
+        let lastM = null;
+        records.forEach((r, i) => {
+            if (r.isPass) {
+                if (r.obtainedMarks !== lastM) {
+                    rank = i + 1;
+                    lastM = r.obtainedMarks;
+                }
+                r.rank = rank;
+                r.positionTitle = this.getUrduPosition(rank);
+            } else {
+                r.positionTitle = '---';
+            }
+        });
+
+        const totalC = records.length;
+        const passC = records.filter(r => r.isPass).length;
+        const failC = totalC - passC;
+        const passPct = totalC > 0 ? Math.round((passC / totalC) * 100 * 10) / 10 : 0;
+
+        const printWin = window.open('', '_blank');
+        printWin.document.write(`
+            <!DOCTYPE html>
+            <html lang="ur" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>اجتماعی گزیٹ - ${exam.title}</title>
+                <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+                <style>
+                    body { font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif; padding: 20px; direction: rtl; background:#ffffff; color:#000; }
+                    .header { text-align: center; border-bottom: 2px solid #065f46; padding-bottom: 12px; margin-bottom: 15px; }
+                    .title { font-size: 2rem; color: #065f46; margin: 0; }
+                    .sub { font-size: 1.2rem; color: #b45309; font-weight: bold; }
+                    .stats-bar { display: flex; justify-content: space-around; background: #f8fafc; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 15px; font-size: 1.05rem; font-weight: bold; }
+                    table { width: 100%; border-collapse: collapse; font-size: 1rem; }
+                    th, td { border: 1px solid #475569; padding: 6px 8px; text-align: center; }
+                    th { background: #f1f5f9; color: #0f172a; font-weight: bold; }
+                    .footer { display: flex; justify-content: space-between; margin-top: 45px; font-size: 1.05rem; font-weight: bold; }
+                    @page { size: A4 landscape; margin: 10mm; }
+                    @media print { .no-print { display: none !important; } body { padding: 0; } }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1 class="title">مدرسہ عبد الرحمن بن عوف غفوریہ (خانیوال)</h1>
+                    <div class="sub">شعبہ تحفیظ القرآن الکریم — باضابطہ اجتماعی امتحانی گزیٹ و نتیجہ</div>
+                    <div style="font-size:0.95rem; color:#475569; margin-top:4px;">امتحان: <b>${exam.title}</b> | سیشن: <b>${exam.session || '1446-1447ھ'}</b> | تاریخ: <b>${exam.date}</b> | ممتحن: <b>${examinerName}</b></div>
+                </div>
+
+                <div class="stats-bar">
+                    <div>کل امیدواران: ${totalC}</div>
+                    <div style="color:#15803d;">کامیاب: ${passC}</div>
+                    <div style="color:#dc2626;">ناکام: ${failC}</div>
+                    <div>شرحِ کامیابی: ${passPct}%</div>
+                    <div>کل ممکنہ نمبر: ${exam.maxMarks || 100}</div>
+                    <div>پاسنگ مارکس: ${exam.passingMarks || 50}</div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:75px;">پوزیشن</th>
+                            <th style="width:35px;">#</th>
+                            <th style="width:65px;">رول نمبر</th>
+                            <th style="text-align:right;">نام طالب علم</th>
+                            <th style="text-align:right;">ولدیت</th>
+                            <th>حلقہ</th>
+                            <th>امتحانی حصہ</th>
+                            <th style="width:60px;">کل نمبر</th>
+                            <th style="width:70px;">حاصل کردہ</th>
+                            <th style="width:60px;">فیصد</th>
+                            <th style="width:65px;">گریڈ</th>
+                            <th style="width:70px;">نتیجہ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${records.map((r, i) => `
+                            <tr>
+                                <td style="font-weight:bold;">${r.positionTitle}</td>
+                                <td>${i + 1}</td>
+                                <td style="font-family:monospace; font-weight:bold;">#${r.student.id}</td>
+                                <td style="text-align:right; font-weight:bold;">${r.student.name}</td>
+                                <td style="text-align:right;">${r.student.fatherName || '---'}</td>
+                                <td>${r.student.className || 'عام'}</td>
+                                <td style="font-weight:bold;">${r.portion}</td>
+                                <td>${r.totalMarks}</td>
+                                <td style="font-weight:bold;">${r.obtainedMarks}</td>
+                                <td>${r.percentage}%</td>
+                                <td style="font-weight:bold;">${r.gradeTitle || r.grade}</td>
+                                <td style="font-weight:bold; color:${r.isPass ? '#15803d' : '#dc2626'};">${r.isPass ? 'کامیاب' : 'ناکام'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <div class="footer">
+                    <div>دستخط ممتحن / ناظم امتحان</div>
+                    <div>دستخط نگرانِ شعبہ حفظ</div>
+                    <div>مہر و دستخط مہتمم ادارہ</div>
+                </div>
+
+                <div class="no-print" style="text-align:center; margin-top:20px;">
+                    <button onclick="window.print()" style="padding:8px 28px; background:#065f46; color:white; border:none; border-radius:20px; font-size:1.1rem; cursor:pointer; font-weight:bold;">
+                        پرنٹ کریں (Print)
+                    </button>
+                    <button onclick="window.close()" style="padding:8px 20px; background:#f1f5f9; color:#475569; border:none; border-radius:20px; font-size:1.1rem; cursor:pointer; margin-right:10px;">
+                        بند کریں
                     </button>
                 </div>
             </body>
@@ -2435,6 +3815,8 @@ const HifzModule = {
         const avgGrade = QuranData.getGradeForMistakes(Math.round(avgMistakes));
 
         const monthName = new Date(month + '-01').toLocaleDateString('ur-PK', { year: 'numeric', month: 'long' });
+        const safeStudentName = (student.name || 'Student').replace(/['"\\s]+/g, '_');
+        const reportFileName = `Hifz-Monthly-Report-${safeStudentName}-${month}`;
 
         const printWin = window.open('', '_blank');
         printWin.document.write(`
@@ -2442,7 +3824,10 @@ const HifzModule = {
             <head>
                 <meta charset="UTF-8">
                 <title>ماہانہ رپورٹ برائے والدین - ${student.name}</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
                 <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
                 <style>
                     body { font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif; padding: 30px; direction: rtl; background: #fff; }
                     .report-wrapper { border: 6px double #065f46; border-radius: 16px; padding: 30px; max-width: 720px; margin: 0 auto; }
@@ -2459,19 +3844,60 @@ const HifzModule = {
                     @media print { .no-print { display: none; } }
                 </style>
                 <script>
-                function downloadDoc(filename) {
-                    const clone = document.documentElement.cloneNode(true);
-                    clone.querySelectorAll('.no-print').forEach(el => el.remove());
-                    const htmlContent = '<!DOCTYPE html>\n' + clone.outerHTML;
-                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = (filename || 'دستاویز') + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                async function downloadPDF(filename) {
+                    const btn = document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) {
+                        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...';
+                        btn.disabled = true;
+                    }
+                    try {
+                        const html2canvasLib = window.html2canvas || (window.opener && window.opener.html2canvas);
+                        const jspdfLib = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf : (window.opener && window.opener.jspdf && window.opener.jspdf.jsPDF ? window.opener.jspdf : null);
+
+                        if (!html2canvasLib || !jspdfLib) {
+                            alert('پی ڈی ایف لائبریری لوڈ نہیں ہو سکی۔ براہ کرم صفحہ دوبارہ لوڈ کریں یا پرنٹ نکالیں کا بٹن استعمال کریں۔');
+                            return;
+                        }
+
+                        const target = document.querySelector('.report-wrapper') || document.body;
+                        const canvas = await html2canvasLib(target, {
+                            scale: 2,
+                            useCORS: true,
+                            logging: false,
+                            backgroundColor: '#ffffff'
+                        });
+
+                        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                        const { jsPDF } = jspdfLib;
+                        // Calculate page dimensions to exactly fit the image on ONE page
+                        // Use A4 width (210mm) and scale height proportionally — guaranteed single page
+                        const pWidth = 210;
+                        const margin = 8;
+                        const printableW = pWidth - (margin * 2);
+                        const imgAspect = canvas.height / canvas.width;
+                        const printableH = printableW * imgAspect;
+                        const pHeight = printableH + (margin * 2);
+
+                        const pdf = new jsPDF({
+                            orientation: pHeight > pWidth ? 'portrait' : 'landscape',
+                            unit: 'mm',
+                            format: [pWidth, pHeight]
+                        });
+                        // Place image to fill entire single page exactly
+                        pdf.addImage(imgData, 'JPEG', margin, margin, printableW, printableH);
+
+                        const safeFilename = (filename || 'Hifz-Monthly-Report').endsWith('.pdf') ? filename : (filename + '.pdf');
+                        pdf.save(safeFilename);
+                    } catch (err) {
+                        console.error('PDF Generation Error:', err);
+                        alert('پی ڈی ایف بنانے میں خرابی پیش آگئی: ' + (err.message || err));
+                    } finally {
+                        if (btn) {
+                            btn.innerHTML = origHtml;
+                            btn.disabled = false;
+                        }
+                    }
                 }
                 </script>
             </head>
@@ -2533,11 +3959,11 @@ const HifzModule = {
                 </div>
 
                 <div class="no-print" style="text-align:center; margin-top:25px; display:flex; justify-content:center; gap:15px;">
-                    <button onclick="window.print()" style="padding:10px 35px; background:#065f46; color:white; border:none; border-radius:25px; font-size:1.2rem; cursor:pointer;">
-                        <i class="fas fa-print"></i> پرنٹ یا PDF محفوظ کریں
+                    <button onclick="window.print()" style="padding:10px 35px; background:#065f46; color:white; border:none; border-radius:25px; font-size:1.15rem; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
+                        <i class="fas fa-print"></i> پرنٹ نکالیں
                     </button>
-                    <button onclick="downloadDoc('حفظ_سرپرست_رپورٹ_${student.name ? student.name.replace(/['&quot;\s]+/g, '_') : 'Report'}')" style="padding:10px 35px; background:#0284c7; color:white; border:none; border-radius:25px; font-size:1.2rem; cursor:pointer;">
-                        <i class="fas fa-download"></i> ڈاؤن لوڈ کریں (Download)
+                    <button class="btn-pdf-download" onclick="downloadPDF('${reportFileName}')" style="padding:10px 35px; background:#dc2626; color:white; border:none; border-radius:25px; font-size:1.15rem; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:8px; box-shadow:0 4px 10px rgba(220,38,38,0.25);">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں
                     </button>
                 </div>
             </body>
@@ -2831,47 +4257,70 @@ const HifzModule = {
         const teacher = teachers.find(t => t.id === completion.teacherId);
         const teacherName = teacher ? teacher.name : 'قاری صاحب';
 
+        const safeStudentName = (student.name || 'Student').replace(/['"\\s]+/g, '_');
+        const pdfFileName = `Hifz-Certificate-${safeStudentName}`;
+
         const printWin = window.open('', '_blank');
         printWin.document.write(`
+            <!DOCTYPE html>
             <html lang="ur" dir="rtl">
             <head>
                 <meta charset="UTF-8">
                 <title>حفظ القرآن تکمیل سرٹیفکیٹ - ${student.name}</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
                 <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
                 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Aref+Ruqaa:wght@400;700&display=swap" rel="stylesheet">
+                <script src="assets/js/html2canvas.min.js"><\/script>
+                <script src="assets/js/jspdf.umd.min.js"><\/script>
                 <style>
-                    @page { size: A4 landscape; margin: 8mm; }
+                    /* ── Single-page landscape print ── */
+                    @page {
+                        size: A4 landscape;
+                        margin: 3mm;
+                    }
+                    * { box-sizing: border-box; }
+                    html, body {
+                        margin: 0;
+                        padding: 0;
+                        background: #fdfbf7;
+                        width: 100%;
+                    }
                     body {
                         font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif;
-                        margin: 0;
-                        padding: 15px;
-                        background: #fdfbf7;
                         direction: rtl;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: flex-start;
+                        padding: 15px 15px 20px;
                     }
                     .cert-container {
                         border: 12px solid #065f46;
                         outline: 4px solid #b45309;
                         outline-offset: -8px;
-                        border-radius: 20px;
-                        padding: 35px 50px;
+                        border-radius: 18px;
+                        padding: 18px 40px;
                         background: #ffffff;
                         position: relative;
-                        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                        width: 100%;
                         min-height: 180mm;
                         display: flex;
                         flex-direction: column;
                         justify-content: space-between;
                         text-align: center;
+                        overflow: hidden;
+                        page-break-inside: avoid;
+                        break-inside: avoid;
                     }
                     .bismillah {
                         font-family: 'Amiri', serif;
-                        font-size: 2.2rem;
+                        font-size: 1.7rem;
                         color: #065f46;
-                        margin-bottom: 5px;
+                        margin-bottom: 2px;
                     }
                     .madrsa-title {
                         font-family: 'Aref Ruqaa', serif;
-                        font-size: 3rem;
+                        font-size: 2.3rem;
                         color: #065f46;
                         margin: 0;
                         line-height: 1.2;
@@ -2880,92 +4329,146 @@ const HifzModule = {
                         display: inline-block;
                         background: linear-gradient(135deg, #065f46, #047857);
                         color: #fef08a;
-                        padding: 6px 30px;
+                        padding: 4px 24px;
                         border-radius: 30px;
-                        font-size: 1.6rem;
+                        font-size: 1.35rem;
                         font-family: 'Amiri', serif;
-                        letter-spacing: 1px;
-                        margin: 15px 0;
+                        margin: 8px 0;
                         border: 2px solid #fef08a;
                     }
                     .cert-text {
-                        font-size: 1.65rem;
-                        line-height: 2.2;
+                        font-size: 1.4rem;
+                        line-height: 1.9;
                         color: #1e293b;
-                        margin: 15px auto;
-                        max-width: 90%;
+                        margin: 6px auto;
+                        max-width: 92%;
                     }
                     .highlight-name {
                         color: #065f46;
                         font-weight: bold;
-                        font-size: 2.2rem;
+                        font-size: 1.8rem;
                         border-bottom: 2px solid #b45309;
-                        padding: 0 15px;
+                        padding: 0 10px;
                         display: inline-block;
                     }
                     .sanad-meta {
                         display: flex;
                         justify-content: space-between;
-                        font-size: 1.25rem;
+                        font-size: 1.05rem;
                         color: #475569;
                         border-top: 1px solid #e2e8f0;
                         border-bottom: 1px solid #e2e8f0;
-                        padding: 8px 20px;
-                        margin: 15px 0;
+                        padding: 5px 16px;
+                        margin: 6px 0;
                     }
                     .signatures {
                         display: flex;
                         justify-content: space-between;
-                        margin-top: 35px;
-                        padding: 0 30px;
+                        margin-top: 10px;
+                        padding: 0 20px;
                     }
                     .sig-block {
                         border-top: 2px solid #065f46;
-                        width: 180px;
-                        padding-top: 6px;
-                        font-size: 1.3rem;
+                        width: 150px;
+                        padding-top: 4px;
+                        font-size: 1.05rem;
                         font-weight: bold;
                         color: #065f46;
                     }
-                    @media print { .no-print { display: none; } }
+                    @media print {
+                        .no-print { display: none !important; }
+                        html, body {
+                            overflow: hidden;
+                            padding: 0;
+                        }
+                        .cert-container {
+                            height: 200mm;
+                            min-height: unset;
+                            page-break-inside: avoid;
+                            break-inside: avoid;
+                        }
+                    }
                 </style>
                 <script>
-                function downloadDoc(filename) {
-                    const clone = document.documentElement.cloneNode(true);
-                    clone.querySelectorAll('.no-print').forEach(el => el.remove());
-                    const htmlContent = '<!DOCTYPE html>\n' + clone.outerHTML;
-                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = (filename || 'دستاویز') + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                async function _doDownload(format) {
+                    const btn = document.querySelector('.btn-triggered');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> تیاری ہو رہی ہے...'; btn.disabled = true; }
+                    try {
+                        const html2canvasLib = window.html2canvas || (window.opener && window.opener.html2canvas);
+                        const jspdfLib = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf : (window.opener && window.opener.jspdf && window.opener.jspdf.jsPDF ? window.opener.jspdf : null);
+                        if (!html2canvasLib) { alert('html2canvas لائبریری لوڈ نہیں ہوئی۔'); return; }
+
+                        const target = document.querySelector('.cert-container');
+                        // Hide local images to prevent tainted canvas error on file:// protocol
+                        const imgs = Array.from(target.querySelectorAll('img'));
+                        imgs.forEach(img => { img._sd = img.style.display; img.style.display = 'none'; });
+
+                        const canvas = await html2canvasLib(target, {
+                            scale: 2, useCORS: false, allowTaint: false,
+                            logging: false, backgroundColor: '#ffffff'
+                        });
+
+                        imgs.forEach(img => { img.style.display = img._sd || ''; delete img._sd; });
+
+                        if (format === 'jpg') {
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+                            const a = document.createElement('a');
+                            a.href = dataUrl;
+                            a.download = '${pdfFileName}.jpg';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                        } else {
+                            if (!jspdfLib) { alert('jsPDF لائبریری لوڈ نہیں ہوئی۔'); return; }
+                            const { jsPDF } = jspdfLib;
+                            // Landscape A4 page — fit image in one page exactly
+                            const pWidth = 297; // landscape A4 width in mm
+                            const margin = 8;
+                            const printableW = pWidth - (margin * 2);
+                            const imgAspect = canvas.height / canvas.width;
+                            const printableH = printableW * imgAspect;
+                            const pHeight = printableH + (margin * 2);
+                            const pdf = new jsPDF({
+                                orientation: pWidth >= pHeight ? 'landscape' : 'portrait',
+                                unit: 'mm',
+                                format: [pWidth, pHeight]
+                            });
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            pdf.addImage(imgData, 'JPEG', margin, margin, printableW, printableH);
+                            pdf.save('${pdfFileName}.pdf');
+                        }
+                    } catch (err) {
+                        console.error('Export error:', err);
+                        alert('خرابی: ' + (err.message || err));
+                    } finally {
+                        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                    }
                 }
-                </script>
+                function dlPDF(el) { el.classList.add('btn-triggered'); _doDownload('pdf').finally(() => el.classList.remove('btn-triggered')); }
+                function dlJPG(el) { el.classList.add('btn-triggered'); _doDownload('jpg').finally(() => el.classList.remove('btn-triggered')); }
+                <\/script>
             </head>
             <body>
                 <div class="cert-container" style="position:relative;">
-                    <img src="${typeof LOGO_DATA_URI !== 'undefined' ? LOGO_DATA_URI : ''}" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:380px; max-width:85%; opacity:0.09; pointer-events:none; z-index:0;" alt="Watermark">
+                    <img src="${typeof LOGO_DATA_URI !== 'undefined' ? LOGO_DATA_URI : ''}" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:340px; max-width:80%; opacity:0.08; pointer-events:none; z-index:0;" alt="Watermark">
                     <div style="position:relative; z-index:1; display:flex; flex-direction:column; justify-content:space-between; height:100%;">
                         <div>
                             <div class="bismillah">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
                             <h1 class="madrsa-title">مدرسہ عبد الرحمن بن عوف غفوریہ</h1>
-                            <div style="color:#b45309; font-size:1.3rem;">تحت انتظام: NOVATIX</div>
+                            <div style="color:#b45309; font-size:1.1rem;">تحت انتظام: NOVATIX</div>
                             <div>
                                 <span class="cert-badge">سند و سرٹیفکیٹ تکمیلِ حفظ القرآن الکریم</span>
                             </div>
                         </div>
 
                         <div class="cert-text">
-                            تصدیق کی جاتی ہے کہ محترم / عزیزم 
-                            <span class="highlight-name">${student.name}</span> 
-                            فرزندِ ارجمند جناب 
+                            تصدیق کی جاتی ہے کہ محترم / عزیزم
+                            <span class="highlight-name">${student.name}</span>
+                            فرزندِ ارجمند جناب
                             <span class="highlight-name">${student.fatherName}</span>
-                            (رجسٹریشن نمبر: #${student.id}) نے اس ادارے میں حسنِ سعی و محنت سے 
-                            <b>قرآن مجید فرقانِ حمید کے مکمل ۳۰ پارے</b> 
+                            (رجسٹریشن نمبر: #${student.id}) نے اس ادارے میں حسنِ سعی و محنت سے
+                            <b>قرآن مجید فرقانِ حمید کے مکمل ۳۰ پارے</b>
                             مع حسنِ تجوید و ترتیل بحمدِ اللہ مکمل حفظ کرنے کی سعادت حاصل فرمائی ہے۔
                         </div>
 
@@ -2985,12 +4488,18 @@ const HifzModule = {
                     </div>
                 </div>
 
-                <div class="no-print" style="text-align:center; margin-top:20px; display:flex; justify-content:center; gap:15px;">
-                    <button onclick="window.print()" style="padding:12px 40px; background:#065f46; color:white; border:none; border-radius:30px; font-size:1.3rem; cursor:pointer; font-weight:bold;">
-                        <i class="fas fa-print"></i> سند پرنٹ فرمائیں (Print Certificate)
+                <div class="no-print" style="text-align:center; margin-top:14px; display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                    <button onclick="window.print()"
+                            style="padding:10px 32px; background:#065f46; color:white; border:none; border-radius:25px; font-size:1.1rem; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
+                        <i class="fas fa-print"></i> پرنٹ نکالیں (Landscape)
                     </button>
-                    <button onclick="downloadDoc('سند_ختم_قرآن_${student.name ? student.name.replace(/['&quot;\s]+/g, '_') : 'Certificate'}')" style="padding:12px 40px; background:#0284c7; color:white; border:none; border-radius:30px; font-size:1.3rem; cursor:pointer; font-weight:bold;">
-                        <i class="fas fa-download"></i> ڈاؤن لوڈ کریں (Download Certificate)
+                    <button onclick="dlPDF(this)"
+                            style="padding:10px 32px; background:#dc2626; color:white; border:none; border-radius:25px; font-size:1.1rem; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:8px; box-shadow:0 4px 10px rgba(220,38,38,0.25);">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں
+                    </button>
+                    <button onclick="dlJPG(this)"
+                            style="padding:10px 32px; background:#0284c7; color:white; border:none; border-radius:25px; font-size:1.1rem; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
+                        <i class="fas fa-image"></i> JPG ڈاؤن لوڈ کریں
                     </button>
                 </div>
             </body>
@@ -2998,6 +4507,7 @@ const HifzModule = {
         `);
         printWin.document.close();
     },
+
 
     // ==========================================
     // 11. HALAQAS & TEACHERS MODULES

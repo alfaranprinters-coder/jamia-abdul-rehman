@@ -1437,4 +1437,38 @@ body[data-section="banat"] .card {
     }
 }
 
+/* ==========================================================================
+   Strict Form Validation & Required Field Highlighting
+   ========================================================================== */
+.field-required-error {
+    border: 2px solid #ef4444 !important;
+    background-color: #fef2f2 !important;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25) !important;
+    outline: none !important;
+    animation: mms-shake 0.4s ease-in-out;
+}
 
+@keyframes mms-shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-4px); }
+    40%, 80% { transform: translateX(4px); }
+}
+
+.required-asterisk {
+    color: #ef4444;
+    font-weight: bold;
+    margin-right: 4px;
+    font-size: 1.1rem;
+    line-height: 1;
+    display: inline-block;
+}
+
+@keyframes highlightPulse {
+    0% { background-color: #a7f3d0 !important; }
+    50% { background-color: #d1fae5 !important; }
+    100% { background-color: #ecfdf5 !important; }
+}
+
+.highlighted-student-row {
+    animation: highlightPulse 3s ease-out;
+}

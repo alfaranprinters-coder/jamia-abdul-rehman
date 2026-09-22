@@ -1,0 +1,14 @@
+const fs = require('fs');
+const content = fs.readFileSync('app.js', 'utf8');
+const start = content.indexOf('<!-- Section 3: Educational Information');
+const end = content.indexOf('<!-- Special Transfer Hifz Assessment Section');
+const section3 = content.substring(start, end);
+console.log('Section 3 snippet length:', section3.length);
+console.log('Contains contemporaryEdu:', section3.includes('name="contemporaryEdu"'));
+console.log('Contains contemporaryInstitute input:', section3.includes('name="contemporaryInstitute"'));
+console.log('Contains lastClass input:', section3.includes('name="lastClass"'));
+console.log('Contains religiousEdu:', section3.includes('name="religiousEdu"'));
+console.log('Contains previousMadrsa:', section3.includes('name="previousMadrsa"'));
+console.log('Contains previousReligiousStage:', section3.includes('name="previousReligiousStage"'));
+console.log('Contains totalMarks:', section3.includes('name="totalMarks"'));
+console.log('Contains leavingReason:', section3.includes('name="leavingReason"'));

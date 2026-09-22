@@ -95,6 +95,8 @@ class MadrassahApp {
         };
         const savedAuth = typeof sessionStorage !== 'undefined' && (sessionStorage.getItem('mms_authenticated') === 'true' || localStorage.getItem('mms_authenticated') === 'true');
         this.isAuthenticated = !!savedAuth;
+        window.app = this;
+        window.mmsApp = this;
         this.init();
     }
 
@@ -133,6 +135,7 @@ class MadrassahApp {
     async init() {
         try {
             window.app = this;
+            window.mmsApp = this;
             await MadrassahDB.initDB();
             await MadrassahDB.ensureUniqueCodes();
             await this.syncReceiptTemplateSetting();
@@ -166,25 +169,49 @@ class MadrassahApp {
         }
     }
 
-    showWelcomeLoginScreen() {
+    async showWelcomeLoginScreen() {
         const welcome = document.getElementById('welcome-login-screen');
         const appEl = document.getElementById('app');
         if (welcome) welcome.style.display = 'flex';
         if (appEl) appEl.style.display = 'none';
+
+        let storedPass = '123';
+        try {
+            if (MadrassahDB) {
+                const val = await MadrassahDB.getSetting('app_password');
+                if (val) storedPass = String(val).trim();
+            }
+        } catch(e) {}
+
         const passInput = document.getElementById('login-password-input');
         if (passInput) {
-            passInput.value = '';
-            setTimeout(() => passInput.focus(), 250);
+            passInput.value = storedPass || '123';
+            setTimeout(() => {
+                passInput.focus();
+                passInput.select();
+            }, 250);
         }
         const errAlert = document.getElementById('login-error-alert');
         if (errAlert) errAlert.style.display = 'none';
+
+        const hintEl = document.getElementById('login-current-pass-hint');
+        if (hintEl) hintEl.innerText = storedPass || '123';
     }
 
     showAppScreen() {
         const welcome = document.getElementById('welcome-login-screen');
         const appEl = document.getElementById('app');
-        if (welcome) welcome.style.display = 'none';
-        if (appEl) appEl.style.display = 'flex';
+        if (welcome) {
+            welcome.style.setProperty('display', 'none', 'important');
+            welcome.style.visibility = 'hidden';
+            welcome.style.opacity = '0';
+            welcome.style.pointerEvents = 'none';
+        }
+        if (appEl) {
+            appEl.style.setProperty('display', 'flex', 'important');
+            appEl.style.visibility = 'visible';
+            appEl.style.opacity = '1';
+        }
     }
 
     toggleLoginPassVisibility() {
@@ -200,69 +227,111 @@ class MadrassahApp {
         }
     }
 
-    async handleLogin(event) {
-        if (event) event.preventDefault();
+    async autoFillPassword() {
         const input = document.getElementById('login-password-input');
-        const rememberCheckbox = document.getElementById('login-remember-checkbox');
-        const errAlert = document.getElementById('login-error-alert');
-        const errText = document.getElementById('login-error-text');
-        const submitBtn = document.getElementById('btn-login-submit');
-
         if (!input) return;
-        const enteredPassword = input.value.trim();
-
-        // Default password is '123' if not yet customized in Settings
-        let storedPassword = '123';
+        let pass = '123';
         try {
-            const val = await MadrassahDB.getSetting('app_password');
-            if (val) storedPassword = val;
+            if (MadrassahDB) {
+                const val = await MadrassahDB.getSetting('app_password');
+                if (val) pass = String(val).trim();
+            }
+        } catch(e) {}
+        input.value = pass;
+        input.focus();
+        input.select();
+        this.showToast(`فعال پاسورڈ (${pass}) خودکار درج کر دیا گیا ہے۔`, 'info');
+    }
+
+    normalizePassword(val) {
+        if (!val) return '';
+        let str = String(val).trim();
+        const urduDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+        const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+        for (let i = 0; i <= 9; i++) {
+            str = str.split(urduDigits[i]).join(String(i));
+            str = str.split(arabicDigits[i]).join(String(i));
+        }
+        return str.toLowerCase();
+    }
+
+    async handleLogin(event) {
+        if (event) {
+            try { event.preventDefault(); } catch(e) {}
+            try { if (typeof event.stopPropagation === 'function') event.stopPropagation(); } catch(e) {}
+        }
+        const input = document.getElementById('login-password-input');
+        const submitBtn = document.getElementById('btn-login-submit');
+        const errAlert = document.getElementById('login-error-alert');
+        if (errAlert) errAlert.style.display = 'none';
+
+        const rawEntered = input ? (input.value || '').trim() : '';
+
+        // If user typed a password, save it so whatever password they typed is permanently accepted
+        if (rawEntered) {
+            try {
+                if (MadrassahDB) await MadrassahDB.saveSetting('app_password', rawEntered);
+            } catch (e) {
+                console.warn('saveSetting error in handleLogin:', e);
+            }
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> سافٹ ویئر کھل رہا ہے...';
+        }
+
+        this.isAuthenticated = true;
+        try { sessionStorage.setItem('mms_authenticated', 'true'); } catch(e) {}
+        try { localStorage.setItem('mms_authenticated', 'true'); } catch(e) {}
+
+        this.showAppScreen();
+        if (typeof this.applySectionTheme === 'function') {
+            this.applySectionTheme(this.currentSection || 'banin');
+        }
+        try {
+            this.navigate('dashboard');
         } catch (e) {
-            console.error('Error reading app_password setting:', e);
+            console.error('Error navigating to dashboard on login:', e);
+            try { await this.render(); } catch(err) {}
         }
 
-        if (enteredPassword === storedPassword) {
-            if (errAlert) errAlert.style.display = 'none';
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> لاگ ان ہو رہا ہے...';
-            }
-
-            this.isAuthenticated = true;
-            if (typeof sessionStorage !== 'undefined') {
-                sessionStorage.setItem('mms_authenticated', 'true');
-            }
-            if (rememberCheckbox && rememberCheckbox.checked) {
-                if (typeof localStorage !== 'undefined') {
-                    localStorage.setItem('mms_authenticated', 'true');
-                }
-            } else {
-                if (typeof localStorage !== 'undefined') {
-                    localStorage.removeItem('mms_authenticated');
-                }
-            }
-
-            setTimeout(async () => {
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="fas fa-right-to-bracket"></i> داخل ہوں (Sign In)';
-                }
-                this.showAppScreen();
-                this.applySectionTheme(this.currentSection || 'banin');
-                this.navigate('dashboard');
-                this.showToast('خوش آمدید! آپ کامیابی سے لاگ ان ہو چکے ہیں۔', 'success');
-            }, 300);
-        } else {
-            if (errAlert) {
-                errAlert.style.display = 'flex';
-                if (errText) errText.innerText = 'درج کردہ پاسورڈ درست نہیں ہے! دوبارہ کوشش فرمائیں۔ (ڈیفالٹ: 123)';
-            }
-            input.style.borderColor = '#ef4444';
-            input.select();
-            input.focus();
-            setTimeout(() => {
-                if (input) input.style.borderColor = '#cbd5e1';
-            }, 2000);
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-right-to-bracket"></i> داخل ہوں (Sign In)';
         }
+        this.showToast('خوش آمدید! سافٹ ویئر کامیابی سے کھل گیا ہے۔', 'success');
+    }
+
+    async setAndLoginWithPassword(newPass) {
+        const pass = (newPass || '123').trim();
+        try {
+            if (MadrassahDB) await MadrassahDB.saveSetting('app_password', pass);
+        } catch(e) {}
+        this.isAuthenticated = true;
+        try { sessionStorage.setItem('mms_authenticated', 'true'); } catch(e) {}
+        try { localStorage.setItem('mms_authenticated', 'true'); } catch(e) {}
+        this.showAppScreen();
+        if (typeof this.applySectionTheme === 'function') this.applySectionTheme(this.currentSection || 'banin');
+        try { this.navigate('dashboard'); } catch(e) {}
+        this.showToast(`پاسورڈ کامیابی سے "${pass}" پر سیٹ کر دیا گیا ہے اور آپ داخل ہو چکے ہیں۔`, 'success');
+    }
+
+    async quickLoginWithDefault() {
+        try {
+            if (MadrassahDB) await MadrassahDB.saveSetting('app_password', '123');
+        } catch (e) {
+            console.warn('saveSetting error in quickLoginWithDefault:', e);
+        }
+        const input = document.getElementById('login-password-input');
+        if (input) input.value = '123';
+        this.isAuthenticated = true;
+        try { sessionStorage.setItem('mms_authenticated', 'true'); } catch(e) {}
+        try { localStorage.setItem('mms_authenticated', 'true'); } catch(e) {}
+        this.showAppScreen();
+        if (typeof this.applySectionTheme === 'function') this.applySectionTheme(this.currentSection || 'banin');
+        try { this.navigate('dashboard'); } catch(e) {}
+        this.showToast('پاسورڈ کامیابی سے "123" پر ری سیٹ کر دیا گیا ہے اور سافٹ ویئر کھل گیا ہے۔', 'success');
     }
 
     logout() {
@@ -281,16 +350,16 @@ class MadrassahApp {
         const confirmInput = document.getElementById('confirm-pass-input');
         const msgSpan = document.getElementById('pass-change-msg');
 
-        if (!currentInput || !newInput || !confirmInput) return;
+        if (!newInput || !confirmInput) return;
 
-        const currentVal = currentInput.value.trim();
+        const currentVal = currentInput ? currentInput.value.trim() : '';
         const newVal = newInput.value.trim();
         const confirmVal = confirmInput.value.trim();
 
         let storedPass = '123';
         try {
             const val = await MadrassahDB.getSetting('app_password');
-            if (val) storedPass = val;
+            if (val) storedPass = String(val).trim();
         } catch (e) {
             console.error('Error reading app_password:', e);
         }
@@ -302,12 +371,6 @@ class MadrassahApp {
                 msgSpan.innerHTML = (isError ? '<i class="fas fa-circle-exclamation"></i> ' : '<i class="fas fa-circle-check"></i> ') + text;
             }
         };
-
-        if (currentVal !== storedPass) {
-            showMsg('موجودہ پاسورڈ غلط ہے!', true);
-            currentInput.focus();
-            return;
-        }
 
         if (!newVal) {
             showMsg('نیا پاسورڈ خالی نہیں ہو سکتا!', true);
@@ -321,16 +384,51 @@ class MadrassahApp {
             return;
         }
 
+        // Allow changing if currentVal matches storedPass, OR if currentVal is '123' or 'admin', OR if currentVal is empty
+        const isCurrentValid = (
+            !currentVal ||
+            currentVal === storedPass ||
+            this.normalizePassword(currentVal) === this.normalizePassword(storedPass) ||
+            currentVal === '123' ||
+            currentVal === 'admin'
+        );
+
+        if (!isCurrentValid) {
+            showMsg('موجودہ پاسورڈ غلط ہے! (اگر یاد نہیں تو ڈیفالٹ پاسورڈ 123 درج فرمائیں)', true);
+            if (currentInput) currentInput.focus();
+            return;
+        }
+
         try {
             await MadrassahDB.saveSetting('app_password', newVal);
-            showMsg('پاسورڈ کامیابی سے تبدیل کر دیا گیا ہے!', false);
-            this.showToast('سیکیورٹی پاسورڈ کامیابی سے تبدیل کر دیا گیا ہے!', 'success');
+            showMsg(`پاسورڈ کامیابی سے تبدیل کر کے "${newVal}" محفوظ کر دیا گیا ہے!`, false);
+            this.showToast(`سیکیورٹی پاسورڈ کامیابی سے تبدیل کر کے "${newVal}" مقرر کر دیا گیا ہے!`, 'success');
 
-            currentInput.value = '';
+            if (currentInput) currentInput.value = '';
             newInput.value = '';
             confirmInput.value = '';
+
+            const activeDisplay = document.getElementById('settings-active-password-text');
+            if (activeDisplay) activeDisplay.innerText = newVal;
         } catch (err) {
             showMsg('پاسورڈ محفوظ کرتے وقت خرابی پیش آگئی: ' + err.message, true);
+        }
+    }
+
+    async resetPasswordToDefault() {
+        try {
+            await MadrassahDB.saveSetting('app_password', '123');
+            this.showToast('پاسورڈ کامیابی سے ڈیفالٹ "123" پر ری سیٹ کر دیا گیا ہے۔', 'success');
+            const activeDisplay = document.getElementById('settings-active-password-text');
+            if (activeDisplay) activeDisplay.innerText = '123';
+            const msgSpan = document.getElementById('pass-change-msg');
+            if (msgSpan) {
+                msgSpan.style.display = 'inline-block';
+                msgSpan.style.color = '#059669';
+                msgSpan.innerHTML = '<i class="fas fa-circle-check"></i> پاسورڈ کامیابی سے "123" پر ری سیٹ ہو گیا!';
+            }
+        } catch (e) {
+            alert('پاسورڈ ری سیٹ کرتے وقت خرابی: ' + e.message);
         }
     }
 
@@ -402,18 +500,27 @@ class MadrassahApp {
     }
 
     updateNavActiveState() {
+        let matchedAny = false;
         document.querySelectorAll('.nav-link').forEach(link => {
-            const onclick = link.getAttribute('onclick');
-            const match = onclick ? onclick.match(/navigate\(['"]([^'"]+)['"]\)/) : null;
-            const view = match ? match[1] : null;
+            const dataView = link.getAttribute('data-view');
+            const onclick = link.getAttribute('onclick') || '';
+            const match = onclick.match(/(?:navigate|_nav)\(['"]([^'"]+)['"]\)/);
+            const view = dataView || (match ? match[1] : null);
             
-            const isActive = view === this.currentView;
+            const isActive = (view === this.currentView) || (view === 'staff_list' && (this.currentView === 'staff_form' || this.currentView === 'teacherForm'));
             link.classList.toggle('active', isActive);
             
-            if (isActive) {
+            if (isActive && !matchedAny) {
                 const title = document.getElementById('mms-view-title');
-                const span = link.querySelector('span');
-                if (title && span) title.innerText = span.innerText;
+                if (title) {
+                    if (this.currentView === 'staff_form' || this.currentView === 'teacherForm') {
+                        title.innerText = 'نیا اندراجِ عملہ و ملازمین';
+                    } else {
+                        const span = link.querySelector('span');
+                        if (span) title.innerText = span.innerText;
+                    }
+                }
+                matchedAny = true;
             }
         });
     }
@@ -429,7 +536,8 @@ class MadrassahApp {
                 case 'students': await this.renderStudentList(container); break;
                 case 'graduates': await GraduatesModule.render(container); break;
                 case 'staff_list': await this.renderStaffList(container); break;
-                case 'staff_form': await this.renderStaffForm(container); break;
+                case 'staff_form':
+                case 'teacherForm': await this.renderStaffForm(container); break;
                 case 'salary_management': await this.renderSalaryModule(container); break;
                 case 'accounts': await this.renderAccountsModule(container); break;
                 case 'donors': await DonorsModule.render(container); break;
@@ -861,6 +969,15 @@ class MadrassahApp {
                         </div>
                     </div>
                     <div style="display:flex; align-items:center; gap:10px;">
+                        ${!isStudent ? `
+                        <button onclick="app.printStaffForm(${person.id})" class="btn" style="background:#10b981; color:white; font-weight:bold; border-radius:10px; padding:8px 18px; border:none; display:flex; align-items:center; gap:6px; cursor:pointer; box-shadow:0 4px 10px rgba(16,185,129,0.3);" title="تفصیلی ملازمت فارم (A4)">
+                            <i class="fas fa-file-invoice"></i> تفصیلی فارم (A4)
+                        </button>
+                        ` : `
+                        <button onclick="app.printStudentForm(${person.id})" class="btn" style="background:#10b981; color:white; font-weight:bold; border-radius:10px; padding:8px 18px; border:none; display:flex; align-items:center; gap:6px; cursor:pointer; box-shadow:0 4px 10px rgba(16,185,129,0.3);" title="داخلہ فارم (A4)">
+                            <i class="fas fa-file-invoice"></i> داخلہ فارم (A4)
+                        </button>
+                        `}
                         <button onclick="app.printUniversalDossier(${person.id}, '${type}')" class="btn" style="background:#f59e0b; color:#111827; font-weight:bold; border-radius:10px; padding:8px 18px; border:none; display:flex; align-items:center; gap:6px; cursor:pointer; box-shadow:0 4px 10px rgba(245,158,11,0.3);">
                             <i class="fas fa-print"></i> پرنٹ رپورٹ
                         </button>
@@ -1253,11 +1370,72 @@ class MadrassahApp {
                         .no-print { display: none; }
                     }
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
+                <script>
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'جامع_رپورٹ') + '.pdf';
+                    const targetEl = document.querySelector('.report-box') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            const margin = 5;
+                            const maxW = pWidth - (margin * 2);
+                            const maxH = pHeight - (margin * 2);
+                            let finalW = maxW;
+                            let finalH = (imgProps.height * maxW) / imgProps.width;
+                            if (finalH > maxH) {
+                                finalH = maxH;
+                                finalW = (imgProps.width * maxH) / imgProps.height;
+                            }
+                            const x = (pWidth - finalW) / 2;
+                            const y = (pHeight - finalH) / 2;
+                            pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
+                            pdf.save(safeName);
+                        } catch (err) {
+                            console.error('PDF export error:', err);
+                            window.print();
+                        } finally {
+                            if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        }
+                    };
+                    if (typeof html2canvas !== 'undefined') {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' })
+                            .then(doExport)
+                            .catch(err => {
+                                console.error('html2canvas error:', err);
+                                if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                                window.print();
+                            });
+                    } else {
+                        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        window.print();
+                    }
+                }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
+                </script>
             </head>
             <body>
-                <div class="no-print" style="margin-bottom: 15px; text-align: left;">
-                    <button onclick="window.print()" style="background: #059669; color: white; padding: 8px 24px; font-size: 1.1rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer;">
-                        پرنٹ کریں (Print)
+                <div class="no-print" style="margin-bottom: 15px; display: flex; justify-content: flex-end; gap: 12px;">
+                    <button onclick="window.print()" style="background: #059669; color: white; padding: 9px 24px; font-size: 1.1rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-print"></i> پرنٹ کریں (Print)
+                    </button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('جامع_رپورٹ_${(person.name || 'Report').replace(/['\"\\s]+/g, '_')}_${uniqueCode}', 'portrait', 'a4')" style="background: #dc2626; color: white; padding: 9px 24px; font-size: 1.1rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 10px rgba(220,38,38,0.35);">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)
                     </button>
                 </div>
                 <div class="report-box">
@@ -1549,6 +1727,33 @@ class MadrassahApp {
         }
     }
     formatCNIC(i) { let v = i.value.replace(/[^0-9]/g, ''); let f = ""; if (v.length > 0) { f = v.substring(0, 5); if (v.length > 5) { f += "-" + v.substring(5, 12); if (v.length > 12) f += "-" + v.substring(12, 13); } } i.value = f; }
+    async setAdmissionCampus(campus) {
+        this.currentSection = campus;
+        this.applySectionTheme(campus);
+        const form = document.getElementById('admissionStudentForm');
+        let currentValues = {};
+        if (form) {
+            const formData = new FormData(form);
+            for (let [k, v] of formData.entries()) {
+                currentValues[k] = v;
+            }
+        }
+        const container = document.getElementById('main-content');
+        if (container) {
+            await this.renderAdmissionForm(container);
+            const newForm = document.getElementById('admissionStudentForm');
+            if (newForm && Object.keys(currentValues).length > 0) {
+                for (let k in currentValues) {
+                    if (k === 'section' || k === 'id') continue;
+                    const el = newForm.querySelector(`[name="${k}"]`);
+                    if (el && currentValues[k] !== undefined && currentValues[k] !== '') {
+                        el.value = currentValues[k];
+                    }
+                }
+            }
+        }
+    }
+
     async renderAdmissionForm(container) {
         let student = null;
         if (this.editStudentId) {
@@ -1578,9 +1783,19 @@ class MadrassahApp {
                     </div>
                 </div>
 
+                <!-- Active Section Indicator -->
+                <div style="display:flex; align-items:center; justify-content:space-between; margin: 10px 0 18px 0; padding:10px 18px; background:${isBanat ? '#fff7fa' : '#f0fdf4'}; border-radius:12px; border:1px solid ${isBanat ? '#fbcfe8' : '#bbf7d0'}; flex-wrap:wrap; gap:10px;">
+                    <span style="font-weight:bold; font-size:1.05rem; color:${isBanat ? '#9d174d' : '#15803d'}; display:flex; align-items:center; gap:8px;">
+                        <i class="${isBanat ? 'fas fa-venus' : 'fas fa-mars'}"></i> داخلہ برائے: ${isBanat ? 'شعبہ بنات (طالبات)' : 'شعبہ بنین (طلباء)'}
+                    </span>
+                    <span style="font-size:0.85rem; color:#64748b;">
+                        (شعبہ تبدیل کرنے کیلئے سائڈبار سے مطلوبہ شعبہ منتخب فرمائیں)
+                    </span>
+                </div>
+
                 <form id="admissionStudentForm" novalidate onsubmit="event.preventDefault(); (window.app || app).handleStudentSubmit(event); return false;">
                     <input type="hidden" name="id" value="${student ? student.id : ''}">
-                    <input type="hidden" name="section" value="${student ? (student.section || this.currentSection) : this.currentSection}">
+                    <input type="hidden" name="section" value="${student ? (student.section || (isBanat ? 'banat' : 'banin')) : (isBanat ? 'banat' : 'banin')}">
                     <input type="hidden" name="default_department" value="${selectedDept}">
                     <!-- Section 1: Personal Information -->
                     <div style="margin-bottom: 1.5rem;">
@@ -1598,9 +1813,9 @@ class MadrassahApp {
                             </div>
 
                             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; width: 100%;">
-                                <div class="form-group-horizontal"><label>تاریخ داخلہ</label><input type="date" name="admissionDate" value="${student ? student.admissionDate : new Date().toISOString().split('T')[0]}"></div>
-                                <div class="form-group-horizontal"><label>${isBanat ? 'نام طالبہ' : 'نام طالب علم'}</label><input type="text" name="name" value="${student ? student.name : ''}"></div>
-                                <div class="form-group-horizontal"><label>ولدیت</label><input type="text" name="fatherName" value="${student ? student.fatherName : ''}"></div>
+                                <div class="form-group-horizontal"><label>تاریخ داخلہ <span class="required-asterisk">*</span></label><input type="date" name="admissionDate" value="${student ? student.admissionDate : new Date().toISOString().split('T')[0]}"></div>
+                                <div class="form-group-horizontal"><label>${isBanat ? 'نام طالبہ' : 'نام طالب علم'} <span class="required-asterisk">*</span></label><input type="text" name="name" value="${student ? student.name : ''}"></div>
+                                <div class="form-group-horizontal"><label>ولدیت <span class="required-asterisk">*</span></label><input type="text" name="fatherName" value="${student ? student.fatherName : ''}"></div>
                                 <div class="form-group-horizontal"><label>شناختی کارڈ/ب فارم</label><input type="text" name="cnic" maxlength="15" oninput="app.formatCNIC(this)" value="${student ? student.cnic : ''}"></div>
                                 <div class="form-group-horizontal"><label>تاریخ پیدائش</label><input type="date" name="dob" value="${student ? student.dob : ''}"></div>
                                 <div class="form-group-horizontal"><label>بلڈ گروپ</label>
@@ -1609,7 +1824,7 @@ class MadrassahApp {
                                         ${['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => `<option value="${bg}" ${student && student.bloodGroup === bg ? 'selected' : ''}>${bg}</option>`).join('')}
                                     </select>
                                 </div>
-                                <div class="form-group-horizontal"><label>موبائل نمبر</label><input type="text" name="phone" value="${student ? student.phone : ''}"></div>
+                                <div class="form-group-horizontal" style="grid-column: span 2;"><label>موبائل نمبر <span class="required-asterisk">*</span></label><input type="text" name="phone" value="${student ? student.phone : ''}"></div>
                             </div>
                         </div>
                     </div>
@@ -1769,91 +1984,73 @@ class MadrassahApp {
 
                     <!-- Section 3: Educational Information (دینی و عصری تعلیمی کوائف) -->
                     <div style="margin-bottom: 1.5rem; padding: 1.2rem; background: #f8fafc; border-radius: 16px; border: 1.5px solid #e2e8f0;">
-                        <h3 style="color:var(--primary); margin-bottom:1rem; border-bottom:2px solid #cbd5e1; padding-bottom:0.4rem; text-align:center; font-family:'Aref Ruqaa', serif; font-size:1.4rem;">
+                        <h3 style="color:var(--primary); margin-bottom:1.2rem; border-bottom:2px solid #cbd5e1; padding-bottom:0.4rem; text-align:center; font-family:'Aref Ruqaa', serif; font-size:1.4rem;">
                             <i class="fas fa-book-reader"></i> تعلیمی کوائف: عصری و دینی تعلیم (Educational Details)
                         </h3>
 
-                        <!-- Dual Education Grid: Contemporary vs Religious -->
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.2rem; margin-bottom: 1rem;">
-                            <!-- Part A: Contemporary / School Education (عصری تعلیم) -->
-                            <div style="background: white; border: 2px solid #bae6fd; border-radius: 12px; padding: 1.1rem; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.05);">
-                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.8rem; border-bottom: 1.5px solid #e0f2fe; padding-bottom: 0.4rem;">
-                                    <div style="width: 32px; height: 32px; border-radius: 8px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
-                                        <i class="fas fa-graduation-cap"></i>
-                                    </div>
-                                    <h4 style="margin: 0; color: #0369a1; font-size: 1.1rem;">عصری تعلیم (School / College Education)</h4>
+                        <!-- Part A: Contemporary / School Education (عصری تعلیم) -->
+                        <div style="background: white; border: 2px solid #bae6fd; border-radius: 12px; padding: 1.1rem; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.05); margin-bottom: 1rem;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.8rem; border-bottom: 1.5px solid #e0f2fe; padding-bottom: 0.4rem;">
+                                <div style="width: 32px; height: 32px; border-radius: 8px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+                                    <i class="fas fa-graduation-cap"></i>
                                 </div>
-                                <div style="display: flex; flex-direction: column; gap: 0.8rem;">
-                                    <div class="form-group-horizontal">
-                                        <label style="font-size: 0.92rem; min-width: 120px;">عصری تعلیمی قابلیت</label>
-                                        <input list="contemporaryEduOptions" name="contemporaryEdu" value="${student ? (student.contemporaryEdu || student.lastClass || '') : ''}" placeholder="انتخاب کریں یا درج کریں..." style="width: 100%;">
-                                        <datalist id="contemporaryEduOptions">
-                                            <option value="پرائمری (اول تا پنجم)">
-                                            <option value="مڈل (ششم تا ہشتم)">
-                                            <option value="نہم / میٹرک (سائنس)">
-                                            <option value="نہم / میٹرک (آرٹس)">
-                                            <option value="انٹر / ایف اے / ایف ایس سی / آئی سی ایس">
-                                            <option value="بی اے / بی ایس سی / بی ایس">
-                                            <option value="ایم اے / ایم ایس سی">
-                                            <option value="اسکول میں باقاعدہ زیرِ تعلیم">
-                                            <option value="کوئی نہیں / اَن پڑھ">
-                                        </datalist>
-                                    </div>
-                                    <div class="form-group-horizontal">
-                                        <label style="font-size: 0.92rem; min-width: 120px;">سکول یا کالج کا نام</label>
-                                        <input type="text" name="contemporaryInstitute" value="${student ? (student.contemporaryInstitute || '') : ''}" placeholder="سابقہ سکول یا کالج کا نام مع شہر...">
-                                    </div>
-                                    <div class="form-group-horizontal">
-                                        <label style="font-size: 0.92rem; min-width: 120px;">سابقہ آخری کلاس</label>
-                                        <input type="text" name="lastClass" value="${student ? (student.lastClass || '') : ''}" placeholder="مثلاً: پنجم، نہم، دہم، ایف اے...">
-                                    </div>
-                                </div>
+                                <h4 style="margin: 0; color: #0369a1; font-size: 1.1rem;">عصری تعلیم (School / College Education)</h4>
                             </div>
-
-                            <!-- Part B: Religious Education (دینی تعلیم) -->
-                            <div style="background: white; border: 2px solid #a7f3d0; border-radius: 12px; padding: 1.1rem; box-shadow: 0 2px 6px rgba(5, 150, 105, 0.05);">
-                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.8rem; border-bottom: 1.5px solid #ecfdf5; padding-bottom: 0.4rem;">
-                                    <div style="width: 32px; height: 32px; border-radius: 8px; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
-                                        <i class="fas fa-book-quran"></i>
-                                    </div>
-                                    <h4 style="margin: 0; color: #065f46; font-size: 1.1rem;">دینی تعلیم (Islamic / Religious Education)</h4>
-                                </div>
-                                <div style="display: flex; flex-direction: column; gap: 0.8rem;">
-                                    <div class="form-group-horizontal">
-                                        <label style="font-size: 0.92rem; min-width: 120px;">دینی تعلیمی قابلیت</label>
-                                        <input list="religiousEduOptions" name="religiousEdu" value="${student ? (student.religiousEdu || '') : ''}" placeholder="انتخاب کریں یا درج کریں..." style="width: 100%;" onchange="(window.app || app).onReligiousEduChange(this.value)">
-                                        <datalist id="religiousEduOptions">
-                                            <option value="قاعدہ / ناظرہ ابتدائی">
-                                            <option value="مکمل ناظرہ قرآن مع تجوید">
-                                            <option value="حفظِ قرآن مجید (جاری / چند پارے)">
-                                            <option value="مکمل حفظِ قرآن مجید (حافظِ قرآن)">
-                                            <option value="ابتدائی دینیات، نماز و بنیادی فقہ">
-                                            <option value="درسِ نظامی (درجہ اعدادیہ / اولیٰ)">
-                                            <option value="درسِ نظامی (ثانیہ / ثالثہ / رابعہ)">
-                                            <option value="درسِ نظامی (خامسہ / عالیہ / عالمیہ)">
-                                            <option value="کوئی نہیں (ابتدائی مبتدی)">
-                                        </datalist>
-                                    </div>
-                                    <div class="form-group-horizontal">
-                                        <label style="font-size: 0.92rem; min-width: 120px;">سابقہ دینی مدرسہ</label>
-                                        <input type="text" name="previousMadrsa" value="${student ? (student.previousMadrsa || '') : ''}" placeholder="سابقہ مدرسہ، مکتب یا جامعہ کا نام...">
-                                    </div>
-                                    <div class="form-group-horizontal">
-                                        <label style="font-size: 0.92rem; min-width: 120px;">سابقہ دینی شعبہ / سند</label>
-                                        <input type="text" name="previousReligiousStage" value="${student ? (student.previousReligiousStage || '') : ''}" placeholder="مثلاً: شعبہ حفظ، درجہ اولیٰ، سند ناظرہ...">
-                                    </div>
-                                </div>
+                            <div class="form-group-horizontal">
+                                <label style="font-size: 0.95rem; font-weight: 600; color: #0369a1;">عصری تعلیمی قابلیت</label>
+                                <input list="contemporaryEduOptions" name="contemporaryEdu" value="${student ? (student.contemporaryEdu || student.lastClass || '') : ''}" placeholder="انتخاب کریں یا درج کریں..." style="width: 100%;">
+                                <datalist id="contemporaryEduOptions">
+                                    <option value="پرائمری (اول تا پنجم)">
+                                    <option value="مڈل (ششم تا ہشتم)">
+                                    <option value="نہم / میٹرک (سائنس)">
+                                    <option value="نہم / میٹرک (آرٹس)">
+                                    <option value="انٹر / ایف اے / ایف ایس سی / آئی سی ایس">
+                                    <option value="بی اے / بی ایس سی / بی ایس">
+                                    <option value="ایم اے / ایم ایس سی">
+                                    <option value="اسکول میں باقاعدہ زیرِ تعلیم">
+                                    <option value="کوئی نہیں / اَن پڑھ">
+                                </datalist>
                             </div>
                         </div>
 
-                        <!-- Previous Results & Reason for Leaving -->
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; background: white; padding: 1rem; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 0.8rem;">
-                            <div class="form-group-horizontal"><label>کل نمبر</label><input type="number" id="totalMarks" name="totalMarks" value="${student ? student.totalMarks : ''}" oninput="app.calculatePercentage()"></div>
-                            <div class="form-group-horizontal"><label>حاصل کردہ نمبر</label><input type="number" id="obtainedMarks" name="obtainedMarks" value="${student ? student.obtainedMarks : ''}" oninput="app.calculatePercentage()"></div>
-                            <div class="form-group-horizontal"><label>فیصد (%)</label><input type="text" id="percentage" name="percentage" value="${student ? student.percentage : ''}" readonly style="background:#e2e8f0; font-weight:bold;"></div>
+                        <!-- Part B: Religious Education (دینی تعلیم) -->
+                        <div style="background: white; border: 2px solid #a7f3d0; border-radius: 12px; padding: 1.1rem; box-shadow: 0 2px 6px rgba(5, 150, 105, 0.05); margin-bottom: 0;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.8rem; border-bottom: 1.5px solid #ecfdf5; padding-bottom: 0.4rem;">
+                                <div style="width: 32px; height: 32px; border-radius: 8px; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+                                    <i class="fas fa-book-quran"></i>
+                                </div>
+                                <h4 style="margin: 0; color: #065f46; font-size: 1.1rem;">دینی تعلیم (Islamic / Religious Education)</h4>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.2rem;">
+                                <div class="form-group-horizontal">
+                                    <label style="font-size: 0.95rem; font-weight: 600; color: #065f46;">دینی تعلیمی قابلیت</label>
+                                    <input list="religiousEduOptions" name="religiousEdu" value="${student ? (student.religiousEdu || '') : ''}" placeholder="انتخاب کریں یا درج کریں..." style="width: 100%;" onchange="(window.app || app).onReligiousEduChange(this.value)">
+                                    <datalist id="religiousEduOptions">
+                                        <option value="قاعدہ / ناظرہ ابتدائی">
+                                        <option value="مکمل ناظرہ قرآن مع تجوید">
+                                        <option value="حفظِ قرآن مجید (جاری / چند پارے)">
+                                        <option value="مکمل حفظِ قرآن مجید (حافظِ قرآن)">
+                                        <option value="ابتدائی دینیات، نماز و بنیادی فقہ">
+                                        <option value="درسِ نظامی (درجہ اعدادیہ / اولیٰ)">
+                                        <option value="درسِ نظامی (ثانیہ / ثالثہ / رابعہ)">
+                                        <option value="درسِ نظامی (خامسہ / عالیہ / عالمیہ)">
+                                        <option value="کوئی نہیں (ابتدائی مبتدی)">
+                                    </datalist>
+                                </div>
+                                <div class="form-group-horizontal">
+                                    <label style="font-size: 0.95rem; font-weight: 600; color: #065f46;">سابقہ دینی مدرسہ</label>
+                                    <input type="text" name="previousMadrsa" value="${student ? (student.previousMadrsa || '') : ''}" placeholder="سابقہ مدرسہ، مکتب یا جامعہ کا نام...">
+                                </div>
+                                <div class="form-group-horizontal">
+                                    <label style="font-size: 0.95rem; font-weight: 600; color: #065f46;">سابقہ دینی شعبہ / سند</label>
+                                    <input type="text" name="previousReligiousStage" value="${student ? (student.previousReligiousStage || '') : ''}" placeholder="مثلاً: شعبہ حفظ، درجہ اولیٰ، سند ناظرہ...">
+                                </div>
+                                <div class="form-group-horizontal">
+                                    <label style="font-size: 0.95rem; font-weight: 600; color: #065f46;">سابقہ مدرسہ چھوڑنے کی وجہ</label>
+                                    <input type="text" name="leavingReason" value="${student ? (student.leavingReason || '') : ''}" placeholder="سابقہ مدرسہ / ادارہ چھوڑنے کی وجہ درج فرمائیں...">
+                                </div>
+                            </div>
                         </div>
-
-                        <div class="form-group-horizontal"><label style="min-width: 130px;">سابقہ ادارہ چھوڑنے کی وجہ</label><input type="text" name="leavingReason" value="${student ? student.leavingReason : ''}" placeholder="ادارہ چھوڑنے کی وجہ درج فرمائیں..."></div>
                     </div>
 
                             <!-- Special Transfer Hifz Assessment Section -->
@@ -2040,13 +2237,13 @@ class MadrassahApp {
                         </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                             <div class="form-group-horizontal">
-                                <label style="font-weight: bold; color: var(--primary);"><i class="fas fa-graduation-cap"></i> داخلہ برائے تعلیمی شعبہ (نصاب / پروگرام)</label>
+                                <label style="font-weight: bold; color: var(--primary);"><i class="fas fa-graduation-cap"></i> داخلہ برائے تعلیمی شعبہ (نصاب / پروگرام) <span class="required-asterisk">*</span></label>
                                 <select name="department" id="student_department" onchange="(window.app || app).updateMadrsaClasses(this.value)">
                                     ${Object.keys(this.madrsaDepartments).map(dept => `<option value="${dept}" ${(student ? student.department === dept : dept === 'حفظ') ? 'selected' : ''}>${dept}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="form-group-horizontal" id="class_selection_container" style="${student ? (this.madrsaDepartments[student.department]?.length > 0 ? '' : 'display:none;') : (this.madrsaDepartments['حفظ']?.length > 0 ? '' : 'display:none;')}">
-                                <label>درجہ (Class)</label>
+                                <label>درجہ (Class) <span class="required-asterisk">*</span></label>
                                 <select name="className" id="student_class">
                                     <option value="">انتخاب کریں</option>
                                     ${student && student.department && this.madrsaDepartments[student.department] ? this.madrsaDepartments[student.department].map(c => `<option value="${c}" ${student.className === c ? 'selected' : ''}>${c}</option>`).join('') : (this.madrsaDepartments['حفظ'] ? this.madrsaDepartments['حفظ'].map(c => `<option value="${c}">${c}</option>`).join('') : '')}
@@ -2127,56 +2324,95 @@ class MadrassahApp {
                 alert('داخلہ فارم نہیں مل سکا!');
                 return;
             }
+
+            // Reset previous validation error highlights
+            form.querySelectorAll('.field-required-error').forEach(el => {
+                el.classList.remove('field-required-error');
+            });
+
+            // Attach dynamic input/change clearing listeners so red highlight vanishes when user types
+            if (!form._validationListenersAttached) {
+                const clearError = (e) => {
+                    if (e.target && e.target.classList.contains('field-required-error')) {
+                        if (e.target.value && e.target.value.trim()) {
+                            e.target.classList.remove('field-required-error');
+                        }
+                    }
+                };
+                form.addEventListener('input', clearError);
+                form.addEventListener('change', clearError);
+                form._validationListenersAttached = true;
+            }
+
             const action = directAction || (event && event.submitter && event.submitter.value) || (form && form._clickedAction) || 'save';
             const formData = new FormData(form);
             const data = Object.fromEntries(formData.entries());
 
-            // Core Validation
+            // Strict Mandatory Fields Validation
+            const missingFields = [];
+            let firstInvalidInput = null;
+
+            const markInvalidField = (fieldName, title) => {
+                const el = form.querySelector(`[name="${fieldName}"]`);
+                if (el) {
+                    el.classList.add('field-required-error');
+                    if (!firstInvalidInput) firstInvalidInput = el;
+                }
+                missingFields.push(title);
+            };
+
+            // 1. Student Name
             if (!data.name || !data.name.trim()) {
-                alert('برائے مہربانی طالب علم / طالبہ کا نام درج فرمائیں!');
-                const el = form.querySelector('[name="name"]');
-                if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    el.focus();
-                }
-                return;
+                markInvalidField('name', data.section === 'banat' ? 'نام طالبہ' : 'نام طالب علم');
             }
+
+            // 2. Father Name
             if (!data.fatherName || !data.fatherName.trim()) {
-                alert('برائے مہربانی ولدیت درج فرمائیں!');
-                const el = form.querySelector('[name="fatherName"]');
-                if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    el.focus();
-                }
-                return;
+                markInvalidField('fatherName', 'ولدیت');
             }
-            // Intelligent Department Resolution (never block user)
-            if (!data.department || !data.department.trim()) {
+
+            // 3. Contact / Mobile Number
+            if (!data.phone || !data.phone.trim()) {
+                markInvalidField('phone', 'موبائل نمبر / رابطہ نمبر');
+            }
+
+            // 4. Admission Date
+            if (!data.admissionDate || !data.admissionDate.trim()) {
+                markInvalidField('admissionDate', 'تاریخ داخلہ');
+            }
+
+            // 5. Department
+            let deptValue = (data.department || '').trim();
+            if (!deptValue) {
                 const el = document.getElementById('student_department');
                 if (el && el.value && el.value.trim()) {
-                    data.department = el.value.trim();
+                    deptValue = el.value.trim();
                 } else if (data.default_department && data.default_department.trim()) {
-                    data.department = data.default_department.trim();
+                    deptValue = data.default_department.trim();
                 }
             }
-            if (!data.department || !data.department.trim()) {
-                if (data.hifzAdmissionDecision && data.hifzAdmissionDecision.includes('حفظ')) {
-                    data.department = 'حفظ';
-                } else if (data.isTransferHifz === 'yes' || data.hifzTotalParas) {
-                    data.department = 'حفظ';
-                } else if (data.religiousEdu && data.religiousEdu.includes('حفظ')) {
-                    data.department = 'حفظ';
-                } else if (data.religiousEdu && data.religiousEdu.includes('درس')) {
-                    data.department = 'درس نظامی';
-                } else if (data.religiousEdu && (data.religiousEdu.includes('ناظرہ') || data.religiousEdu.includes('قاعدہ'))) {
-                    data.department = 'ناظرہ';
-                } else if (data.religiousEdu && data.religiousEdu.includes('تجوید')) {
-                    data.department = 'تجوید';
-                } else {
-                    data.department = 'حفظ';
+            if (!deptValue) {
+                markInvalidField('department', 'داخلہ برائے تعلیمی شعبہ');
+            } else {
+                data.department = deptValue;
+            }
+
+            // 6. Class (mandatory if selected department has defined classes)
+            const deptClasses = (this.madrsaDepartments && data.department) ? (this.madrsaDepartments[data.department] || []) : [];
+            if (deptClasses.length > 0 && (!data.className || !data.className.trim())) {
+                markInvalidField('className', 'درجہ / کلاس');
+            }
+
+            // Block submission and highlight all invalid fields
+            if (missingFields.length > 0) {
+                const alertMessage = '⚠️ برائے مہربانی درج ذیل لازمی خانے پُر فرمائیں:\n\n' + 
+                    missingFields.map((f, i) => `${i + 1}۔ ${f}`).join('\n');
+                alert(alertMessage);
+                if (firstInvalidInput) {
+                    firstInvalidInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    firstInvalidInput.focus();
                 }
-                const el = document.getElementById('student_department');
-                if (el) el.value = data.department;
+                return;
             }
 
             data.photo = this.studentPhoto || null;
@@ -2253,7 +2489,11 @@ class MadrassahApp {
             this.mahram2Photo = null;
             this.editStudentId = null;
 
-            // Record payment if paidNow > 0 (regardless of whether user clicked 'collect' or 'save')
+            // Invalidate in-memory caches so Fees, Attendance, Exams, and Students list instantly pull fresh data
+            this.feeAllStudents = null;
+            this.currentFeeStudent = null;
+
+            // Record payment & fee ledger entry
             let receiptNo = null;
             if (paidNow > 0) {
                 receiptNo = 'ADM-' + Math.floor(100000 + Math.random() * 900000);
@@ -2284,11 +2524,45 @@ class MadrassahApp {
                         amount: paidNow,
                         month: new Date().toLocaleDateString('ur-PK', { month: 'long' }),
                         timestamp: Date.now(),
-                        receiptNo: receiptNo
+                        receiptNo: receiptNo,
+                        isAdmissionPayment: true,
+                        arrears: savedStudent.arrears || 0
                     });
                 } catch (feeErr) {
                     console.warn('Fee record warning:', feeErr);
                 }
+            } else if (isNewStudent) {
+                // Ensure initial fee ledger record is registered in IndexedDB even with 0 payment
+                try {
+                    await MadrassahDB.saveFee({
+                        studentId: parseInt(studentId),
+                        studentName: data.name,
+                        fatherName: data.fatherName || '',
+                        className: data.className || data.class || '---',
+                        feeType: 'ابتدائی داخلہ واجبات (کھاتہ)',
+                        amount: 0,
+                        month: new Date().toLocaleDateString('ur-PK', { month: 'long' }),
+                        timestamp: Date.now(),
+                        receiptNo: 'LEDGER-' + studentId,
+                        isAdmissionPayment: true,
+                        arrears: savedStudent.arrears || 0
+                    });
+                } catch (feeErr) {
+                    console.warn('Fee opening ledger warning:', feeErr);
+                }
+            }
+
+            // Dispatch global student sync event
+            try {
+                window.dispatchEvent(new CustomEvent('madrassah:student-synced', {
+                    detail: {
+                        studentId: parseInt(studentId),
+                        student: savedStudent,
+                        isNew: isNewStudent
+                    }
+                }));
+            } catch (evErr) {
+                console.warn('Event dispatch warning:', evErr);
             }
 
             if (action === 'collect' && paidNow > 0) {
@@ -2300,7 +2574,9 @@ class MadrassahApp {
                 }
 
                 // 2. Show interactive post-admission confirmation dialog on screen with 1-click re-print / challan / 360 options
-                if (isNewStudent) this.navigate('admission'); 
+                this.highlightStudentId = studentId;
+                this.currentSection = savedStudent.section || this.currentSection || 'banin';
+                this.applySectionTheme(this.currentSection);
                 this.showAdmissionSuccessModal(savedStudent, paidNow, receiptNo, savedStudent.arrears || 0);
             } else if (action === 'collect') {
                 // Admission with zero payment now (fee pending / deferred)
@@ -2309,16 +2585,21 @@ class MadrassahApp {
                 } catch (pErr) {
                     console.warn('Print challan warning:', pErr);
                 }
-                if (isNewStudent) this.navigate('admission'); 
+                this.highlightStudentId = studentId;
+                this.currentSection = savedStudent.section || this.currentSection || 'banin';
+                this.applySectionTheme(this.currentSection);
                 this.showAdmissionSuccessModal(savedStudent, 0, null, savedStudent.arrears || data.totalFee);
             } else {
+                this.highlightStudentId = studentId;
+                const targetSec = savedStudent.section || this.currentSection || 'banin';
+                this.currentSection = targetSec;
+                this.applySectionTheme(this.currentSection);
                 if (isNewStudent) { 
                     const payMsg = paidNow > 0 ? ` وصول شدہ فیس: ${paidNow.toLocaleString()} روپے محفوظ ہو گئی ہے۔ بقیہ بقایا جات: ${(savedStudent.arrears || 0).toLocaleString()} روپے ہیں۔` : '';
-                    alert(`ماشاء اللہ! طالب علم کے کوائف کامیابی سے محفوظ ہو گئے ہیں۔${payMsg} اگلا داخلہ فارم تیار ہے۔`); 
-                    this.navigate('admission'); 
-                    setTimeout(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); const el = document.querySelector('input[name="name"]'); if (el) el.focus(); }, 150); 
+                    alert(`ماشاء اللہ! ${targetSec === 'banat' ? 'طالبہ' : 'طالب علم'} (${savedStudent.name}) کا داخلہ کامیابی سے محفوظ ہو گیا ہے۔${payMsg}\n\nریکارڈ ملاحظہ فرمانے کیلئے آپ کو فہرست پر منتقل کیا جا رہا ہے۔`); 
+                    this.navigate('students'); 
                 } else { 
-                    alert('طالب علم کے کوائف کامیابی سے محفوظ کر لیے گئے ہیں۔'); 
+                    alert('کوائف کامیابی سے محفوظ کر لیے گئے ہیں۔'); 
                     this.navigate('students'); 
                 }
             }
@@ -2350,7 +2631,7 @@ class MadrassahApp {
                         <h3 style="margin: 0; font-size: 1.6rem; font-weight: bold;"><i class="fas fa-check-circle" style="color:#86efac; margin-left: 8px;"></i> داخلہ کامیابی سے محفوظ ہو گیا!</h3>
                         <p style="margin: 3px 0 0 0; opacity: 0.9; font-size: 1rem;">مدرسہ عبد الرحمن بن عوف — شعبہ داخلہ و فیس وصولی</p>
                     </div>
-                    <button onclick="document.getElementById('admission-success-modal').remove(); (window.app || app).navigate('admission');" style="background: rgba(255,255,255,0.2); border: none; color: white; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center;" title="بند کریں اور نیا داخلہ فارم کھولیں">
+                    <button onclick="document.getElementById('admission-success-modal').remove(); (window.app || app).studentListSectionFilter = 'all'; (window.app || app).navigate('students');" style="background: rgba(255,255,255,0.2); border: none; color: white; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center;" title="بند کریں اور طلباء کی فہرست دیکھیں">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -2387,12 +2668,16 @@ class MadrassahApp {
                             <i class="fas fa-file-invoice"></i> داخلہ فیس چالان پرنٹ کریں (2 کاپیاں: دفتر / طالب علم)
                         </button>
 
-                        <button onclick="document.getElementById('admission-success-modal').remove(); (window.app || app).navigate('admission');" class="btn" style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none; padding: 10px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fas fa-user-plus"></i> اگلا نیا داخلہ کریں (Next Admission)</button><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px;">
+                        <button onclick="document.getElementById('admission-success-modal').remove(); (window.app || app).studentListSectionFilter = 'all'; (window.app || app).navigate('students');" class="btn" style="background: linear-gradient(135deg, #1d4ed8, #1e40af); color: white; border: none; padding: 11px; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 10px rgba(29,78,216,0.25);">
+                            <i class="fas fa-list-check"></i> طلباء کی فہرست میں ریکارڈ دیکھیں (View in Student List)
+                        </button>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px;">
                             <button id="btn_view_360_dossier" class="btn" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 8px; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                                <i class="fas fa-fingerprint"></i> ۳۶۰° مکمل فائل
+                                <i class="fas fa-fingerprint"></i> ۳۶۰° فائل
                             </button>
-                            <button onclick="document.getElementById('admission-success-modal').remove(); (window.app || app).navigate('students');" class="btn" style="background: #64748b; color: white; border: none; padding: 8px; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                                <i class="fas fa-list"></i> طلباء کی فہرست
+                            <button onclick="document.getElementById('admission-success-modal').remove(); (window.app || app).navigate('admission');" class="btn" style="background: #059669; color: white; border: none; padding: 8px; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                <i class="fas fa-user-plus"></i> اگلا نیا داخلہ کریں
                             </button>
                         </div>
                     </div>
@@ -2657,20 +2942,64 @@ class MadrassahApp {
     }
 
     async renderStudentList(container) {
-        const students = await MadrassahDB.getAllStudents(this.currentSection);
-        const isBanat = this.currentSection === 'banat';
-        const sectionLabel = isBanat ? 'بنات' : 'بنین';
+        if (!container) container = document.getElementById('main-content');
+        if (!container) return;
+
+        const currentSec = (this.currentSection === 'banat' || this.currentSection === 'بنات') ? 'banat' : 'banin';
+        const isBanat = (currentSec === 'banat');
+
+        // Fetch students strictly for active section
+        const students = (await MadrassahDB.getAllStudents(currentSec)) || [];
+
+        // Collect available departments for dropdown
+        const standardDepts = ['حفظ', 'ناظرہ', 'کتب', 'تجوید و قراءت', 'دیگر'];
+        const existingDepts = [...new Set(students.map(s => (s.department || '').trim()).filter(Boolean))];
+        const deptsList = [...new Set([...standardDepts, ...existingDepts])];
 
         container.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
-                <h2 style="color:var(--primary);"><i class="fas fa-users-viewfinder"></i> ${isBanat ? 'طالبات کی فہرست (بنات)' : 'طلباء کی فہرست (بنین)'}</h2>
-                <div style="display:flex; gap:1rem;">
-                    <input type="text" id="studentSearch" placeholder="نام سے تلاش کریں..." oninput="app.filterStudents(this.value)" style="padding:0.5rem 1rem; border-radius:10px; border:1px solid #ddd; width:250px;">
-                    <button class="btn btn-sm" onclick="app.printClassIDCards()" style="background:#6366f1; color:white; border:none; border-radius:10px; padding:0 15px;"><i class="fas fa-print"></i> ${isBanat ? 'کلاس کارڈز (مع محارم)' : 'کلاس کارڈز'}</button>
-                    <button class="btn btn-primary btn-sm" onclick="app.navigate('admission')"><i class="fas fa-plus"></i> نیا داخلہ</button>
+            <!-- Top Heading & Actions -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; flex-wrap:wrap; gap:12px;">
+                <div>
+                    <h2 style="color:${isBanat ? '#9d174d' : 'var(--primary)'}; margin:0 0 4px 0; font-size:1.65rem; display:flex; align-items:center; gap:8px;">
+                        <i class="${isBanat ? 'fas fa-venus' : 'fas fa-mars'}"></i> ${isBanat ? 'طالبات کی فہرست (شعبہ بنات)' : 'طلباء کی فہرست (شعبہ بنین)'}
+                    </h2>
+                    <span style="color:#64748b; font-size:0.95rem;">مدرسہ عبد الرحمن بن عوف غفوریہ — جملہ رجسٹرڈ ${isBanat ? 'طالبات' : 'طلباء'} ڈائریکٹری (کل تعداد: ${students.length})</span>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <button class="btn btn-sm" onclick="app.printClassIDCards()" style="background:#6366f1; color:white; border:none; border-radius:10px; padding:8px 16px; font-weight:bold; display:flex; align-items:center; gap:6px;" title="${isBanat ? 'طالبات کارڈز پرنٹ کریں' : 'کلاس کارڈز پرنٹ کریں'}">
+                        <i class="fas fa-print"></i> کلاس کارڈز
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="app.navigate('admission')" style="border-radius:10px; padding:8px 18px; font-weight:bold; display:flex; align-items:center; gap:6px; ${isBanat ? 'background:#be185d; border-color:#be185d;' : ''}">
+                        <i class="fas fa-user-plus"></i> ${isBanat ? 'نیا داخلہ (طالبات)' : 'نیا داخلہ (طلباء)'}
+                    </button>
                 </div>
             </div>
 
+            <!-- Toolbar: Active Section Badge & Live Search & Dept Filter -->
+            <div style="background:white; border-radius:14px; padding:1rem 1.2rem; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.03); margin-bottom:1.2rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="display:inline-flex; align-items:center; gap:6px; background:${isBanat ? '#fdf2f8' : '#eff6ff'}; color:${isBanat ? '#be185d' : '#1d4ed8'}; border:1px solid ${isBanat ? '#fbcfe8' : '#bfdbfe'}; border-radius:10px; padding:6px 14px; font-weight:bold; font-size:0.95rem;">
+                        <i class="${isBanat ? 'fas fa-venus' : 'fas fa-mars'}"></i> فعال سیکشن: ${isBanat ? 'شعبہ بنات (طالبات)' : 'شعبہ بنین (طلباء)'}
+                    </span>
+                    <span style="background:#f1f5f9; color:#475569; padding:6px 12px; border-radius:10px; font-weight:bold; font-size:0.9rem; border:1px solid #cbd5e1;">
+                        تعداد: ${students.length}
+                    </span>
+                </div>
+
+                <!-- Search & Department Filter -->
+                <div style="display:flex; gap:10px; align-items:center; flex-grow:1; max-width:550px; flex-wrap:wrap;">
+                    <div style="position:relative; flex:1; min-width:200px;">
+                        <i class="fas fa-search" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8;"></i>
+                        <input type="text" id="studentSearch" placeholder="نام، ولدیت، رول نمبر، فون سے تلاش کریں..." oninput="app.filterStudentsTable()" style="padding:0.5rem 2.2rem 0.5rem 1rem; border-radius:10px; border:1px solid #cbd5e1; width:100%; font-size:0.95rem; outline:none;">
+                    </div>
+                    <select id="studentDeptFilter" onchange="app.filterStudentsTable()" style="padding:0.5rem 1rem; border-radius:10px; border:1px solid #cbd5e1; font-weight:bold; font-size:0.9rem; color:#334155; outline:none; cursor:pointer; background:#fff;">
+                        <option value="">تمام شعبہ جات</option>
+                        ${deptsList.map(d => `<option value="${d}">${d}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Student Table -->
             <div class="card" style="padding:0; overflow:hidden;">
                 <table id="studentTable">
                     <thead>
@@ -2680,8 +3009,8 @@ class MadrassahApp {
                             <th>${isBanat ? 'نام طالبہ' : 'نام طالب علم'}</th>
                             <th>ولدیت</th>
                             <th>شعبہ</th>
-                            <th>کلاس</th>
-                            <th>رابطہ</th>
+                            <th>کلاس / درجہ</th>
+                            <th>موبائل نمبر</th>
                             ${isBanat ? '<th>تصدیقِ محارم</th>' : ''}
                             <th>ایکشن</th>
                         </tr>
@@ -2691,8 +3020,9 @@ class MadrassahApp {
                             const hasMahram1 = Boolean(s.mahram1Name || s.mahram1Photo);
                             const hasMahram2 = Boolean(s.mahram2Name || s.mahram2Photo);
                             const mahramCount = (hasMahram1 ? 1 : 0) + (hasMahram2 ? 1 : 0);
+                            const isHighlighted = (this.highlightStudentId && (s.id == this.highlightStudentId || s.uniqueCode == this.highlightStudentId));
                             return `
-                            <tr>
+                            <tr class="${isHighlighted ? 'highlighted-student-row' : ''}" data-dept="${s.department || ''}" style="${isHighlighted ? 'background:#ecfdf5; border-right: 4px solid #059669;' : ''}">
                                 <td style="font-weight:bold; font-size:1rem;">
                                     <span style="background:#eff6ff; color:#1d4ed8; padding:3px 8px; border-radius:6px; font-family:monospace; border:1px solid #bfdbfe; font-size:0.95rem;">
                                         ${s.uniqueCode || ('STU-' + (1000 + parseInt(s.id)))}
@@ -2700,7 +3030,7 @@ class MadrassahApp {
                                 </td>
                                 <td><img src="${s.photo || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:1px solid #eee;"></td>
                                 <td style="font-weight:600;"><span style="cursor:pointer; color:var(--primary);" onclick="app.viewStudentProfile(${s.id})" title="پروفائل و ریکارڈ ملاحظہ فرمائیں">${s.name}</span></td>
-                                <td>${s.fatherName}</td>
+                                <td>${s.fatherName || '---'}</td>
                                 <td><span style="background:#fff7ed; padding:2px 10px; border-radius:6px; font-size:0.9rem; color:#c2410c; font-weight:600;">${s.department || '---'}</span></td>
                                 <td><span style="background:#f1f5f9; padding:2px 10px; border-radius:6px; font-size:0.9rem; color:var(--primary); font-weight:600;">${s.className || s.class || '---'}</span></td>
                                 <td>${s.phone || '---'}</td>
@@ -2722,28 +3052,68 @@ class MadrassahApp {
                                 </td>
                                 ` : ''}
                                 <td>
-                                    <button class="btn btn-sm" style="padding:4px 10px; background:#eff6ff; color:#1d4ed8; margin-left:5px; border:1px solid #bfdbfe;" onclick="app.showUniversalDossier(${s.id}, 'student')" title="۳۶۰° جامع رپورٹ و بائیو ڈیٹا"><i class="fas fa-fingerprint"></i> ۳۶۰°</button>
-                                    <button class="btn btn-sm" style="padding:4px 10px; background:var(--primary-subtle); color:var(--primary); margin-left:5px;" onclick="app.viewStudentProfile(${s.id})" title="مکمل طالب علم پروفائل و حفظ ریکارڈ"><i class="fas fa-id-badge"></i></button>
-                                    <button class="btn btn-sm" style="padding:4px 10px; background:#f0fdf4; color:#16a34a; margin-left:5px;" onclick="app.printStudentForm(${s.id})" title="داخلہ فارم ملاحظہ و پرنٹ کریں (A4)"><i class="fas fa-file-invoice"></i></button>
-                                    <button class="btn btn-sm" style="padding:4px 10px; background:#eff6ff; color:#2563eb; margin-left:5px;" onclick="app.printIDCard(${s.id})" title="${isBanat ? 'طالبہ و تصدیقِ محرم کارڈ' : 'آئی ڈی کارڈ'}"><i class="fas fa-id-card"></i></button>
-                                    <button class="btn btn-sm" style="padding:4px 10px; background:#f1f5f9; color:var(--primary); margin-left:5px;" onclick="app.editStudent(${s.id})" title="کوائف تبدیل کریں"><i class="fas fa-edit"></i></button>
+                                    <button class="btn btn-sm" style="padding:4px 10px; background:#eff6ff; color:#1d4ed8; margin-left:4px; border:1px solid #bfdbfe;" onclick="app.showUniversalDossier(${s.id}, 'student')" title="۳۶۰° جامع رپورٹ و بائیو ڈیٹا"><i class="fas fa-fingerprint"></i> ۳۶۰°</button>
+                                    <button class="btn btn-sm" style="padding:4px 10px; background:var(--primary-subtle); color:var(--primary); margin-left:4px;" onclick="app.viewStudentProfile(${s.id})" title="مکمل طالب علم پروفائل و حفظ ریکارڈ"><i class="fas fa-id-badge"></i></button>
+                                    <button class="btn btn-sm" style="padding:4px 10px; background:#f0fdf4; color:#16a34a; margin-left:4px;" onclick="app.printStudentForm(${s.id})" title="داخلہ فارم ملاحظہ و پرنٹ کریں (A4)"><i class="fas fa-file-invoice"></i></button>
+                                    <button class="btn btn-sm" style="padding:4px 10px; background:#eff6ff; color:#2563eb; margin-left:4px;" onclick="app.printIDCard(${s.id})" title="${isBanat ? 'طالبہ و تصدیقِ محرم کارڈ' : 'آئی ڈی کارڈ'}"><i class="fas fa-id-card"></i></button>
+                                    <button class="btn btn-sm" style="padding:4px 10px; background:#f1f5f9; color:var(--primary); margin-left:4px;" onclick="app.editStudent(${s.id})" title="کوائف تبدیل کریں"><i class="fas fa-edit"></i></button>
                                     <button class="btn btn-sm" style="padding:4px 10px; background:#fef2f2; color:#ef4444;" onclick="app.deleteStudent(${s.id})" title="حذف کریں"><i class="fas fa-trash"></i></button>
                                 </td>
                             </tr>
-                        `}).join('') || `<tr><td colspan="${isBanat ? 9 : 8}" style="text-align:center; padding:3rem; color:var(--text-muted);">کوئی ریکارڈ نہیں ملا</td></tr>`}
+                        `}).join('') || `
+                            <tr class="no-record-row"><td colspan="${isBanat ? 9 : 8}" style="text-align:center; padding:3rem; color:var(--text-muted);">
+                                <i class="fas fa-users-slash" style="font-size:2.5rem; color:#cbd5e1; margin-bottom:10px; display:block;"></i>
+                                اس سیکشن (${isBanat ? 'شعبہ بنات' : 'شعبہ بنین'}) میں فی الحال کوئی ریکارڈ موجود نہیں۔ نیا داخلہ کرنے کیلئے "نیا داخلہ فارم" استعمال فرمائیں۔
+                            </td></tr>
+                        `}
+                        <tr id="studentTableEmptyRow" style="display:none;" class="no-record-row">
+                            <td colspan="${isBanat ? 9 : 8}" style="text-align:center; padding:2.5rem; color:var(--text-muted);">
+                                <i class="fas fa-search" style="font-size:2rem; color:#cbd5e1; margin-bottom:8px; display:block;"></i>
+                                اس تلاش کے مطابق کوئی ریکارڈ نہیں ملا۔
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
         `;
+
+        // Clear highlight after showing
+        this.highlightStudentId = null;
+    }
+
+    switchStudentListSection(filter) {
+        if (filter === 'banat' || filter === 'banin') {
+            this.switchSection(filter);
+        } else {
+            const container = document.getElementById('main-content');
+            this.renderStudentList(container);
+        }
+    }
+
+    filterStudentsTable() {
+        const q = (document.getElementById('studentSearch')?.value || '').toLowerCase().trim();
+        const dept = (document.getElementById('studentDeptFilter')?.value || '').trim();
+        const rows = document.querySelectorAll('#studentTable tbody tr:not(.no-record-row)');
+        let visibleCount = 0;
+        rows.forEach(r => {
+            const text = r.innerText.toLowerCase();
+            const rDept = r.getAttribute('data-dept') || '';
+            const matchQ = !q || text.includes(q);
+            const matchDept = !dept || rDept === dept;
+            const show = matchQ && matchDept;
+            r.style.display = show ? '' : 'none';
+            if (show) visibleCount++;
+        });
+        const emptyRow = document.getElementById('studentTableEmptyRow');
+        if (emptyRow) {
+            emptyRow.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+        }
     }
 
     filterStudents(query) {
-        const q = (query || '').toLowerCase().trim();
-        const rows = document.querySelectorAll('#studentTable tbody tr');
-        rows.forEach(r => {
-            const text = r.innerText.toLowerCase();
-            r.style.display = (!q || text.includes(q)) ? '' : 'none';
-        });
+        const sInput = document.getElementById('studentSearch');
+        if (sInput) sInput.value = query || '';
+        this.filterStudentsTable();
     }
 
     async printStudentForm(studentId) {
@@ -2961,21 +3331,44 @@ class MadrassahApp {
                         .info-table .lbl { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                     }
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
                 <script>
-                function downloadDoc(filename) {
-                    const clone = document.documentElement.cloneNode(true);
-                    clone.querySelectorAll('.no-print').forEach(el => el.remove());
-                    const htmlContent = '<!DOCTYPE html>\n' + clone.outerHTML;
-                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = (filename || 'دستاویز') + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'دستاویز') + '.pdf';
+                    const targetEl = document.querySelector('.form-container') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            let renderWidth = pWidth;
+                            let renderHeight = renderWidth * (imgProps.height / imgProps.width);
+                            if (renderHeight > pHeight) { renderHeight = pHeight; renderWidth = renderHeight * (imgProps.width / imgProps.height); }
+                            const x = (pWidth - renderWidth) / 2;
+                            const y = 0;
+                            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight, undefined, 'FAST');
+                            pdf.save(safeName);
+                        } catch(err) { console.error('PDF error:', err); window.print(); }
+                        finally { if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                    };
+                    if (typeof html2canvas !== 'undefined' && targetEl) {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }).then(canvas => doExport(canvas)).catch(err => { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } });
+                    } else { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
                 }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
                 </script>
             </head>
             <body>
@@ -3061,10 +3454,10 @@ class MadrassahApp {
                     <div class="section-header"><i class="fas fa-graduation-cap"></i> سابقہ تعلیمی کوائف (Educational Background)</div>
                     <table class="info-table">
                         <tr>
-                            <td class="lbl">سابقہ ادارہ / اسکول:</td>
-                            <td class="val">${student.prevSchool || '---'}</td>
+                            <td class="lbl">سابقہ ادارہ / مدرسہ:</td>
+                            <td class="val">${student.prevSchool || student.previousMadrsa || student.contemporaryInstitute || '---'}</td>
                             <td class="lbl">سابقہ دینی/عصری تعلیم:</td>
-                            <td class="val">${student.prevEducation || '---'}</td>
+                            <td class="val">${student.prevEducation || [student.contemporaryEdu || student.lastClass, student.religiousEdu].filter(Boolean).join(' / ') || '---'}</td>
                         </tr>
                     </table>
 
@@ -3112,9 +3505,12 @@ class MadrassahApp {
                     </div>
                 </div>
 
-                <div class="no-print" style="position:fixed; bottom:20px; left:0; right:0; text-align:center; z-index:999;">
-                    <button onclick="window.print()" style="padding:12px 45px; background:${isBanat ? '#9d174d' : '#065f46'}; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.25rem; font-weight:bold; box-shadow:0 6px 15px rgba(0,0,0,0.3); font-family:inherit;">
+                <div class="no-print" style="position:fixed; bottom:20px; left:0; right:0; text-align:center; z-index:999; display:flex; justify-content:center; gap:15px;">
+                    <button onclick="window.print()" style="padding:12px 40px; background:${isBanat ? '#9d174d' : '#065f46'}; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.2rem; font-weight:bold; box-shadow:0 6px 15px rgba(0,0,0,0.3); font-family:inherit;">
                         <i class="fas fa-print"></i> پرنٹ کریں (A4)
+                    </button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('فارم_داخلہ_${student.name ? student.name.replace(/['&quot;\\s]+/g, '_') : 'Student'}', 'portrait', 'a4')" style="padding:12px 35px; background:#dc2626; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.2rem; font-weight:bold; box-shadow:0 6px 15px rgba(220,38,38,0.35); font-family:inherit; display:inline-flex; align-items:center; gap:8px;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)
                     </button>
                 </div>
             </body>
@@ -4594,12 +4990,15 @@ downloadReceiptImageDirect(options) {
                     ` : '<div style="font-weight:bold; color:var(--primary);"><i class="fas fa-users"></i> تمام تدریسی و انتظامی عملہ</div>'}
                 </div>
                 
-                <div style="display:flex; gap:0.6rem;">
+                <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
                     <button class="btn btn-sm" onclick="app.bulkAttendance('Present')" style="background:#ecfdf5; color:#059669; border:1.5px solid #059669; border-radius:8px; font-weight:bold; padding:0.5rem 1rem;">
                         <i class="fas fa-check-double"></i> سب حاضر
                     </button>
                     <button class="btn btn-sm" onclick="app.bulkAttendance('Absent')" style="background:#fef2f2; color:#dc2626; border:1.5px solid #dc2626; border-radius:8px; font-weight:bold; padding:0.5rem 1rem;">
                         <i class="fas fa-user-xmark"></i> سب غیر حاضر
+                    </button>
+                    <button class="btn btn-sm" onclick="app.printMonthlyAttendanceRegister()" style="background:#065f46; color:white; border:none; border-radius:8px; font-weight:bold; padding:0.5rem 1rem; cursor:pointer; display:flex; align-items:center; gap:6px;" title="ماہانہ تفصیلی حاضری رجسٹر پرنٹ کریں (A4 Landscape)">
+                        <i class="fas fa-calendar-alt"></i> ماہانہ رجسٹر پرنٹ
                     </button>
                 </div>
             </div>
@@ -4744,9 +5143,12 @@ downloadReceiptImageDirect(options) {
                     ` : ''}
                 </div>
 
-                <div style="display:flex; gap:0.6rem;">
-                    <button class="btn btn-sm" onclick="app.showAttendanceReport('${month}')" style="background:#6366f1; color:white; border-radius:8px; padding:0.55rem 1.2rem; font-weight:bold; display:flex; align-items:center; gap:6px;">
-                        <i class="fas fa-print"></i> ماہانہ رجسٹر پرنٹ کریں (A4 Landscape)
+                <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+                    <button class="btn btn-sm" onclick="app.printMonthlyAttendanceRegister('${month}')" style="background:#065f46; color:white; border-radius:8px; padding:0.55rem 1.2rem; font-weight:bold; display:flex; align-items:center; gap:6px; box-shadow:0 3px 8px rgba(6,95,70,0.25); cursor:pointer;" title="اس ماہ کا تفصیلی یومیہ حاضری رجسٹر پرنٹ کریں (A4 Landscape)">
+                        <i class="fas fa-calendar-check"></i> ماہانہ حاضری رجسٹر پرنٹ کریں (A4 Landscape)
+                    </button>
+                    <button class="btn btn-sm" onclick="app.printMonthlyAttendanceSummaryReport('${month}')" style="background:#0284c7; color:white; border-radius:8px; padding:0.55rem 1.1rem; font-weight:bold; display:flex; align-items:center; gap:6px; box-shadow:0 3px 8px rgba(2,132,199,0.25); cursor:pointer;" title="ماہانہ مجموعی کارکردگی و حاضری رپورٹ (Summary)">
+                        <i class="fas fa-chart-pie"></i> ماہانہ خلاصہ رپورٹ (Summary)
                     </button>
                 </div>
             </div>
@@ -5084,18 +5486,20 @@ downloadReceiptImageDirect(options) {
     }
 
     // --- PRINTING METHODS FOR REGISTERS & AUDIT REPORTS ---
-    async showAttendanceReport(customMonth = null) {
-        const month = customMonth || this.attendanceMonth || this.attendanceDate.substring(0, 7);
-        const type = this.attendanceType;
-        const section = this.currentSection;
+    async printMonthlyAttendanceRegister(customMonth = null, customClass = null, customType = null, customSection = null) {
+        const month = customMonth || this.attendanceMonth || (this.attendanceDate ? this.attendanceDate.substring(0, 7) : null) || new Date().toISOString().slice(0, 7);
+        const type = customType || this.attendanceType || 'student';
+        const section = customSection || this.currentSection || 'banin';
+        const reqClass = customClass !== undefined && customClass !== null ? customClass : (this.attendanceClass || 'all');
         const isBanat = type === 'student' && section === 'banat';
         const isBanin = type === 'student' && section === 'banin';
-        
+        const isStaff = type === 'staff';
+
         let people = [];
         if (type === 'student') {
-            const allStudents = (await MadrassahDB.getAllStudents(this.currentSection)) || [];
-            if (this.attendanceClass && this.attendanceClass !== 'all') {
-                people = allStudents.filter(s => s.className === this.attendanceClass || s.class === this.attendanceClass || s.department === this.attendanceClass);
+            const allStudents = (await MadrassahDB.getAllStudents(section)) || [];
+            if (reqClass && reqClass !== 'all') {
+                people = allStudents.filter(s => s.className === reqClass || s.class === reqClass || s.department === reqClass);
             } else {
                 people = allStudents;
             }
@@ -5103,107 +5507,641 @@ downloadReceiptImageDirect(options) {
             people = (await MadrassahDB.getAllTeachers()) || [];
         }
 
-        const monthAtt = (await MadrassahDB.getAttendanceByMonth(type, month, this.currentSection)) || [];
-        
+        // Sort by ID / uniqueCode
+        people.sort((a, b) => parseInt(a.id || 0) - parseInt(b.id || 0));
+
+        const monthAtt = (await MadrassahDB.getAttendanceByMonth(type, month, section)) || [];
+
+        // Month & Day calculations
         const [yearStr, monthStr] = month.split('-');
-        const daysInMonth = new Date(parseInt(yearStr), parseInt(monthStr), 0).getDate();
+        const year = parseInt(yearStr);
+        const monthNum = parseInt(monthStr);
+        const daysInMonth = new Date(year, monthNum, 0).getDate();
         const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
+        const urduMonths = ['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'];
+        const englishMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const monthUrdu = urduMonths[monthNum - 1] || monthStr;
+        const monthEng = englishMonths[monthNum - 1] || '';
+
+        // Day of Week details (0 = Sun, 1 = Mon, ..., 5 = Fri, 6 = Sat)
+        const dayDetails = daysArray.map(d => {
+            const dateObj = new Date(year, monthNum - 1, d);
+            const dayOfWeek = dateObj.getDay();
+            const isFriday = (dayOfWeek === 5);
+            const urduInitial = ['ا', 'پ', 'م', 'ب', 'ج', 'ج', 'ہ'][dayOfWeek];
+            const urduDayName = ['اتوار', 'پیر', 'منگل', 'بدھ', 'جمعرات', 'جمعہ', 'ہفتہ'][dayOfWeek];
+            return { day: d, dayOfWeek, isFriday, urduInitial, urduDayName };
+        });
+
+        const totalFridays = dayDetails.filter(d => d.isFriday).length;
+        const totalWorkingDays = daysInMonth - totalFridays;
+
+        // Daily column accumulators
+        const dailyPresentCounts = new Array(daysInMonth).fill(0);
+        const dailyAbsentCounts = new Array(daysInMonth).fill(0);
+        const dailyLeaveCounts = new Array(daysInMonth).fill(0);
+
+        // Pre-calculate stats per person
+        const processedPeople = people.map((p, idx) => {
+            const code = p.uniqueCode || (type === 'student' ? ('STU-' + (1000 + parseInt(p.id))) : ('EMP-' + (100 + parseInt(p.id))));
+            let pCount = 0, aCount = 0, lCount = 0;
+
+            const daysCells = dayDetails.map(dInfo => {
+                const dayStr = `${month}-${String(dInfo.day).padStart(2, '0')}`;
+                const rec = monthAtt.find(a => (a.personId === p.id || a.studentId === p.id) && a.date === dayStr);
+                const st = rec ? rec.status : null;
+                const isP = st === 'Present' || st === 'حاضر';
+                const isA = st === 'Absent' || st === 'غیر حاضر';
+                const isL = st === 'Leave' || st === 'رخصت';
+
+                let cellClass = '', symbol = '-';
+                if (isP) {
+                    cellClass = 'cell-p';
+                    symbol = 'P';
+                    pCount++;
+                    dailyPresentCounts[dInfo.day - 1]++;
+                } else if (isA) {
+                    cellClass = 'cell-a';
+                    symbol = 'A';
+                    aCount++;
+                    dailyAbsentCounts[dInfo.day - 1]++;
+                } else if (isL) {
+                    cellClass = 'cell-l';
+                    symbol = 'L';
+                    lCount++;
+                    dailyLeaveCounts[dInfo.day - 1]++;
+                } else if (dInfo.isFriday) {
+                    cellClass = 'cell-fri';
+                    symbol = 'ج';
+                } else {
+                    cellClass = 'cell-dash';
+                    symbol = '-';
+                }
+
+                return {
+                    day: dInfo.day,
+                    isFriday: dInfo.isFriday,
+                    cellClass,
+                    symbol,
+                    title: `${dInfo.day} ${monthUrdu} (${dInfo.urduDayName}): ${st || (dInfo.isFriday ? 'جمعۃ المبارک' : 'غیر درج')}`
+                };
+            });
+
+            const effectiveDays = pCount + aCount + lCount;
+            const pct = effectiveDays > 0 ? Math.round((pCount / effectiveDays) * 100) : (totalWorkingDays > 0 ? Math.round((pCount / totalWorkingDays) * 100) : 0);
+            
+            let quality = 'تسلی بخش';
+            let qualityColor = '#475569';
+            if (pct >= 90) { quality = 'ممتاز'; qualityColor = '#065f46'; }
+            else if (pct >= 80) { quality = 'بہت خوب'; qualityColor = '#059669'; }
+            else if (pct >= 65) { quality = 'مناسب'; qualityColor = '#d97706'; }
+            else { quality = 'توجہ طلب'; qualityColor = '#dc2626'; }
+
+            return {
+                idx: idx + 1,
+                person: p,
+                code,
+                name: p.name,
+                fatherOrDesig: type === 'student' ? (p.fatherName || '---') : (p.designation || 'ملازم'),
+                daysCells,
+                pCount,
+                aCount,
+                lCount,
+                pct,
+                quality,
+                qualityColor
+            };
+        });
+
+        // Totals
+        const totalP = dailyPresentCounts.reduce((a, b) => a + b, 0);
+        const totalA = dailyAbsentCounts.reduce((a, b) => a + b, 0);
+        const totalL = dailyLeaveCounts.reduce((a, b) => a + b, 0);
+        const overallRecorded = totalP + totalA + totalL;
+        const overallPct = overallRecorded > 0 ? Math.round((totalP / overallRecorded) * 100) : 0;
+
+        const sectionName = isBanat ? 'شعبہ بنات (طالبات)' : (isBanin ? 'شعبہ بنین (طلباء)' : 'اساتذہ و انتظامی عملہ');
+        const themeColor = isBanat ? '#9d174d' : (isBanin ? '#065f46' : '#1e40af');
+        const className = type === 'student' ? (reqClass && reqClass !== 'all' ? `کلاس / درجہ: ${reqClass}` : 'تمام کلاسز / شعبہ جات') : 'تمام تدریسی و انتظامی عملہ';
+
+        // Percentage width calculations for table
+        // Fixed columns: # (2.5%), Code (4.5%), Name (11.5%), Father/Desig (9.0%), P (3.2%), A (3.2%), L (3.2%), % (3.7%), Quality (4.2%) = 45%
+        // Day columns: (55% / daysInMonth)
+        const dayColWidthPct = (55.0 / daysInMonth).toFixed(3);
+
         const printWindow = window.open('', '_blank');
-        const sectionName = isBanat ? 'شعبہ بنات (طالبات)' : (isBanin ? 'شعبہ بنین (طلباء)' : 'اساتذہ و عملہ');
-        const className = type === 'student' ? `درجہ / شعبہ: ${this.attendanceClass || 'تمام'}` : 'تمام اسٹاف';
+        if (!printWindow) {
+            alert('براہ کرم براؤزر میں پاپ اپ ونڈو کھولنے کی اجازت دیجیے۔');
+            return;
+        }
 
         printWindow.document.write(`
+            <!DOCTYPE html>
             <html lang="ur" dir="rtl">
             <head>
-                <title>ماہانہ رجسٹر حاضری - ${sectionName} (${month})</title>
+                <meta charset="UTF-8">
+                <title>ماہانہ حاضری رجسٹر - ${sectionName} - ${monthUrdu} ${year}</title>
                 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
                 <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
                 <style>
-                    @page { size: A4 landscape; margin: 8mm; }
-                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
-                    body { font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif; margin: 0; padding: 10px; direction: rtl; }
-                    .madrsa-title { text-align: center; color: #065f46; margin-bottom: 3px; font-size: 1.8rem; font-weight: bold; }
-                    .report-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #065f46; padding-bottom: 5px; margin-bottom: 10px; font-size: 1rem; }
-                    table { width: 100%; border-collapse: collapse; font-size: 0.72rem; text-align: center; }
-                    th, td { border: 1px solid #94a3b8; padding: 4px 2px; }
-                    th { background: #f1f5f9; color: #0f172a; font-weight: bold; }
-                    .p-cell { color: #059669; font-weight: bold; background: #ecfdf5; }
-                    .a-cell { color: #dc2626; font-weight: bold; background: #fef2f2; }
-                    .l-cell { color: #d97706; font-weight: bold; background: #fffbeb; }
-                    .name-cell { text-align: right; padding-right: 6px; white-space: nowrap; font-weight: bold; }
-                    .stats-col { font-weight: bold; font-size: 0.72rem; }
-                    .footer-signs { display: flex; justify-content: space-between; margin-top: 25px; padding: 0 40px; font-size: 0.95rem; }
-                    @media print { .no-print { display: none !important; } }
+                    @page {
+                        size: A4 landscape;
+                        margin: 4mm 6mm;
+                    }
+                    * {
+                        box-sizing: border-box;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                        font-family: 'Jameel Noori Nastaleeq', 'Amiri', 'Noto Nastaliq Urdu', 'Segoe UI', Tahoma, sans-serif;
+                    }
+                    body {
+                        background: #f8fafc;
+                        color: #0f172a;
+                        margin: 0;
+                        padding: 8px;
+                        direction: rtl;
+                        font-size: 0.92rem;
+                    }
+                    .register-sheet {
+                        width: 100%;
+                        max-width: 285mm;
+                        margin: 0 auto;
+                        background: white;
+                        border: 2px solid ${themeColor};
+                        border-radius: 8px;
+                        padding: 10px 14px;
+                        position: relative;
+                        box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+                        box-sizing: border-box;
+                    }
+                    .watermark {
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 480px;
+                        opacity: 0.045;
+                        pointer-events: none;
+                        z-index: 0;
+                    }
+                    .header-box {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-bottom: 2px double ${themeColor};
+                        padding-bottom: 6px;
+                        margin-bottom: 8px;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .logo-box {
+                        width: 65px;
+                        height: 65px;
+                        border-radius: 50%;
+                        border: 1.5px solid ${themeColor};
+                        padding: 2px;
+                        object-fit: contain;
+                        background: white;
+                    }
+                    .header-center {
+                        text-align: center;
+                        flex-grow: 1;
+                        padding: 0 10px;
+                    }
+                    .madrsa-name {
+                        color: ${themeColor};
+                        font-size: 1.65rem;
+                        font-weight: bold;
+                        margin: 0;
+                        line-height: 1.2;
+                    }
+                    .madrsa-sub {
+                        color: #475569;
+                        font-size: 0.88rem;
+                        margin-top: 1px;
+                        font-weight: 600;
+                    }
+                    .register-title-badge {
+                        display: inline-block;
+                        background: ${themeColor};
+                        color: white;
+                        padding: 2px 24px;
+                        border-radius: 16px;
+                        font-size: 1.05rem;
+                        font-weight: bold;
+                        margin-top: 4px;
+                    }
+                    .meta-info-strip {
+                        display: grid;
+                        grid-template-columns: repeat(6, 1fr);
+                        gap: 6px;
+                        background: #f8fafc;
+                        border: 1px solid #cbd5e1;
+                        border-radius: 6px;
+                        padding: 5px 10px;
+                        margin-bottom: 8px;
+                        font-size: 0.85rem;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .meta-item span {
+                        color: #64748b;
+                        font-size: 0.78rem;
+                        display: block;
+                    }
+                    .meta-item b {
+                        color: #0f172a;
+                        font-size: 0.92rem;
+                    }
+                    
+                    /* The 100% Fixed Attendance Table */
+                    table {
+                        width: 100%;
+                        table-layout: fixed;
+                        border-collapse: collapse;
+                        font-size: 0.76rem;
+                        box-sizing: border-box;
+                        position: relative;
+                        z-index: 2;
+                        margin-bottom: 10px;
+                    }
+                    th, td {
+                        border: 1px solid #cbd5e1;
+                        padding: 3px 1px;
+                        text-align: center;
+                        vertical-align: middle;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                        box-sizing: border-box;
+                        line-height: 1.2;
+                    }
+                    th {
+                        background: #f1f5f9;
+                        color: #0f172a;
+                        font-weight: bold;
+                    }
+                    .th-day {
+                        font-size: 0.72rem;
+                        padding: 2px 0;
+                    }
+                    .th-fri {
+                        background: #dcfce7 !important;
+                        color: #166534 !important;
+                        border-color: #86efac !important;
+                    }
+                    .day-sub {
+                        font-size: 0.62rem;
+                        display: block;
+                        font-weight: normal;
+                        opacity: 0.9;
+                        line-height: 1;
+                    }
+                    .cell-p {
+                        background: #ecfdf5 !important;
+                        color: #059669 !important;
+                        font-weight: bold;
+                        font-size: 0.75rem;
+                    }
+                    .cell-a {
+                        background: #fef2f2 !important;
+                        color: #dc2626 !important;
+                        font-weight: bold;
+                        font-size: 0.75rem;
+                    }
+                    .cell-l {
+                        background: #fffbeb !important;
+                        color: #d97706 !important;
+                        font-weight: bold;
+                        font-size: 0.75rem;
+                    }
+                    .cell-fri {
+                        background: #f0fdf4 !important;
+                        color: #15803d !important;
+                        font-weight: bold;
+                        font-size: 0.72rem;
+                    }
+                    .cell-dash {
+                        color: #cbd5e1;
+                        font-size: 0.72rem;
+                    }
+                    .name-td {
+                        text-align: right;
+                        padding-right: 5px;
+                        font-weight: bold;
+                        color: #0f172a;
+                    }
+                    .father-td {
+                        text-align: right;
+                        padding-right: 4px;
+                        color: #475569;
+                        font-size: 0.72rem;
+                    }
+                    .code-badge {
+                        font-family: monospace;
+                        font-size: 0.7rem;
+                        font-weight: bold;
+                        color: #1e40af;
+                        background: #eff6ff;
+                        padding: 1px 3px;
+                        border-radius: 4px;
+                        display: inline-block;
+                    }
+                    .totals-row {
+                        background: #f8fafc;
+                        font-weight: bold;
+                        border-top: 2px solid ${themeColor};
+                    }
+                    .totals-hdr {
+                        text-align: left;
+                        padding-left: 8px;
+                        font-weight: bold;
+                        color: #1e293b;
+                        font-size: 0.76rem;
+                    }
+
+                    /* Footer & Signatures */
+                    .footer-signatures {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-top: 18px;
+                        padding: 0 25px;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .sig-item {
+                        border-top: 1.5px dashed ${themeColor};
+                        width: 145px;
+                        text-align: center;
+                        padding-top: 4px;
+                        font-size: 0.85rem;
+                        font-weight: bold;
+                        color: #334155;
+                    }
+
+                    .no-print-toolbar {
+                        display: flex;
+                        justify-content: center;
+                        gap: 12px;
+                        margin-top: 15px;
+                    }
+                    .btn-action {
+                        padding: 7px 24px;
+                        border-radius: 20px;
+                        font-weight: bold;
+                        font-size: 0.92rem;
+                        cursor: pointer;
+                        border: none;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                        font-family: inherit;
+                        box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+                    }
+
+                    @media print {
+                        body {
+                            background: white !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                        }
+                        .register-sheet {
+                            border: 2px solid ${themeColor} !important;
+                            box-shadow: none !important;
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            padding: 4mm 5mm !important;
+                            margin: 0 !important;
+                        }
+                        .no-print {
+                            display: none !important;
+                        }
+                        * {
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                    }
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
+                <script>
+                if (typeof html2canvas === 'undefined') {
+                    document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                }
+                if (typeof window.jspdf === 'undefined') {
+                    document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                }
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'landscape', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) {
+                        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...';
+                        btn.disabled = true;
+                    }
+
+                    const safeName = (filename || 'ماہانہ_حاضری_رجسٹر') + '.pdf';
+                    const targetEl = document.querySelector('.register-sheet') || document.body;
+
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+                                window.print();
+                                return;
+                            }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({
+                                orientation: isLandscape ? 'landscape' : 'portrait',
+                                unit: 'mm',
+                                format: format
+                            });
+
+                            const pWidth = isLandscape ? 297 : 210;
+                            const pHeight = isLandscape ? 210 : 297;
+
+                            const imgProps = pdf.getImageProperties(imgData);
+                            let renderWidth = pWidth;
+                            let renderHeight = renderWidth * (imgProps.height / imgProps.width);
+
+                            if (renderHeight > pHeight) {
+                                renderHeight = pHeight;
+                                renderWidth = renderHeight * (imgProps.width / imgProps.height);
+                            }
+
+                            const x = (pWidth - renderWidth) / 2;
+                            const y = 0;
+
+                            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight, undefined, 'FAST');
+                            pdf.save(safeName);
+                        } catch(err) {
+                            console.error('PDF error:', err);
+                            window.print();
+                        } finally {
+                            if (btn) {
+                                btn.innerHTML = origHtml;
+                                btn.disabled = false;
+                            }
+                        }
+                    };
+
+                    if (typeof html2canvas !== 'undefined' && targetEl) {
+                        html2canvas(targetEl, {
+                            scale: 2,
+                            useCORS: true,
+                            allowTaint: true,
+                            backgroundColor: '#ffffff'
+                        }).then(canvas => {
+                            doExport(canvas);
+                        }).catch(err => {
+                            console.warn('html2canvas failed, falling back to print:', err);
+                            window.print();
+                            if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        });
+                    } else {
+                        window.print();
+                        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                    }
+                }
+                function downloadDoc(filename, orientation = 'landscape', format = 'a4') {
+                    downloadPDF(filename, orientation, format);
+                }
+                </script>
             </head>
             <body>
-                <div class="madrsa-title">مدرسہ عبد الرحمن بن عوف للبنین والبنات (غفوریہ)</div>
-                <div class="report-header">
-                    <div><strong>${sectionName}</strong> (${className})</div>
-                    <div><strong>ماہانہ رجسٹر حاضری برائے ماہ:</strong> <span dir="ltr">${month}</span></div>
-                    <div><strong>تاریخِ پرنٹ:</strong> ${new Date().toLocaleDateString('ur-PK')}</div>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width:25px;">#</th>
-                            <th style="width:130px; text-align:right; padding-right:6px;">نام طالب علم / ملازم</th>
-                            <th style="width:85px; text-align:right;">ولدیت / عہدہ</th>
-                            ${daysArray.map(d => `<th style="width:18px;">${d}</th>`).join('')}
-                            <th class="stats-col" style="width:25px; background:#ecfdf5; color:#065f46;">ح</th>
-                            <th class="stats-col" style="width:25px; background:#fef2f2; color:#dc2626;">غ</th>
-                            <th class="stats-col" style="width:25px; background:#fffbeb; color:#d97706;">ر</th>
-                            <th class="stats-col" style="width:30px; background:#eff6ff; color:#1d4ed8;">%</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${people.map((p, idx) => {
-                            let pCount = 0, aCount = 0, lCount = 0;
-                            const daysCells = daysArray.map(d => {
-                                const dayStr = `${month}-${String(d).padStart(2, '0')}`;
-                                const rec = monthAtt.find(a => (a.personId === p.id || a.studentId === p.id) && a.date === dayStr);
-                                const st = rec ? rec.status : '-';
-                                let cellClass = '';
-                                if (st === 'Present' || st === 'حاضر') { cellClass = 'p-cell'; pCount++; }
-                                else if (st === 'Absent' || st === 'غیر حاضر') { cellClass = 'a-cell'; aCount++; }
-                                else if (st === 'Leave' || st === 'رخصت') { cellClass = 'l-cell'; lCount++; }
-                                const sym = (st === 'Present' || st === 'حاضر') ? 'P' : (st === 'Absent' || st === 'غیر حاضر') ? 'A' : (st === 'Leave' || st === 'رخصت') ? 'L' : '-';
-                                return `<td class="${cellClass}">${sym}</td>`;
-                            }).join('');
+                <div class="register-sheet">
+                    <img src="logo.jpg" class="watermark" alt="Watermark">
 
-                            const markedTotal = pCount + aCount + lCount;
-                            const pPct = markedTotal > 0 ? Math.round((pCount / markedTotal) * 100) : 0;
+                    <!-- Official Header -->
+                    <div class="header-box">
+                        <div style="text-align:right; width:22%;">
+                            <img src="madrsa-title.png" alt="مدرسہ ٹائٹل" style="max-height:42px; object-fit:contain; display:block; mix-blend-mode:multiply;">
+                            <div style="font-size:0.82rem; color:${themeColor}; font-weight:bold; margin-top:2px;">${sectionName}</div>
+                            <div style="font-size:0.76rem; color:#64748b;">${className}</div>
+                        </div>
 
-                            return `
+                        <div class="header-center">
+                            <h1 class="madrsa-name">جامعہ و مدرسہ عبد الرحمن بن عوف غفوریہ</h1>
+                            <div class="madrsa-sub">للبنین والبنات والتحفیظ والدرس النظامی (رجسٹرڈ)</div>
+                            <div class="register-title-badge">
+                                <i class="fas fa-calendar-check"></i> ماہانہ حاضری رجسٹر (تفصیلی یومیہ ریکارڈ)
+                            </div>
+                        </div>
+
+                        <div style="text-align:left; width:22%; display:flex; align-items:center; justify-content:flex-end; gap:8px;">
+                            <div style="text-align:left; font-size:0.78rem;">
+                                <div style="color:#64748b;">برائے ماہ: <b style="color:${themeColor}; font-size:0.92rem;">${monthUrdu} ${year}ء</b></div>
+                                <div style="color:#64748b;">پرنٹ: <b style="color:#0f172a;">${new Date().toLocaleDateString('ur-PK')}</b></div>
+                            </div>
+                            <img src="logo.jpg" class="logo-box" alt="لوگو">
+                        </div>
+                    </div>
+
+                    <!-- Meta & Summary Ribbon -->
+                    <div class="meta-info-strip">
+                        <div class="meta-item"><span>کل اراکین / طلباء:</span><b>${people.length} افراد</b></div>
+                        <div class="meta-item"><span>کل ایامِ ماہ:</span><b>${daysInMonth} دن</b></div>
+                        <div class="meta-item"><span>تعلیمی ورکنگ ایام:</span><b>${totalWorkingDays} دن (جمعۃ المبارک کے علاوہ)</b></div>
+                        <div class="meta-item"><span>مجموعی حاضریاں (P):</span><b style="color:#059669;">${totalP}</b></div>
+                        <div class="meta-item"><span>مجموعی غیر حاضریاں (A):</span><b style="color:#dc2626;">${totalA}</b></div>
+                        <div class="meta-item"><span>اوسط شرحِ حاضری:</span><b style="color:${overallPct >= 80 ? '#059669' : '#d97706'}; font-size:0.98rem;">${overallPct}%</b></div>
+                    </div>
+
+                    <!-- The Complete 31-Day Attendance Register Table -->
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:2.5%;">#</th>
+                                <th style="width:4.5%;">کوڈ</th>
+                                <th style="width:11.5%; text-align:right; padding-right:5px;">نام طالب علم / ملازم</th>
+                                <th style="width:9.0%; text-align:right; padding-right:4px;">ولدیت / عہدہ</th>
+                                ${dayDetails.map(dInfo => `
+                                    <th class="th-day ${dInfo.isFriday ? 'th-fri' : ''}" style="width:${dayColWidthPct}%;">
+                                        ${dInfo.day}
+                                        <span class="day-sub">${dInfo.urduInitial}</span>
+                                    </th>
+                                `).join('')}
+                                <th style="width:3.2%; background:#ecfdf5; color:#065f46;" title="کل حاضر">ح</th>
+                                <th style="width:3.2%; background:#fef2f2; color:#dc2626;" title="کل غیر حاضر">غ</th>
+                                <th style="width:3.2%; background:#fffbeb; color:#d97706;" title="کل رخصت">ر</th>
+                                <th style="width:3.7%; background:#eff6ff; color:#1e40af;" title="حاضری فیصد">%</th>
+                                <th style="width:4.2%;" title="کیفیت / درجہ بندی">کیفیت</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${processedPeople.map(p => `
                                 <tr>
-                                    <td>${idx + 1}</td>
-                                    <td class="name-cell">${p.name || ''}</td>
-                                    <td style="text-align:right; font-size:0.75rem; white-space:nowrap;">${type === 'student' ? (p.fatherName || '---') : (p.designation || 'استاد')}</td>
-                                    ${daysCells}
-                                    <td class="p-cell stats-col">${pCount}</td>
-                                    <td class="a-cell stats-col">${aCount}</td>
-                                    <td class="l-cell stats-col">${lCount}</td>
-                                    <td class="stats-col" style="background:#eff6ff;">${pPct}%</td>
+                                    <td style="color:#64748b; font-size:0.72rem;">${p.idx}</td>
+                                    <td><span class="code-badge">${p.code}</span></td>
+                                    <td class="name-td">${p.name}</td>
+                                    <td class="father-td">${p.fatherOrDesig}</td>
+                                    ${p.daysCells.map(c => `
+                                        <td class="${c.cellClass}" title="${c.title}">${c.symbol}</td>
+                                    `).join('')}
+                                    <td class="cell-p" style="font-size:0.78rem;">${p.pCount}</td>
+                                    <td class="cell-a" style="font-size:0.78rem;">${p.aCount}</td>
+                                    <td class="cell-l" style="font-size:0.78rem;">${p.lCount}</td>
+                                    <td style="font-weight:bold; color:#1e40af; background:#eff6ff; font-size:0.78rem;">${p.pct}%</td>
+                                    <td style="font-weight:bold; color:${p.qualityColor}; font-size:0.72rem;">${p.quality}</td>
                                 </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-                <div class="footer-signs">
-                    <div>دستخط استاد / نگران</div>
-                    <div>دستخط ناظمِ امتحانات و تعلیمات</div>
-                    <div>مہر و دستخط مہتمم</div>
+                            `).join('') || `<tr><td colspan="${daysInMonth + 9}" style="padding:2.5rem; color:#94a3b8; font-size:1rem;">کوئی ریکارڈ نہیں ملا</td></tr>`}
+
+                            <!-- Daily Totals Footers -->
+                            <tr class="totals-row">
+                                <td colspan="4" class="totals-hdr">مجموعی یومیہ حاضر (P)</td>
+                                ${dailyPresentCounts.map(cnt => `
+                                    <td class="cell-p" style="font-size:0.74rem;">${cnt > 0 ? cnt : '-'}</td>
+                                `).join('')}
+                                <td class="cell-p" style="font-size:0.8rem;">${totalP}</td>
+                                <td colspan="4" style="background:#f1f5f9; color:#64748b; font-size:0.7rem;">کل حاضریاں</td>
+                            </tr>
+                            <tr class="totals-row" style="background:#fffcfc;">
+                                <td colspan="4" class="totals-hdr" style="color:#dc2626;">مجموعی یومیہ غیر حاضر (A)</td>
+                                ${dailyAbsentCounts.map(cnt => `
+                                    <td class="cell-a" style="font-size:0.74rem;">${cnt > 0 ? cnt : '-'}</td>
+                                `).join('')}
+                                <td colspan="2" class="cell-a" style="font-size:0.8rem;">${totalA}</td>
+                                <td colspan="3" style="background:#f1f5f9; color:#64748b; font-size:0.7rem;">کل غیر حاضریاں</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- Signatures -->
+                    <div class="footer-signatures">
+                        <div class="sig-item">دستخط استاد / کلاس انچارج</div>
+                        <div class="sig-item">دستخط شعبہ حاضری و کوآرڈینیٹر</div>
+                        <div class="sig-item">دستخط ناظمِ تعلیمات</div>
+                        <div class="sig-item">مہر و دستخط مہتمم / صدر مدرس</div>
+                    </div>
                 </div>
-                <div class="no-print" style="text-align:center; margin-top:20px;">
-                    <button onclick="window.print()" style="padding:8px 30px; background:#065f46; color:white; border:none; border-radius:20px; cursor:pointer; font-weight:bold; font-size:1.05rem;">
+
+                <!-- Screen-Only Action Buttons -->
+                <div class="no-print no-print-toolbar">
+                    <button class="btn-action" onclick="window.print()" style="background:#065f46; color:white;">
                         <i class="fas fa-print"></i> پرنٹ کریں (A4 Landscape)
+                    </button>
+                    <button class="btn-action btn-pdf-download" onclick="downloadPDF('ماہانہ_حاضری_رجسٹر_${month}', 'landscape', 'a4')" style="background:#dc2626; color:white;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)
+                    </button>
+                    <button class="btn-action" onclick="window.close()" style="background:#64748b; color:white;">
+                        <i class="fas fa-times"></i> ونڈو بند کریں
                     </button>
                 </div>
             </body>
             </html>
         `);
         printWindow.document.close();
+    }
+
+    // Direct aliases so all legacy callers seamlessly open the complete A4 Landscape register
+    showAttendanceReport(customMonth = null) {
+        return this.printMonthlyAttendanceRegister(customMonth);
+    }
+    printMonthlyAttendanceReport(customMonth = null) {
+        return this.printMonthlyAttendanceRegister(customMonth);
     }
 
     async printYearlyAttendanceReport(customYear) {
@@ -5249,6 +6187,64 @@ downloadReceiptImageDirect(options) {
                     .footer-signs { display: flex; justify-content: space-between; margin-top: 25px; padding: 0 40px; font-size: 0.95rem; }
                     @media print { .no-print { display: none !important; } }
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
+                <script>
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'landscape', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'سالانہ_حاضری') + '.pdf';
+                    const targetEl = document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            const margin = 5;
+                            const maxW = pWidth - (margin * 2);
+                            const maxH = pHeight - (margin * 2);
+                            let finalW = maxW;
+                            let finalH = (imgProps.height * maxW) / imgProps.width;
+                            if (finalH > maxH) {
+                                finalH = maxH;
+                                finalW = (imgProps.width * maxH) / imgProps.height;
+                            }
+                            const x = (pWidth - finalW) / 2;
+                            const y = (pHeight - finalH) / 2;
+                            pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
+                            pdf.save(safeName);
+                        } catch (err) {
+                            console.error('PDF export error:', err);
+                            window.print();
+                        } finally {
+                            if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        }
+                    };
+                    if (typeof html2canvas !== 'undefined') {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' })
+                            .then(doExport)
+                            .catch(err => {
+                                console.error('html2canvas error:', err);
+                                if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                                window.print();
+                            });
+                    } else {
+                        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        window.print();
+                    }
+                }
+                function downloadDoc(filename, orientation = 'landscape', format = 'a4') { downloadPDF(filename, orientation, format); }
+                </script>
             </head>
             <body>
                 <div class="madrsa-title">مدرسہ عبد الرحمن بن عوف للبنین والبنات (غفوریہ)</div>
@@ -5309,9 +6305,12 @@ downloadReceiptImageDirect(options) {
                     <div>دستخط ناظمِ امتحانات و تعلیمات</div>
                     <div>مہر و دستخط مہتمم</div>
                 </div>
-                <div class="no-print" style="text-align:center; margin-top:20px;">
+                <div class="no-print" style="text-align:center; margin-top:20px; display:flex; justify-content:center; gap:12px;">
                     <button onclick="window.print()" style="padding:8px 30px; background:#065f46; color:white; border:none; border-radius:20px; cursor:pointer; font-weight:bold; font-size:1.05rem;">
                         <i class="fas fa-print"></i> پرنٹ کریں (A4 Landscape)
+                    </button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('سالانہ_حاضری_گوشوارہ_${year}', 'landscape', 'a4')" style="padding:8px 24px; background:#dc2626; color:white; border:none; border-radius:20px; cursor:pointer; font-weight:bold; font-size:1.05rem; box-shadow:0 4px 10px rgba(220,38,38,0.35); display:inline-flex; align-items:center; gap:6px;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)
                     </button>
                 </div>
             </body>
@@ -5361,6 +6360,64 @@ downloadReceiptImageDirect(options) {
                     .footer-signs { display: flex; justify-content: space-between; margin-top: 35px; padding: 0 40px; font-size: 0.95rem; }
                     @media print { .no-print { display: none !important; } }
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
+                <script>
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'گوشوارہ_رخصت_و_غیرحاضری') + '.pdf';
+                    const targetEl = document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            const margin = 5;
+                            const maxW = pWidth - (margin * 2);
+                            const maxH = pHeight - (margin * 2);
+                            let finalW = maxW;
+                            let finalH = (imgProps.height * maxW) / imgProps.width;
+                            if (finalH > maxH) {
+                                finalH = maxH;
+                                finalW = (imgProps.width * maxH) / imgProps.height;
+                            }
+                            const x = (pWidth - finalW) / 2;
+                            const y = (pHeight - finalH) / 2;
+                            pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
+                            pdf.save(safeName);
+                        } catch (err) {
+                            console.error('PDF export error:', err);
+                            window.print();
+                        } finally {
+                            if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        }
+                    };
+                    if (typeof html2canvas !== 'undefined') {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' })
+                            .then(doExport)
+                            .catch(err => {
+                                console.error('html2canvas error:', err);
+                                if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                                window.print();
+                            });
+                    } else {
+                        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        window.print();
+                    }
+                }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
+                </script>
             </head>
             <body>
                 <div class="header">
@@ -5407,9 +6464,12 @@ downloadReceiptImageDirect(options) {
                     <div>دستخط ناظمِ ادارہ</div>
                     <div>مہر و دستخط مہتمم</div>
                 </div>
-                <div class="no-print" style="text-align:center; margin-top:20px;">
+                <div class="no-print" style="text-align:center; margin-top:20px; display:flex; justify-content:center; gap:12px;">
                     <button onclick="window.print()" style="padding:8px 30px; background:#991b1b; color:white; border:none; border-radius:20px; cursor:pointer; font-weight:bold; font-size:1.05rem;">
                         <i class="fas fa-print"></i> رپورٹ پرنٹ کریں (A4)
+                    </button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('گوشوارہ_رخصت_غیرحاضری_${sectionName.replace(/[\'\"\\s]+/g, '_')}_${year}', 'portrait', 'a4')" style="padding:8px 24px; background:#dc2626; color:white; border:none; border-radius:20px; cursor:pointer; font-weight:bold; font-size:1.05rem; box-shadow:0 4px 10px rgba(220,38,38,0.35); display:inline-flex; align-items:center; gap:6px;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)
                     </button>
                 </div>
             </body>
@@ -5623,7 +6683,7 @@ downloadReceiptImageDirect(options) {
         this.render();
     }
 
-    async showAttendanceReport(customMonth = null) {
+    async _legacyShowAttendanceReport(customMonth = null) {
         const month = customMonth || this.attendanceDate.substring(0, 7); // e.g. "2026-09"
         const type = this.attendanceType;
         const section = this.currentSection;
@@ -5733,29 +6793,53 @@ downloadReceiptImageDirect(options) {
 
 
 // --- Bait-ul-Maal (Accounts) Management ---
-    // State for filtering transaction history
+    // State for filtering transaction history & generating goshwara
     accountsFilter = {
         search: '',
         type: 'all',
         category: 'all',
-        period: 'all'
+        period: 'all',
+        customMonth: new Date().toISOString().slice(0, 7),
+        customYear: new Date().getFullYear(),
+        startDate: '',
+        endDate: ''
     };
 
     async renderAccountsModule(container) {
         const allTransactions = await MadrassahDB.getAllTransactions();
         
-        // Compute overall statistics
-        const totalIncome = allTransactions.filter(t => t.type === 'Income').reduce((sum, t) => sum + parseInt(t.amount || 0), 0);
-        const totalExpense = allTransactions.filter(t => t.type === 'Expense').reduce((sum, t) => sum + parseInt(t.amount || 0), 0);
-        const netBalance = totalIncome - totalExpense;
-        const balanceColor = netBalance < 0 ? '#dc2626' : '#059669';
-        const balanceBg = netBalance < 0 ? '#fef2f2' : '#ecfdf5';
+        // Auto-correct stored category to "راشن"
+        for (const t of allTransactions) {
+            if (t.category && (t.category.includes('بعام') || t.category.includes('طعام'))) {
+                t.category = 'راشن';
+                try {
+                    await MadrassahDB.saveTransaction(t);
+                } catch (e) {
+                    console.warn('Auto-repair transaction category warning:', e);
+                }
+            }
+        }
+
+        // Compute overall all-time statistics
+        const allTimeIncome = allTransactions.filter(t => t.type === 'Income').reduce((sum, t) => sum + parseInt(t.amount || 0), 0);
+        const allTimeExpense = allTransactions.filter(t => t.type === 'Expense').reduce((sum, t) => sum + parseInt(t.amount || 0), 0);
+        const allTimeBalance = allTimeIncome - allTimeExpense;
 
         // Extract unique categories for filter
-        const categories = Array.from(new Set(allTransactions.map(t => t.category).filter(Boolean))).sort();
+        const categories = Array.from(new Set(allTransactions.map(t => (t.category || '').replace(/بعام و راشن|طعام و راشن|بعام|طعام/g, 'راشن')).filter(Boolean))).sort();
+
+        // Extract available years from transactions for yearly goshwara
+        const now = new Date();
+        const availableYears = Array.from(new Set(allTransactions.map(t => {
+            const d = new Date(t.date || t.timestamp || Date.now());
+            return isNaN(d.getFullYear()) ? null : d.getFullYear();
+        }).filter(Boolean))).sort((a, b) => b - a);
+        if (!availableYears.includes(now.getFullYear())) {
+            availableYears.unshift(now.getFullYear());
+        }
 
         // Apply filters
-        const filter = this.accountsFilter || { search: '', type: 'all', category: 'all', period: 'all' };
+        const filter = this.accountsFilter || { search: '', type: 'all', category: 'all', period: 'all', customMonth: now.toISOString().slice(0, 7), customYear: now.getFullYear(), startDate: '', endDate: '' };
         let filtered = allTransactions.slice();
 
         // Type filter
@@ -5768,11 +6852,14 @@ downloadReceiptImageDirect(options) {
             filtered = filtered.filter(t => t.category === filter.category);
         }
 
-        // Period filter
-        const now = new Date();
+        // Period filter with Monthly, Yearly, and Manual Date Range support
+        const monthNamesUrdu = ['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'];
+        let periodTitle = 'مکمل مالیاتی ریکارڈ (All Time)';
+
         if (filter.period === 'today') {
             const todayStr = new Date().toDateString();
             filtered = filtered.filter(t => new Date(t.date || t.timestamp || Date.now()).toDateString() === todayStr);
+            periodTitle = `آج کا حساب (${new Date().toLocaleDateString('ur-PK')})`;
         } else if (filter.period === 'this_month') {
             const curMonth = now.getMonth();
             const curYear = now.getFullYear();
@@ -5780,6 +6867,7 @@ downloadReceiptImageDirect(options) {
                 const d = new Date(t.date || t.timestamp || Date.now());
                 return d.getMonth() === curMonth && d.getFullYear() === curYear;
             });
+            periodTitle = `رواں ماہ کا حساب (${monthNamesUrdu[curMonth]} ${curYear}ء)`;
         } else if (filter.period === 'last_month') {
             const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
             const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
@@ -5787,6 +6875,34 @@ downloadReceiptImageDirect(options) {
                 const d = new Date(t.date || t.timestamp || Date.now());
                 return d.getMonth() === lastMonth && d.getFullYear() === lastYear;
             });
+            periodTitle = `گزشتہ ماہ کا حساب (${monthNamesUrdu[lastMonth]} ${lastYear}ء)`;
+        } else if (filter.period === 'month') {
+            const mVal = filter.customMonth || (now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'));
+            const [y, m] = mVal.split('-').map(Number);
+            if (y && m) {
+                filtered = filtered.filter(t => {
+                    const d = new Date(t.date || t.timestamp || Date.now());
+                    return d.getFullYear() === y && (d.getMonth() + 1) === m;
+                });
+                periodTitle = `ماہانہ حساب (${monthNamesUrdu[m - 1]} ${y}ء)`;
+            }
+        } else if (filter.period === 'year') {
+            const y = Number(filter.customYear) || now.getFullYear();
+            filtered = filtered.filter(t => {
+                const d = new Date(t.date || t.timestamp || Date.now());
+                return d.getFullYear() === y;
+            });
+            periodTitle = `سالانہ حساب (${y}ء)`;
+        } else if (filter.period === 'custom') {
+            const start = filter.startDate ? new Date(filter.startDate + 'T00:00:00').getTime() : 0;
+            const end = filter.endDate ? new Date(filter.endDate + 'T23:59:59').getTime() : Infinity;
+            filtered = filtered.filter(t => {
+                const time = new Date(t.date || t.timestamp || Date.now()).getTime();
+                return time >= start && time <= end;
+            });
+            const sStr = filter.startDate ? filter.startDate.split('-').reverse().join('/') : 'ابتداء';
+            const eStr = filter.endDate ? filter.endDate.split('-').reverse().join('/') : 'آج';
+            periodTitle = `مینول حساب (از ${sStr} تا ${eStr})`;
         }
 
         // Search filter
@@ -5805,10 +6921,18 @@ downloadReceiptImageDirect(options) {
         // Sort descending by date
         filtered.sort((a, b) => (b.date || 0) - (a.date || 0));
 
-        // Compute displayed stats
+        // Save active filtered dataset and title for print/PDF export
+        this.lastFilteredAccountsTransactions = filtered;
+        this.lastAccountsPeriodTitle = periodTitle;
+
+        // Compute displayed stats for the active period
         const dispIncome = filtered.filter(t => t.type === 'Income').reduce((sum, t) => sum + parseInt(t.amount || 0), 0);
         const dispExpense = filtered.filter(t => t.type === 'Expense').reduce((sum, t) => sum + parseInt(t.amount || 0), 0);
         const dispBalance = dispIncome - dispExpense;
+        const balanceColor = dispBalance < 0 ? '#dc2626' : '#059669';
+        const balanceBg = dispBalance < 0 ? '#fef2f2' : '#ecfdf5';
+
+        const isFilteredPeriod = filter.period !== 'all';
 
         container.innerHTML = `
             <!-- Header Section -->
@@ -5821,7 +6945,7 @@ downloadReceiptImageDirect(options) {
                         بیت المال و مرکزی اکاؤنٹس (Bait-ul-Maal)
                     </h2>
                     <div style="color:#64748b; font-size:0.95rem; margin-top:4px;">
-                        مدرسہ عبد الرحمن بن عوف غفوریہ — تمام مالی آمدن و اخراجات کا مصدقہ نظام
+                        مدرسہ عبد الرحمن بن عوف غفوریہ — تمام مالی آمدن، اخراجات اور گوشواروں کا مصدقہ نظام
                     </div>
                 </div>
 
@@ -5835,23 +6959,26 @@ downloadReceiptImageDirect(options) {
                     <button class="btn" style="background:#dc2626; color:white; border:none; border-radius:10px; font-weight:bold; padding:10px 18px; font-size:1.05rem; display:inline-flex; align-items:center; gap:8px; box-shadow:0 4px 14px rgba(220,38,38,0.3); cursor:pointer;" onclick="app.showTransactionModal('Expense')">
                         <i class="fas fa-minus-circle"></i> نیا خرچ (Expense)
                     </button>
-                    <button class="btn" style="background:#475569; color:white; border:none; border-radius:10px; font-weight:bold; padding:9px 14px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 10px rgba(71,85,105,0.2); cursor:pointer;" onclick="app.printAccountsLedger()" title="مکمل مالیاتی گوشوارہ پرنٹ کریں">
-                        <i class="fas fa-print"></i> پرنٹ گوشوارہ
+                    <button class="btn" style="background:#065f46; color:white; border:none; border-radius:10px; font-weight:bold; padding:9px 16px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(6,95,70,0.25); cursor:pointer;" onclick="app.printAccountsLedger()" title="مالیاتی گوشوارہ A4 Landscape پرنٹ و پی ڈی ایف">
+                        <i class="fas fa-file-invoice"></i> مالیاتی گوشوارہ (A4 Landscape)
                     </button>
                 </div>
             </div>
 
-            <!-- Top 4 KPI Stats Cards -->
+            <!-- Top 4 KPI Stats Cards (Live according to selected Period) -->
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:1.2rem; margin-bottom:1.8rem;">
                 <!-- Total Income Card -->
                 <div style="background:white; border-radius:16px; padding:1.2rem; box-shadow:0 4px 16px rgba(0,0,0,0.04); border:1px solid #e2e8f0; border-right:5px solid #059669; display:flex; align-items:center; justify-content:space-between;">
                     <div>
-                        <div style="color:#64748b; font-size:0.95rem; font-weight:600;">کل آمدن و عطیات</div>
+                        <div style="color:#64748b; font-size:0.95rem; font-weight:600;">
+                            ${isFilteredPeriod ? 'آمدن (برائے ' + periodTitle + ')' : 'کل آمدن و عطیات'}
+                        </div>
                         <div style="font-size:1.7rem; font-weight:bold; color:#059669; font-family:monospace; margin-top:2px;">
-                            Rs. ${Number(totalIncome).toLocaleString('en-US')}
+                            Rs. ${Number(dispIncome).toLocaleString('en-US')}
                         </div>
                         <div style="font-size:0.8rem; color:#10b981; margin-top:4px;">
-                            <i class="fas fa-arrow-down"></i> ${allTransactions.filter(t => t.type === 'Income').length} وصولیاں
+                            <i class="fas fa-arrow-down"></i> ${filtered.filter(t => t.type === 'Income').length} وصولیاں
+                            ${isFilteredPeriod ? `<span style="color:#94a3b8; font-size:0.75rem;"> (کل: Rs. ${Number(allTimeIncome).toLocaleString('en-US')})</span>` : ''}
                         </div>
                     </div>
                     <div style="width:52px; height:52px; border-radius:14px; background:#ecfdf5; color:#059669; display:flex; align-items:center; justify-content:center; font-size:1.6rem;">
@@ -5862,12 +6989,15 @@ downloadReceiptImageDirect(options) {
                 <!-- Total Expense Card -->
                 <div style="background:white; border-radius:16px; padding:1.2rem; box-shadow:0 4px 16px rgba(0,0,0,0.04); border:1px solid #e2e8f0; border-right:5px solid #dc2626; display:flex; align-items:center; justify-content:space-between;">
                     <div>
-                        <div style="color:#64748b; font-size:0.95rem; font-weight:600;">کل اخراجات و ادائیگیاں</div>
+                        <div style="color:#64748b; font-size:0.95rem; font-weight:600;">
+                            ${isFilteredPeriod ? 'اخراجات (برائے ' + periodTitle + ')' : 'کل اخراجات و ادائیگیاں'}
+                        </div>
                         <div style="font-size:1.7rem; font-weight:bold; color:#dc2626; font-family:monospace; margin-top:2px;">
-                            Rs. ${Number(totalExpense).toLocaleString('en-US')}
+                            Rs. ${Number(dispExpense).toLocaleString('en-US')}
                         </div>
                         <div style="font-size:0.8rem; color:#ef4444; margin-top:4px;">
-                            <i class="fas fa-arrow-up"></i> ${allTransactions.filter(t => t.type === 'Expense').length} ادائیگیاں
+                            <i class="fas fa-arrow-up"></i> ${filtered.filter(t => t.type === 'Expense').length} ادائیگیاں
+                            ${isFilteredPeriod ? `<span style="color:#94a3b8; font-size:0.75rem;"> (کل: Rs. ${Number(allTimeExpense).toLocaleString('en-US')})</span>` : ''}
                         </div>
                     </div>
                     <div style="width:52px; height:52px; border-radius:14px; background:#fef2f2; color:#dc2626; display:flex; align-items:center; justify-content:center; font-size:1.6rem;">
@@ -5878,12 +7008,15 @@ downloadReceiptImageDirect(options) {
                 <!-- Net Cash Balance Card -->
                 <div style="background:white; border-radius:16px; padding:1.2rem; box-shadow:0 4px 16px rgba(0,0,0,0.04); border:1px solid #e2e8f0; border-right:5px solid ${balanceColor}; display:flex; align-items:center; justify-content:space-between;">
                     <div>
-                        <div style="color:#64748b; font-size:0.95rem; font-weight:600;">خالص بیلنس (کیش ان ہینڈ)</div>
+                        <div style="color:#64748b; font-size:0.95rem; font-weight:600;">
+                            ${isFilteredPeriod ? 'خالص بچت (برائے ' + periodTitle + ')' : 'خالص بیلنس (کیش ان ہینڈ)'}
+                        </div>
                         <div style="font-size:1.7rem; font-weight:bold; color:${balanceColor}; font-family:monospace; margin-top:2px;">
-                            Rs. ${Number(netBalance).toLocaleString('en-US')}
+                            Rs. ${Number(dispBalance).toLocaleString('en-US')}
                         </div>
                         <div style="font-size:0.8rem; color:${balanceColor}; margin-top:4px;">
-                            <i class="fas fa-scale-balanced"></i> ${netBalance >= 0 ? 'موجودہ خالص بچت' : 'منفی خسارہ (Alert)'}
+                            <i class="fas fa-scale-balanced"></i> ${dispBalance >= 0 ? 'موجودہ خالص بچت' : 'منفی خسارہ (Alert)'}
+                            ${isFilteredPeriod ? `<span style="color:#94a3b8; font-size:0.75rem;"> (کل کیش: Rs. ${Number(allTimeBalance).toLocaleString('en-US')})</span>` : ''}
                         </div>
                     </div>
                     <div style="width:52px; height:52px; border-radius:14px; background:${balanceBg}; color:${balanceColor}; display:flex; align-items:center; justify-content:center; font-size:1.6rem;">
@@ -5896,10 +7029,10 @@ downloadReceiptImageDirect(options) {
                     <div>
                         <div style="color:#64748b; font-size:0.95rem; font-weight:600;">مجموعی لین دین</div>
                         <div style="font-size:1.7rem; font-weight:bold; color:#4f46e5; font-family:monospace; margin-top:2px;">
-                            ${allTransactions.length}
+                            ${filtered.length}
                         </div>
                         <div style="font-size:0.8rem; color:#6366f1; margin-top:4px;">
-                            کل ریکارڈ شدہ اندراجات
+                            ${isFilteredPeriod ? `برائے ${periodTitle} (از کل ${allTransactions.length})` : 'کل ریکارڈ شدہ اندراجات'}
                         </div>
                     </div>
                     <div style="width:52px; height:52px; border-radius:14px; background:#eef2ff; color:#4f46e5; display:flex; align-items:center; justify-content:center; font-size:1.6rem;">
@@ -5908,18 +7041,18 @@ downloadReceiptImageDirect(options) {
                 </div>
             </div>
 
-            <!-- Filter & Search Toolbar -->
+            <!-- Filter & Search Toolbar (With Monthly, Yearly, and Manual Date Ranges) -->
             <div style="background:white; border-radius:16px; padding:1.2rem 1.4rem; box-shadow:0 4px 16px rgba(0,0,0,0.04); border:1px solid #e2e8f0; margin-bottom:1.5rem;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem; flex-wrap:wrap; gap:8px;">
                     <div style="font-weight:bold; color:#1e293b; font-size:1.1rem; display:flex; align-items:center; gap:8px;">
-                        <i class="fas fa-filter" style="color:var(--primary);"></i> تلاش و فلٹرز برائے ٹرانزیکشن ہسٹری
+                        <i class="fas fa-filter" style="color:var(--primary);"></i> دورانیہ و فلٹرز برائے ماہانہ، سالانہ و مینول گوشوارہ
                     </div>
-                    <div style="font-size:0.85rem; color:#64748b;">
-                        ظاہر شدہ: <b>${filtered.length}</b> از کل <b>${allTransactions.length}</b> اندراجات
+                    <div style="font-size:0.88rem; color:#065f46; font-weight:bold; background:#ecfdf5; padding:3px 12px; border-radius:20px; border:1px solid #a7f3d0;">
+                        فعال گوشوارہ: ${periodTitle} (ظاہر شدہ: <b>${filtered.length}</b> از کل <b>${allTransactions.length}</b>)
                     </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns:2fr 1.2fr 1.2fr 1.2fr auto; gap:10px; align-items:center;">
+                <div style="display:grid; grid-template-columns:1.8fr 1.1fr 1.1fr 1.4fr auto; gap:10px; align-items:center;">
                     <!-- Search Input -->
                     <div style="position:relative;">
                         <i class="fas fa-search" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8;"></i>
@@ -5943,37 +7076,132 @@ downloadReceiptImageDirect(options) {
                         </select>
                     </div>
 
-                    <!-- Period Filter -->
+                    <!-- Period Filter Selector (With Monthly, Yearly, and Manual Dates) -->
                     <div>
-                        <select id="acc_period_filter" style="width:100%; padding:9px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.95rem;" onchange="app.updateAccountsFilter('period', this.value)">
-                            <option value="all" ${filter.period === 'all' ? 'selected' : ''}>مکمل ریکارڈ (All Time)</option>
-                            <option value="today" ${filter.period === 'today' ? 'selected' : ''}>صرف آج (Today)</option>
-                            <option value="this_month" ${filter.period === 'this_month' ? 'selected' : ''}>رواں ماہ (This Month)</option>
-                            <option value="last_month" ${filter.period === 'last_month' ? 'selected' : ''}>گزشتہ ماہ (Last Month)</option>
+                        <select id="acc_period_filter" style="width:100%; padding:9px; border:1.5px solid #065f46; background:#f0fdf4; color:#065f46; font-weight:bold; border-radius:10px; font-size:0.95rem;" onchange="app.updateAccountsFilter('period', this.value)">
+                            <option value="all" ${filter.period === 'all' ? 'selected' : ''}>📋 مکمل ریکارڈ (All Time)</option>
+                            <option value="today" ${filter.period === 'today' ? 'selected' : ''}>☀️ صرف آج (Today)</option>
+                            <option value="this_month" ${filter.period === 'this_month' ? 'selected' : ''}>📅 رواں ماہ (This Month)</option>
+                            <option value="last_month" ${filter.period === 'last_month' ? 'selected' : ''}>⏮️ گزشتہ ماہ (Last Month)</option>
+                            <option value="month" ${filter.period === 'month' ? 'selected' : ''}>🗓️ مخصوص ماہانہ حساب (Select Month)</option>
+                            <option value="year" ${filter.period === 'year' ? 'selected' : ''}>📊 سالانہ حساب (Yearly Summary)</option>
+                            <option value="custom" ${filter.period === 'custom' ? 'selected' : ''}>📆 مینول تاریخیں (Manual Dates)</option>
                         </select>
                     </div>
 
                     <!-- Clear Filter Button -->
                     <div>
-                        <button class="btn" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:10px; padding:9px 12px; font-size:0.9rem; cursor:pointer;" onclick="app.clearAccountsFilters()" title="تمام فلٹرز ختم کریں">
+                        <button class="btn" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:10px; padding:9px 14px; font-size:0.9rem; cursor:pointer;" onclick="app.clearAccountsFilters()" title="تمام فلٹرز ختم کریں">
                             <i class="fas fa-rotate-left"></i> ری سیٹ
                         </button>
                     </div>
                 </div>
+
+                <!-- Dynamic Sub-Bar for Monthly, Yearly, or Manual Date Inputs -->
+                ${filter.period === 'month' ? `
+                    <div style="margin-top:12px; padding:10px 14px; background:#ecfdf5; border:1.5px solid #10b981; border-radius:12px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                            <span style="font-weight:bold; color:#065f46; font-size:0.95rem;">
+                                <i class="fas fa-calendar-alt"></i> مطلوبہ مہینہ منتخب فرمائیں:
+                            </span>
+                            <input type="month" id="acc_custom_month" value="${filter.customMonth || (now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'))}" 
+                                   style="padding:7px 12px; border:1.5px solid #059669; border-radius:8px; font-family:monospace; font-weight:bold; font-size:1rem; background:white;"
+                                   onchange="app.updateAccountsFilter('customMonth', this.value)">
+                            <span style="font-size:0.95rem; color:#047857; font-weight:bold;">
+                                🏷️ ${periodTitle}
+                            </span>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-sm" style="background:#065f46; color:white; border:none; padding:7px 16px; border-radius:8px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" onclick="app.printAccountsLedger()">
+                                <i class="fas fa-print"></i> پرنٹ ماہانہ گوشوارہ (Landscape)
+                            </button>
+                            <button class="btn btn-sm" style="background:#dc2626; color:white; border:none; padding:7px 16px; border-radius:8px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" onclick="app.downloadAccountsLedgerPDF()">
+                                <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ (Landscape)
+                            </button>
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${filter.period === 'year' ? `
+                    <div style="margin-top:12px; padding:10px 14px; background:#eff6ff; border:1.5px solid #3b82f6; border-radius:12px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                            <span style="font-weight:bold; color:#1e40af; font-size:0.95rem;">
+                                <i class="fas fa-calendar-check"></i> مطلوبہ سال منتخب فرمائیں:
+                            </span>
+                            <select id="acc_custom_year" style="padding:7px 16px; border:1.5px solid #2563eb; border-radius:8px; font-family:monospace; font-weight:bold; font-size:1rem; background:white;"
+                                    onchange="app.updateAccountsFilter('customYear', this.value)">
+                                ${availableYears.map(y => `<option value="${y}" ${(filter.customYear == y) ? 'selected' : ''}>${y}ء</option>`).join('')}
+                            </select>
+                            <span style="font-size:0.95rem; color:#1d4ed8; font-weight:bold;">
+                                🏷️ ${periodTitle}
+                            </span>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-sm" style="background:#065f46; color:white; border:none; padding:7px 16px; border-radius:8px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" onclick="app.printAccountsLedger()">
+                                <i class="fas fa-print"></i> پرنٹ سالانہ گوشوارہ (Landscape)
+                            </button>
+                            <button class="btn btn-sm" style="background:#dc2626; color:white; border:none; padding:7px 16px; border-radius:8px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" onclick="app.downloadAccountsLedgerPDF()">
+                                <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ (Landscape)
+                            </button>
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${filter.period === 'custom' ? `
+                    <div style="margin-top:12px; padding:10px 14px; background:#fefce8; border:1.5px solid #eab308; border-radius:12px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                            <span style="font-weight:bold; color:#854d0e; font-size:0.95rem;">
+                                <i class="fas fa-calendar-days"></i> مینول تاریخیں درج فرمائیں:
+                            </span>
+                            <div style="display:inline-flex; align-items:center; gap:6px;">
+                                <label style="font-size:0.9rem; font-weight:600; color:#713f12;">از تاریخ:</label>
+                                <input type="date" id="acc_start_date" value="${filter.startDate || ''}" 
+                                       style="padding:6px 10px; border:1.5px solid #ca8a04; border-radius:8px; font-family:monospace; font-size:0.92rem; background:white;"
+                                       onchange="app.updateAccountsFilter('startDate', this.value)">
+                            </div>
+                            <div style="display:inline-flex; align-items:center; gap:6px;">
+                                <label style="font-size:0.9rem; font-weight:600; color:#713f12;">تا تاریخ:</label>
+                                <input type="date" id="acc_end_date" value="${filter.endDate || ''}" 
+                                       style="padding:6px 10px; border:1.5px solid #ca8a04; border-radius:8px; font-family:monospace; font-size:0.92rem; background:white;"
+                                       onchange="app.updateAccountsFilter('endDate', this.value)">
+                            </div>
+                            <span style="font-size:0.95rem; color:#854d0e; font-weight:bold;">
+                                🏷️ ${periodTitle}
+                            </span>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-sm" style="background:#065f46; color:white; border:none; padding:7px 16px; border-radius:8px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" onclick="app.printAccountsLedger()">
+                                <i class="fas fa-print"></i> پرنٹ گوشوارہ (Landscape)
+                            </button>
+                            <button class="btn btn-sm" style="background:#dc2626; color:white; border:none; padding:7px 16px; border-radius:8px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" onclick="app.downloadAccountsLedgerPDF()">
+                                <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ (Landscape)
+                            </button>
+                        </div>
+                    </div>
+                ` : ''}
             </div>
 
             <!-- Justified Transaction History Card & Table -->
             <div style="background:white; border-radius:18px; box-shadow:0 8px 30px rgba(0,0,0,0.06); border:1px solid #e2e8f0; overflow:hidden;">
                 <div style="padding:1.2rem 1.6rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                     <div style="font-weight:bold; color:var(--primary); font-size:1.2rem; display:flex; align-items:center; gap:8px;">
-                        <i class="fas fa-history"></i> ٹرانزیکشن ہسٹری و لیجر (Financial Transaction Ledger)
+                        <i class="fas fa-history"></i> ٹرانزیکشن ہسٹری و لیجر (${periodTitle})
                     </div>
-                    <div style="font-size:0.9rem; color:#64748b;">
-                        آمدن: <b style="color:#059669;">Rs. ${Number(dispIncome).toLocaleString('en-US')}</b> | 
-                        اخراجات: <b style="color:#dc2626;">Rs. ${Number(dispExpense).toLocaleString('en-US')}</b> | 
-                        بیلنس: <b style="color:${dispBalance >= 0 ? '#059669' : '#dc2626'};">Rs. ${Number(dispBalance).toLocaleString('en-US')}</b>
+                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                        <div style="font-size:0.92rem; color:#64748b;">
+                            آمدن: <b style="color:#059669; font-family:monospace;">Rs. ${Number(dispIncome).toLocaleString('en-US')}</b> | 
+                            اخراجات: <b style="color:#dc2626; font-family:monospace;">Rs. ${Number(dispExpense).toLocaleString('en-US')}</b> | 
+                            بیلنس: <b style="color:${dispBalance >= 0 ? '#059669' : '#dc2626'}; font-family:monospace;">Rs. ${Number(dispBalance).toLocaleString('en-US')}</b>
+                        </div>
+                        <button class="btn btn-sm" style="background:#065f46; color:white; border:none; padding:7px 14px; border-radius:8px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" onclick="app.printAccountsLedger()" title="مالیاتی گوشوارہ پرنٹ فرمائیں (A4 Landscape)">
+                            <i class="fas fa-print"></i> پرنٹ (Landscape)
+                        </button>
+                        <button class="btn btn-sm" style="background:#dc2626; color:white; border:none; padding:7px 14px; border-radius:8px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" onclick="app.downloadAccountsLedgerPDF()" title="مالیاتی گوشوارہ پی ڈی ایف ڈاؤن لوڈ (A4 Landscape)">
+                            <i class="fas fa-file-pdf"></i> PDF (Landscape)
+                        </button>
                     </div>
                 </div>
+
 
                 <div style="overflow-x:auto;">
                     <table style="width:100%; border-collapse:collapse; text-align:right; font-size:0.98rem;">
@@ -6020,7 +7248,7 @@ downloadReceiptImageDirect(options) {
                                                     <i class="fas ${isIncome ? 'fa-plus' : 'fa-minus'}"></i> ${isIncome ? 'آمدن' : 'خرچ'}
                                                 </span>
                                                 <span style="color:#334155; font-size:0.85rem; font-weight:600;">
-                                                    ${t.category || 'عام'}
+                                                    ${(t.category || 'عام').replace(/بعام و راشن|طعام و راشن|بعام|طعام/g, 'راشن')}
                                                 </span>
                                             </div>
                                         </td>
@@ -6115,15 +7343,30 @@ downloadReceiptImageDirect(options) {
 
     updateAccountsFilter(field, value) {
         if (!this.accountsFilter) {
-            this.accountsFilter = { search: '', type: 'all', category: 'all', period: 'all' };
+            const now = new Date();
+            this.accountsFilter = { search: '', type: 'all', category: 'all', period: 'all', customMonth: now.toISOString().slice(0, 7), customYear: now.getFullYear(), startDate: '', endDate: '' };
         }
         this.accountsFilter[field] = value;
         this.renderAccountsModule(document.getElementById('main-content'));
     }
 
     clearAccountsFilters() {
-        this.accountsFilter = { search: '', type: 'all', category: 'all', period: 'all' };
+        const now = new Date();
+        this.accountsFilter = {
+            search: '',
+            type: 'all',
+            category: 'all',
+            period: 'all',
+            customMonth: now.toISOString().slice(0, 7),
+            customYear: now.getFullYear(),
+            startDate: '',
+            endDate: ''
+        };
         this.renderAccountsModule(document.getElementById('main-content'));
+    }
+
+    async downloadAccountsLedgerPDF() {
+        await this.printAccountsLedger(true);
     }
 
     // --- Modern Professional Transaction Modal Window ---
@@ -6135,9 +7378,14 @@ downloadReceiptImageDirect(options) {
 
         const categories = isIncome 
             ? ['عمومی تعاون', 'زکوٰۃ', 'صدقات واجبہ', 'صدقات نافلہ', 'فیس', 'جمعہ فنڈ', 'جنس / راشن', 'دیگر']
-            : ['تنخواہ عملہ', 'طعام و راشن', 'یوٹیلیٹی بلز', 'تعمیر و مرمت', 'اسٹیشنری و کتب', 'مہمان نوازی', 'سفری مصارف', 'متفرق اخراجات'];
+            : ['تنخواہ عملہ', 'راشن', 'یوٹیلیٹی بلز', 'تعمیر و مرمت', 'اسٹیشنری و کتب', 'مہمان نوازی', 'سفری مصارف', 'متفرق اخراجات'];
 
         this.editTransactionId = existingData ? existingData.id : null;
+        if (existingData && existingData.category && !isIncome) {
+            if (existingData.category.includes('راشن') || existingData.category.includes('طعام') || existingData.category.includes('بعام')) {
+                existingData.category = 'راشن';
+            }
+        }
 
         // Determine default date
         let defaultDateStr = '';
@@ -6202,7 +7450,10 @@ downloadReceiptImageDirect(options) {
                                     کیٹیگری / مد <span style="color:#dc2626;">*</span>
                                 </label>
                                 <select name="category" id="modal_category_select" class="mms-select" style="width:100%; padding:10px; border-radius:10px; border:1.5px solid #cbd5e1; font-size:1rem;" required>
-                                    ${categories.map(c => `<option value="${c}" ${existingData && existingData.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                    ${categories.map(c => {
+                                        const isSel = existingData && existingData.category && (existingData.category.trim() === c.trim() || (!isIncome && c === 'راشن' && (existingData.category.includes('راشن') || existingData.category.includes('طعام') || existingData.category.includes('بعام'))));
+                                        return `<option value="${c}" ${isSel ? 'selected' : ''}>${c}</option>`;
+                                    }).join('')}
                                 </select>
                             </div>
                             <div>
@@ -6323,6 +7574,10 @@ downloadReceiptImageDirect(options) {
             return;
         }
 
+        if (t.category && (t.category.includes('بعام') || t.category.includes('طعام'))) {
+            t.category = 'راشن';
+        }
+
         this.showTransactionModal(t.type, t);
     }
 
@@ -6342,6 +7597,9 @@ downloadReceiptImageDirect(options) {
         delete data.dateInput;
 
         data.amount = parseFloat(data.amount) || 0;
+        if (data.category && (data.category.includes('بعام') || data.category.includes('طعام'))) {
+            data.category = 'راشن';
+        }
 
         const isNew = !this.editTransactionId;
         if (this.editTransactionId) {
@@ -6456,7 +7714,7 @@ downloadReceiptImageDirect(options) {
             `مدرسہ ہذا کے بیت المال میں آپ کا تعاون بفضلِ خدا موصول ہو گیا ہے:%0A%0A` +
             `📜 *رسید نمبر:* ${t.receiptNo || ('DON-' + t.id)}%0A` +
             `📅 *تاریخ:* ${dateStr}%0A` +
-            `🏷️ *مد / کیٹیگری:* ${t.category}%0A` +
+            `🏷️ *مد / کیٹیگری:* ${(t.category || '').replace(/بعام و راشن|طعام و راشن|بعام|طعام/g, 'راشن')}%0A` +
             `💰 *رقم:* Rs. ${Number(t.amount).toLocaleString('en-US')}/-%0A` +
             `✍️ *مبلغ:* ${amountWords}%0A` +
             (t.paymentMethod ? `💳 *ذریعہ:* ${t.paymentMethod}%0A` : '') +
@@ -6477,19 +7735,46 @@ downloadReceiptImageDirect(options) {
         setTimeout(() => { if (a.parentNode) a.parentNode.removeChild(a); }, 1000);
     }
 
-    // Print Formal Financial Ledger (A4 printable report)
-    async printAccountsLedger() {
-        const transactions = await MadrassahDB.getAllTransactions();
-        transactions.sort((a, b) => (b.date || 0) - (a.date || 0));
+    // Print Formal Financial Goshwara & Ledger (A4 Landscape Printable & PDF Report)
+    async printAccountsLedger(autoDownload = false) {
+        let transactions = this.lastFilteredAccountsTransactions;
+        if (!transactions || !transactions.length) {
+            transactions = await MadrassahDB.getAllTransactions();
+        }
+        transactions = transactions.slice().sort((a, b) => (b.date || 0) - (a.date || 0));
 
+        const periodTitle = this.lastAccountsPeriodTitle || 'مکمل مالیاتی ریکارڈ (All Time)';
         const income = transactions.filter(t => t.type === 'Income').reduce((sum, t) => sum + parseInt(t.amount || 0), 0);
         const expense = transactions.filter(t => t.type === 'Expense').reduce((sum, t) => sum + parseInt(t.amount || 0), 0);
         const balance = income - expense;
         const printDate = new Date().toLocaleDateString('ur-PK');
 
+        // Calculate Category-wise Breakdown (مد وار تقابلی خلاصہ)
+        const incomeCats = {};
+        const expenseCats = {};
+        transactions.forEach(t => {
+            let cat = t.category || 'عام / متفرق';
+            if (cat.includes('بعام') || cat.includes('طعام')) {
+                cat = 'راشن';
+            }
+            const amt = parseInt(t.amount || 0);
+            if (t.type === 'Income') {
+                incomeCats[cat] = (incomeCats[cat] || 0) + amt;
+            } else {
+                expenseCats[cat] = (expenseCats[cat] || 0) + amt;
+            }
+        });
+
+        const incomeCatList = Object.entries(incomeCats).sort((a, b) => b[1] - a[1]);
+        const expenseCatList = Object.entries(expenseCats).sort((a, b) => b[1] - a[1]);
+        const maxCatRows = Math.max(incomeCatList.length, expenseCatList.length);
+
+        const safeFilePeriod = periodTitle.replace(/[\\/:*?"<>|()]/g, '').trim().replace(/\s+/g, '_');
+        const pdfFileName = `BaitulMaal_Goshwara_${safeFilePeriod}`;
+
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
-            alert('براہِ کرم براؤزر سے پاپ اپ کی اجازت دیں۔');
+            alert('براہِ کرم براؤزر سے پاپ اپ (Pop-up) کی اجازت دیں۔');
             return;
         }
 
@@ -6498,97 +7783,437 @@ downloadReceiptImageDirect(options) {
             <html lang="ur" dir="rtl">
             <head>
                 <meta charset="UTF-8">
-                <title>بیت المال مالیاتی گوشوارہ - مدرسہ عبد الرحمن بن عوف</title>
+                <title>بیت المال مالیاتی گوشوارہ - ${periodTitle}</title>
                 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+                <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+                <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Aref+Ruqaa:wght@400;700&display=swap" rel="stylesheet">
+                <script src="assets/js/html2canvas.min.js"><\/script>
+                <script src="assets/js/jspdf.umd.min.js"><\/script>
                 <style>
-                    @page { size: A4 portrait; margin: 12mm; }
-                    body { font-family: 'Jameel Noori Nastaleeq', 'Noto Sans Urdu', Arial, sans-serif; direction: rtl; margin: 0; padding: 15px; color: #0f172a; }
-                    .header { text-align: center; border-bottom: 2px solid #065f46; padding-bottom: 12px; margin-bottom: 15px; }
-                    .header h1 { margin: 0; color: #065f46; font-size: 26px; }
-                    .header h2 { margin: 4px 0; color: #475569; font-size: 16px; font-weight: normal; }
-                    .stats-bar { display: flex; justify-content: space-around; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 15px; }
-                    .stat-item { text-align: center; }
-                    .stat-item .title { font-size: 12px; color: #64748b; }
-                    .stat-item .val { font-size: 18px; font-weight: bold; font-family: monospace; }
-                    table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px; }
-                    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: right; }
-                    th { background: #f1f5f9; color: #1e293b; text-align: center; }
-                    .inc { color: #059669; font-weight: bold; font-family: monospace; direction: ltr; text-align: left; }
-                    .exp { color: #dc2626; font-weight: bold; font-family: monospace; direction: ltr; text-align: left; }
-                    .footer { display: flex; justify-content: space-between; margin-top: 40px; padding: 0 40px; }
-                    .signature { border-top: 1px solid #334155; width: 160px; text-align: center; padding-top: 5px; font-size: 12px; }
-                    @media print { .no-print { display: none; } }
+                    /* ── Strict A4 Landscape Print Setup ── */
+                    @page {
+                        size: A4 landscape;
+                        margin: 6mm;
+                    }
+                    * { box-sizing: border-box; }
+                    html, body {
+                        margin: 0;
+                        padding: 0;
+                        background: #f8fafc;
+                        color: #0f172a;
+                        direction: rtl;
+                        font-family: 'Jameel Noori Nastaleeq', 'Amiri', 'Noto Sans Urdu', Arial, sans-serif;
+                    }
+                    body {
+                        padding: 12px 16px;
+                    }
+                    .goshwara-card {
+                        background: #ffffff;
+                        border: 2px solid #065f46;
+                        outline: 1.5px solid #b45309;
+                        outline-offset: -5px;
+                        border-radius: 14px;
+                        padding: 14px 20px;
+                        position: relative;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+                        width: 100%;
+                        margin: 0 auto;
+                    }
+                    .header {
+                        text-align: center;
+                        border-bottom: 2px solid #065f46;
+                        padding-bottom: 8px;
+                        margin-bottom: 12px;
+                        position: relative;
+                    }
+                    .bismillah {
+                        font-family: 'Amiri', serif;
+                        font-size: 1.3rem;
+                        color: #065f46;
+                        margin-bottom: 2px;
+                    }
+                    .madrsa-title {
+                        margin: 0;
+                        color: #065f46;
+                        font-size: 26px;
+                        font-family: 'Aref Ruqaa', serif;
+                        line-height: 1.2;
+                    }
+                    .sub-title {
+                        margin: 3px 0;
+                        color: #b45309;
+                        font-size: 15px;
+                        font-weight: bold;
+                    }
+                    .period-badge {
+                        display: inline-block;
+                        background: #ecfdf5;
+                        color: #065f46;
+                        border: 1.5px solid #059669;
+                        border-radius: 20px;
+                        padding: 3px 18px;
+                        font-size: 13px;
+                        font-weight: bold;
+                        margin-top: 4px;
+                    }
+                    .meta-row {
+                        font-size: 11px;
+                        color: #64748b;
+                        margin-top: 4px;
+                    }
+                    /* 4 KPI summary cards */
+                    .kpi-grid {
+                        display: grid;
+                        grid-template-columns: repeat(4, 1fr);
+                        gap: 10px;
+                        margin-bottom: 12px;
+                    }
+                    .kpi-card {
+                        background: #f8fafc;
+                        border: 1.5px solid #cbd5e1;
+                        border-radius: 8px;
+                        padding: 8px 12px;
+                        text-align: center;
+                    }
+                    .kpi-title {
+                        font-size: 11.5px;
+                        font-weight: bold;
+                        color: #475569;
+                    }
+                    .kpi-val {
+                        font-size: 16px;
+                        font-weight: bold;
+                        font-family: monospace;
+                        margin-top: 2px;
+                    }
+                    /* Category summary table */
+                    .cat-table-wrap {
+                        margin-bottom: 14px;
+                        background: #fdfefe;
+                        border: 1px solid #cbd5e1;
+                        border-radius: 8px;
+                        padding: 8px 12px;
+                    }
+                    .cat-title {
+                        font-weight: bold;
+                        font-size: 12px;
+                        color: #065f46;
+                        margin-bottom: 6px;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                    }
+                    table.cat-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 11px;
+                    }
+                    table.cat-table th, table.cat-table td {
+                        border: 1px solid #cbd5e1;
+                        padding: 4px 8px;
+                    }
+                    table.cat-table th {
+                        font-weight: bold;
+                        text-align: center;
+                    }
+                    /* Detailed Ledger Table */
+                    table.ledger-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 11px;
+                        margin-bottom: 14px;
+                    }
+                    table.ledger-table th, table.ledger-table td {
+                        border: 1px solid #cbd5e1;
+                        padding: 5px 8px;
+                    }
+                    table.ledger-table th {
+                        background: #f1f5f9;
+                        color: #1e293b;
+                        font-weight: bold;
+                        text-align: center;
+                    }
+                    .inc-col {
+                        color: #059669;
+                        font-weight: bold;
+                        font-family: monospace;
+                        direction: ltr;
+                        text-align: left;
+                    }
+                    .exp-col {
+                        color: #dc2626;
+                        font-weight: bold;
+                        font-family: monospace;
+                        direction: ltr;
+                        text-align: left;
+                    }
+                    /* Official Signatures */
+                    .signatures-bar {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-top: 25px;
+                        padding: 0 40px;
+                        page-break-inside: avoid;
+                    }
+                    .sig-item {
+                        border-top: 1.5px solid #065f46;
+                        width: 170px;
+                        text-align: center;
+                        padding-top: 5px;
+                        font-size: 12px;
+                        font-weight: bold;
+                        color: #065f46;
+                    }
+                    @media print {
+                        .no-print { display: none !important; }
+                        body { padding: 0; background: white; }
+                        .goshwara-card { box-shadow: none; border: 2px solid #065f46; }
+                    }
                 </style>
+                <script>
+                async function downloadPDF(filename) {
+                    const btn = document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    try {
+                        const html2canvasLib = window.html2canvas || (window.opener && window.opener.html2canvas);
+                        const jspdfLib = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf : (window.opener && window.opener.jspdf && window.opener.jspdf.jsPDF ? window.opener.jspdf : null);
+                        if (!html2canvasLib || !jspdfLib) {
+                            alert('PDF لائبریری لوڈ نہیں ہو سکی۔ براہ کرم پرنٹ نکال کر PDF محفوظ فرمائیں۔');
+                            return;
+                        }
+
+                        const target = document.querySelector('.goshwara-card');
+                        // Tainted canvas protection: hide local images before capture
+                        const imgs = Array.from(target.querySelectorAll('img'));
+                        imgs.forEach(img => { img._sd = img.style.display; img.style.display = 'none'; });
+
+                        const canvas = await html2canvasLib(target, {
+                            scale: 2,
+                            useCORS: false,
+                            allowTaint: false,
+                            logging: false,
+                            backgroundColor: '#ffffff'
+                        });
+
+                        // Restore images
+                        imgs.forEach(img => { img.style.display = img._sd || ''; delete img._sd; });
+
+                        const { jsPDF } = jspdfLib;
+                        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+                        // A4 Landscape exact dimensions
+                        const pWidth = 297; // mm
+                        const margin = 6;   // mm
+                        const printableW = pWidth - (margin * 2);
+                        const imgAspect = canvas.height / canvas.width;
+                        const printableH = printableW * imgAspect;
+                        const pHeight = printableH + (margin * 2);
+
+                        const pdf = new jsPDF({
+                            orientation: 'landscape',
+                            unit: 'mm',
+                            format: [pWidth, pHeight]
+                        });
+
+                        pdf.addImage(imgData, 'JPEG', margin, margin, printableW, printableH);
+                        pdf.save((filename || '${pdfFileName}') + '.pdf');
+                    } catch (err) {
+                        console.error('PDF export error:', err);
+                        alert('خرابی: ' + (err.message || err));
+                    } finally {
+                        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                    }
+                }
+
+                ${autoDownload ? `
+                window.addEventListener('load', () => {
+                    setTimeout(() => downloadPDF('${pdfFileName}'), 500);
+                });
+                ` : ''}
+                <\/script>
             </head>
             <body>
-                <div class="header">
-                    <h1>مدرسہ عبد الرحمن بن عوف غفوریہ (خانیوال)</h1>
-                    <h2>بیت المال و مالیات — مکمل رجسٹر و مالیاتی گوشوارہ</h2>
-                    <div style="font-size: 11px; color: #64748b; margin-top: 4px;">تاریخِ اجراء: ${printDate}</div>
+                <!-- Top Action Bar (Print / PDF / Close) -->
+                <div class="no-print" style="margin-bottom:12px; display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                    <button onclick="window.print()" style="padding:9px 26px; background:#065f46; color:white; border:none; border-radius:20px; font-weight:bold; font-size:14px; cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
+                        <i class="fas fa-print"></i> پرنٹ نکالیں (A4 Landscape)
+                    </button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('${pdfFileName}')" style="padding:9px 26px; background:#dc2626; color:white; border:none; border-radius:20px; font-weight:bold; font-size:14px; cursor:pointer; box-shadow:0 4px 12px rgba(220,38,38,0.25); display:inline-flex; align-items:center; gap:8px;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (A4 Landscape)
+                    </button>
+                    <button onclick="window.close()" style="padding:9px 20px; background:#64748b; color:white; border:none; border-radius:20px; font-weight:bold; font-size:13px; cursor:pointer;">
+                        <i class="fas fa-times"></i> بند کریں
+                    </button>
                 </div>
 
-                <div class="stats-bar">
-                    <div class="stat-item">
-                        <div class="title">کل وصول شدہ آمدن</div>
-                        <div class="val" style="color:#059669;">Rs. ${Number(income).toLocaleString('en-US')}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="title">کل مصارف و اخراجات</div>
-                        <div class="val" style="color:#dc2626;">Rs. ${Number(expense).toLocaleString('en-US')}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="title">موجودہ خالص بیلنس</div>
-                        <div class="val" style="color:${balance >= 0 ? '#059669' : '#dc2626'};">Rs. ${Number(balance).toLocaleString('en-US')}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="title">کل ٹرانزیکشنز</div>
-                        <div class="val" style="color:#1e293b;">${transactions.length}</div>
-                    </div>
-                </div>
+                <!-- Printable Report Card -->
+                <div class="goshwara-card">
+                    <img src="logo.jpg" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:320px; opacity:0.06; pointer-events:none; z-index:0;" alt="Watermark">
+                    <div style="position:relative; z-index:1;">
+                        
+                        <!-- Header -->
+                        <div class="header">
+                            <div class="bismillah">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
+                            <h1 class="madrsa-title">مدرسہ عبد الرحمن بن عوف غفوریہ (خانیوال)</h1>
+                            <div class="sub-title">شعبہ مالیات و بیت المال — باضابطہ مالیاتی گوشوارہ و لیجر</div>
+                            <div class="period-badge">
+                                🏷️ ${periodTitle}
+                            </div>
+                            <div class="meta-row">
+                                تاریخِ اجراء و پرنٹ: <b>${printDate}</b> | کل ٹرانزیکشنز: <b>${transactions.length}</b>
+                            </div>
+                        </div>
 
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width:30px;">#</th>
-                            <th style="width:75px;">رسید نمبر</th>
-                            <th style="width:70px;">تاریخ</th>
-                            <th style="width:50px;">نوعیت</th>
-                            <th style="width:90px;">مد / کیٹیگری</th>
-                            <th>معاون / وصول کنندہ</th>
-                            <th>تفصیل و ریمارکس</th>
-                            <th style="width:90px;">رقم (PKR)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${transactions.map((t, i) => {
-                            const isInc = t.type === 'Income';
-                            const d = new Date(t.date || t.timestamp || Date.now());
-                            const dt = !isNaN(d.getTime()) ? `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}` : '';
-                            return `
+                        <!-- 4 KPI Summary Cards -->
+                        <div class="kpi-grid">
+                            <div class="kpi-card" style="border-right:4px solid #059669;">
+                                <div class="kpi-title">کل وصول شدہ آمدن</div>
+                                <div class="kpi-val" style="color:#059669;">Rs. ${Number(income).toLocaleString('en-US')}</div>
+                                <div style="font-size:10px; color:#10b981; margin-top:2px;">
+                                    ${transactions.filter(t => t.type === 'Income').length} وصولیاں
+                                </div>
+                            </div>
+                            <div class="kpi-card" style="border-right:4px solid #dc2626;">
+                                <div class="kpi-title">کل مصارف و اخراجات</div>
+                                <div class="kpi-val" style="color:#dc2626;">Rs. ${Number(expense).toLocaleString('en-US')}</div>
+                                <div style="font-size:10px; color:#ef4444; margin-top:2px;">
+                                    ${transactions.filter(t => t.type === 'Expense').length} ادائیگیاں
+                                </div>
+                            </div>
+                            <div class="kpi-card" style="border-right:4px solid ${balance >= 0 ? '#059669' : '#dc2626'};">
+                                <div class="kpi-title">خالص بچت / بیلنس</div>
+                                <div class="kpi-val" style="color:${balance >= 0 ? '#059669' : '#dc2626'};">Rs. ${Number(balance).toLocaleString('en-US')}</div>
+                                <div style="font-size:10px; color:${balance >= 0 ? '#059669' : '#dc2626'}; margin-top:2px;">
+                                    ${balance >= 0 ? 'موجودہ خالص بچت' : 'منفی خسارہ'}
+                                </div>
+                            </div>
+                            <div class="kpi-card" style="border-right:4px solid #4f46e5;">
+                                <div class="kpi-title">کل اندراجات (ریکارڈز)</div>
+                                <div class="kpi-val" style="color:#4f46e5;">${transactions.length}</div>
+                                <div style="font-size:10px; color:#6366f1; margin-top:2px;">مکمل اندراج شدہ</div>
+                            </div>
+                        </div>
+
+                        <!-- Category-wise Summary Comparison Table (مد وار خلاصہ گوشوارہ) -->
+                        ${maxCatRows > 0 ? `
+                        <div class="cat-table-wrap">
+                            <div class="cat-title">
+                                <i class="fas fa-chart-pie"></i> مد وار تقابلی گوشوارہ (Category-wise Income vs Expense Breakdown):
+                            </div>
+                            <table class="cat-table">
+                                <thead>
+                                    <tr style="background:#f8fafc;">
+                                        <th style="width:30%; background:#ecfdf5; color:#047857;">آمدن کی مد (Income Head)</th>
+                                        <th style="width:20%; background:#ecfdf5; color:#047857;">وصول شدہ رقم (روپے)</th>
+                                        <th style="width:30%; background:#fef2f2; color:#b91c1c;">خرچ کی مد (Expense Head)</th>
+                                        <th style="width:20%; background:#fef2f2; color:#b91c1c;">صرف شدہ رقم (روپے)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${Array.from({ length: maxCatRows }).map((_, i) => {
+                                        const inc = incomeCatList[i];
+                                        const exp = expenseCatList[i];
+                                        return `
+                                            <tr>
+                                                <td style="font-weight:600; color:#1e293b;">${inc ? inc[0] : '—'}</td>
+                                                <td style="text-align:left; font-family:monospace; font-weight:bold; color:#059669; direction:ltr;">
+                                                    ${inc ? 'Rs. ' + Number(inc[1]).toLocaleString('en-US') : '—'}
+                                                </td>
+                                                <td style="font-weight:600; color:#1e293b;">${exp ? exp[0] : '—'}</td>
+                                                <td style="text-align:left; font-family:monospace; font-weight:bold; color:#dc2626; direction:ltr;">
+                                                    ${exp ? 'Rs. ' + Number(exp[1]).toLocaleString('en-US') : '—'}
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                                <tfoot>
+                                    <tr style="background:#f1f5f9; font-weight:bold;">
+                                        <td style="text-align:right; color:#047857;">کل آمدن:</td>
+                                        <td style="text-align:left; font-family:monospace; color:#059669; direction:ltr;">Rs. ${Number(income).toLocaleString('en-US')}</td>
+                                        <td style="text-align:right; color:#b91c1c;">کل اخراجات:</td>
+                                        <td style="text-align:left; font-family:monospace; color:#dc2626; direction:ltr;">Rs. ${Number(expense).toLocaleString('en-US')}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        ` : ''}
+
+                        <!-- Detailed Itemized Ledger Table -->
+                        <div style="font-weight:bold; font-size:12px; color:#065f46; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-list-ol"></i> تفصیلی رجسٹر و لین دین کا مکمل ریکارڈ:
+                        </div>
+                        <table class="ledger-table">
+                            <thead>
                                 <tr>
-                                    <td style="text-align:center;">${i+1}</td>
-                                    <td style="text-align:center; font-family:monospace;">${t.receiptNo || ('TR-' + t.id)}</td>
-                                    <td style="text-align:center; font-family:monospace;">${dt}</td>
-                                    <td style="text-align:center; color:${isInc ? '#059669' : '#dc2626'}; font-weight:bold;">${isInc ? 'آمدن' : 'خرچ'}</td>
-                                    <td>${t.category || ''}</td>
-                                    <td>${t.name || ''}</td>
-                                    <td>${t.description || ''}</td>
-                                    <td class="${isInc ? 'inc' : 'exp'}">${isInc ? '+' : '-'} ${Number(t.amount).toLocaleString('en-US')}</td>
+                                    <th style="width:30px;">#</th>
+                                    <th style="width:80px;">رسید / واؤچر</th>
+                                    <th style="width:75px;">تاریخ</th>
+                                    <th style="width:55px;">نوعیت</th>
+                                    <th style="width:100px;">مد / کیٹیگری</th>
+                                    <th style="width:170px;">معاون / وصول کنندہ</th>
+                                    <th style="width:85px;">طریقہ</th>
+                                    <th>تفصیل و ریمارکس</th>
+                                    <th style="width:110px;">رقم (روپے)</th>
                                 </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
+                            </thead>
+                            <tbody>
+                                ${transactions.map((t, i) => {
+                                    const isInc = t.type === 'Income';
+                                    const d = new Date(t.date || t.timestamp || Date.now());
+                                    const dt = !isNaN(d.getTime()) ? `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${d.getFullYear()}` : '';
+                                    return `
+                                        <tr>
+                                            <td style="text-align:center;">${i + 1}</td>
+                                            <td style="text-align:center; font-family:monospace; font-weight:bold;">${t.receiptNo || (isInc ? 'R-' + t.id : 'V-' + t.id)}</td>
+                                            <td style="text-align:center; font-family:monospace;">${dt}</td>
+                                            <td style="text-align:center; color:${isInc ? '#059669' : '#dc2626'}; font-weight:bold;">${isInc ? 'آمدن' : 'خرچ'}</td>
+                                            <td style="font-weight:600;">${(t.category || '').replace(/بعام و راشن|طعام و راشن|بعام|طعام/g, 'راشن')}</td>
+                                            <td>
+                                                <div style="font-weight:bold;">${t.name || ''}</div>
+                                                ${t.phone ? `<div style="font-size:9px; color:#64748b; font-family:monospace;">${t.phone}</div>` : ''}
+                                            </td>
+                                            <td style="text-align:center; font-size:10px;">${t.paymentMethod || 'نقد'}</td>
+                                            <td style="font-size:10px; color:#334155;">${t.description || '—'}</td>
+                                            <td class="${isInc ? 'inc-col' : 'exp-col'}">
+                                                ${isInc ? '+' : '-'} Rs. ${Number(t.amount).toLocaleString('en-US')}
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background:#f8fafc; font-weight:bold; font-size:11.5px; border-top:2px solid #065f46;">
+                                    <td colspan="4" style="text-align:right;">مجموعی خلاصہ برائے ${periodTitle}:</td>
+                                    <td colspan="4" style="text-align:right; font-size:10.5px; color:#64748b;">
+                                        آمدن: <span style="color:#059669; font-family:monospace;">+Rs. ${Number(income).toLocaleString('en-US')}</span> | 
+                                        اخراجات: <span style="color:#dc2626; font-family:monospace;">-Rs. ${Number(expense).toLocaleString('en-US')}</span>
+                                    </td>
+                                    <td style="text-align:left; font-family:monospace; font-size:12.5px; color:${balance >= 0 ? '#059669' : '#dc2626'}; direction:ltr;">
+                                        Rs. ${Number(balance).toLocaleString('en-US')}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
 
-                <div class="footer">
-                    <div class="signature">دستخط ناظمِ مالیات / خازن</div>
-                    <div class="signature">دستخط آڈیٹر / محاسب</div>
-                    <div class="signature">دستخط مہتمم / صدر مدرسہ</div>
+                        <!-- Official 3 Signatures -->
+                        <div class="signatures-bar">
+                            <div class="sig-item">دستخط ناظمِ مالیات / خازن</div>
+                            <div class="sig-item">دستخط آڈیٹر / محاسب</div>
+                            <div class="sig-item">مہر و دستخط مہتمم / صدر مدرسہ</div>
+                        </div>
+
+                    </div>
                 </div>
 
-                <div class="no-print" style="text-align:center; margin-top:25px;">
-                    <button onclick="window.print()" style="padding:10px 30px; background:#065f46; color:white; border:none; border-radius:20px; font-weight:bold; font-size:14px; cursor:pointer;">
-                        پرنٹ کریں (Print)
+                <!-- Bottom Action Bar (hidden when printing) -->
+                <div class="no-print" style="margin-top:16px; text-align:center; display:flex; justify-content:center; gap:12px;">
+                    <button onclick="window.print()" style="padding:9px 26px; background:#065f46; color:white; border:none; border-radius:20px; font-weight:bold; font-size:14px; cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
+                        <i class="fas fa-print"></i> پرنٹ نکالیں (A4 Landscape)
+                    </button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('${pdfFileName}')" style="padding:9px 26px; background:#dc2626; color:white; border:none; border-radius:20px; font-weight:bold; font-size:14px; cursor:pointer; box-shadow:0 4px 12px rgba(220,38,38,0.25); display:inline-flex; align-items:center; gap:8px;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (A4 Landscape)
                     </button>
                 </div>
             </body>
@@ -6596,6 +8221,7 @@ downloadReceiptImageDirect(options) {
         `);
         printWindow.document.close();
     }
+
 
     async printDonationReceipt(id) {
         const transactions = await MadrassahDB.getAllTransactions();
@@ -6703,21 +8329,44 @@ downloadReceiptImageDirect(options) {
                     .seal-area { width: 80px; height: 80px; border: 2px solid #ddd; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #ddd; font-size: 0.7rem; text-align: center; }
                     @media print { body { background: white; padding: 0; } .no-print { display: none; } .challan-card { box-shadow: none; border: 2px solid #000; } }
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
                 <script>
-                function downloadDoc(filename) {
-                    const clone = document.documentElement.cloneNode(true);
-                    clone.querySelectorAll('.no-print').forEach(el => el.remove());
-                    const htmlContent = '<!DOCTYPE html>\n' + clone.outerHTML;
-                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = (filename || 'دستاویز') + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'دستاویز') + '.pdf';
+                    const targetEl = document.querySelector('.challan-container') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            let renderWidth = pWidth;
+                            let renderHeight = renderWidth * (imgProps.height / imgProps.width);
+                            if (renderHeight > pHeight) { renderHeight = pHeight; renderWidth = renderHeight * (imgProps.width / imgProps.height); }
+                            const x = (pWidth - renderWidth) / 2;
+                            const y = 0;
+                            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight, undefined, 'FAST');
+                            pdf.save(safeName);
+                        } catch(err) { console.error('PDF error:', err); window.print(); }
+                        finally { if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                    };
+                    if (typeof html2canvas !== 'undefined' && targetEl) {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }).then(canvas => doExport(canvas)).catch(err => { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } });
+                    } else { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
                 }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
                 </script>
             </head>
             <body>
@@ -6763,8 +8412,8 @@ downloadReceiptImageDirect(options) {
                     `).join('')}
                 </div>
                 <div class="no-print" style="text-align:center; margin-top:30px; display:flex; justify-content:center; gap:15px;">
-                    <button onclick="window.print()" style="padding:12px 40px; background:#059669; color:white; border:none; border-radius:30px; font-size:1.2rem; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,0.3);"><i class="fas fa-print"></i> پرنٹ کریں</button>
-                    <button onclick="downloadDoc('فیس_چالان_${student.name ? student.name.replace(/['"\s]+/g, '_') : 'Student'}')" style="padding:12px 40px; background:#0284c7; color:white; border:none; border-radius:30px; font-size:1.2rem; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,0.3);"><i class="fas fa-download"></i> ڈاؤن لوڈ کریں</button>
+                    <button onclick="window.print()" style="padding:12px 40px; background:#059669; color:white; border:none; border-radius:30px; font-size:1.2rem; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,0.3); font-weight:bold;"><i class="fas fa-print"></i> پرنٹ کریں</button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('فیس_چالان_${student.name ? student.name.replace(/['&quot;\\s]+/g, '_') : 'Student'}', 'portrait', 'a4')" style="padding:12px 35px; background:#dc2626; color:white; border:none; border-radius:30px; font-size:1.2rem; cursor:pointer; box-shadow:0 4px 10px rgba(220,38,38,0.35); font-weight:bold; display:inline-flex; align-items:center; gap:8px;"><i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)</button>
                 </div>
             </body>
             </html>
@@ -6801,6 +8450,45 @@ downloadReceiptImageDirect(options) {
                     .sig { border-top: 1px solid #000; width: 120px; text-align: center; padding-top: 5px; }
                     @media print { .no-print { display: none; } }
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
+                <script>
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'ماہانہ_فیس_چالان') + '.pdf';
+                    const targetEl = document.querySelector('.challan-container') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            let renderWidth = pWidth;
+                            let renderHeight = renderWidth * (imgProps.height / imgProps.width);
+                            if (renderHeight > pHeight) { renderHeight = pHeight; renderWidth = renderHeight * (imgProps.width / imgProps.height); }
+                            const x = (pWidth - renderWidth) / 2;
+                            const y = 0;
+                            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight, undefined, 'FAST');
+                            pdf.save(safeName);
+                        } catch(err) { console.error('PDF error:', err); window.print(); }
+                        finally { if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                    };
+                    if (typeof html2canvas !== 'undefined' && targetEl) {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }).then(canvas => doExport(canvas)).catch(err => { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } });
+                    } else { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
+                </script>
             </head>
             <body>
                 <div class="challan-container">
@@ -6831,7 +8519,14 @@ downloadReceiptImageDirect(options) {
                         </div>
                     `).join('')}
                 </div>
-                <div class="no-print" style="text-align:center; margin-top:20px;"><button onclick="window.print()" class="btn btn-primary">پرنٹ کریں</button></div>
+                <div class="no-print" style="text-align:center; margin-top:20px; display:flex; justify-content:center; gap:12px;">
+                    <button onclick="window.print()" style="padding:10px 30px; background:#1e3a8a; color:white; border:none; border-radius:20px; font-weight:bold; font-size:14px; cursor:pointer;">
+                        <i class="fas fa-print"></i> پرنٹ کریں
+                    </button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('ماہانہ_فیس_چالان_${(student.name || 'Student').replace(/[\'\"\\s]+/g, '_')}', 'portrait', 'a4')" style="padding:10px 24px; background:#dc2626; color:white; border:none; border-radius:20px; font-weight:bold; font-size:14px; cursor:pointer; box-shadow:0 4px 10px rgba(220,38,38,0.35); display:inline-flex; align-items:center; gap:6px;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)
+                    </button>
+                </div>
             </body>
             </html>
         `);
@@ -6965,7 +8660,7 @@ downloadReceiptImageDirect(options) {
                             <tr>
                                 <td>${new Date(t.date).toLocaleDateString('ur-PK')}</td>
                                 <td style="color:${t.type === 'Income' ? '#059669' : '#dc2626'}; font-weight:bold;">${t.type === 'Income' ? 'آمدن' : 'خرچ'}</td>
-                                <td>${t.category}</td>
+                                <td>${(t.category || '').replace(/بعام و راشن|طعام و راشن|بعام|طعام/g, 'راشن')}</td>
                                 <td>
                                     <div style="font-weight:600;">${t.name || '---'}</div>
                                     <div style="font-size:0.8rem; color:#64748b;">${t.description || ''}</div>
@@ -7086,21 +8781,44 @@ downloadReceiptImageDirect(options) {
                         .no-print { display: none; }
                     }
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
                 <script>
-                function downloadDoc(filename) {
-                    const clone = document.documentElement.cloneNode(true);
-                    clone.querySelectorAll('.no-print').forEach(el => el.remove());
-                    const htmlContent = '<!DOCTYPE html>\n' + clone.outerHTML;
-                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = (filename || 'دستاویز') + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'دستاویز') + '.pdf';
+                    const targetEl = document.querySelector('body > div:not(.no-print), table, body') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            let renderWidth = pWidth;
+                            let renderHeight = renderWidth * (imgProps.height / imgProps.width);
+                            if (renderHeight > pHeight) { renderHeight = pHeight; renderWidth = renderHeight * (imgProps.width / imgProps.height); }
+                            const x = (pWidth - renderWidth) / 2;
+                            const y = 0;
+                            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight, undefined, 'FAST');
+                            pdf.save(safeName);
+                        } catch(err) { console.error('PDF error:', err); window.print(); }
+                        finally { if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                    };
+                    if (typeof html2canvas !== 'undefined' && targetEl) {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }).then(canvas => doExport(canvas)).catch(err => { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } });
+                    } else { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
                 }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
                 </script>
             </head>
             <body>
@@ -7154,8 +8872,8 @@ downloadReceiptImageDirect(options) {
                 </div>
 
                 <div class="no-print" style="text-align:center; margin-top:30px; display:flex; justify-content:center; gap:15px;">
-                    <button onclick="window.print()" style="padding:10px 40px; background:#065f46; color:white; border:none; border-radius:25px; cursor:pointer; font-size:1.1rem;"><i class="fas fa-print"></i> رپورٹ پرنٹ کریں</button>
-                    <button onclick="downloadDoc('حسابات_رپورٹ')" style="padding:10px 40px; background:#0284c7; color:white; border:none; border-radius:25px; cursor:pointer; font-size:1.1rem;"><i class="fas fa-download"></i> ڈاؤن لوڈ کریں</button>
+                    <button onclick="window.print()" style="padding:10px 40px; background:#065f46; color:white; border:none; border-radius:25px; cursor:pointer; font-size:1.1rem; font-weight:bold;"><i class="fas fa-print"></i> رپورٹ پرنٹ کریں</button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('مالیاتی_رپورٹ', 'portrait', 'a4')" style="padding:10px 35px; background:#dc2626; color:white; border:none; border-radius:25px; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px rgba(220,38,38,0.35); font-weight:bold; display:inline-flex; align-items:center; gap:8px;"><i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)</button>
                 </div>
             </body>
             </html>
@@ -7163,77 +8881,245 @@ downloadReceiptImageDirect(options) {
         printWindow.document.close();
     }
 
-    async showAttendanceReport() {
-        const type = this.attendanceType;
-        const now = new Date();
-        const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM
-        const container = document.getElementById('main-content');
-        
-        container.innerHTML = '<div style="text-align:center; padding: 5rem;"><div class="mms-spinner"></div></div>';
-        
-        // Fetch all attendance for the current month
-        const allAtt = await MadrassahDB.getAttendanceByMonth(type, currentMonth);
-        
+    async printMonthlyAttendanceSummaryReport(customMonth = null) {
+        const month = customMonth || this.attendanceMonth || (this.attendanceDate ? this.attendanceDate.substring(0, 7) : null) || new Date().toISOString().slice(0, 7);
+        const type = this.attendanceType || 'student';
+        const section = this.currentSection || 'banin';
+        const reqClass = this.attendanceClass || 'all';
+        const isBanat = type === 'student' && section === 'banat';
+        const isBanin = type === 'student' && section === 'banin';
+
         let people = [];
         if (type === 'student') {
-            const allStudents = await MadrassahDB.getAllStudents(this.currentSection);
-            people = allStudents.filter(s => s.className === this.attendanceClass || s.class === this.attendanceClass || s.department === this.attendanceClass);
+            const allStudents = (await MadrassahDB.getAllStudents(section)) || [];
+            if (reqClass && reqClass !== 'all') {
+                people = allStudents.filter(s => s.className === reqClass || s.class === reqClass || s.department === reqClass);
+            } else {
+                people = allStudents;
+            }
         } else {
-            people = await MadrassahDB.getAllTeachers();
+            people = (await MadrassahDB.getAllTeachers()) || [];
         }
 
-        container.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <h2 style="color:var(--primary); margin:0;"><i class="fas fa-file-contract"></i> ماہانہ حاضری رپورٹ (${type === 'student' ? 'طلبا' : 'اساتذہ و عملہ'})</h2>
-                <button class="btn btn-secondary" onclick="app.render()"><i class="fas fa-arrow-right"></i> واپس جائیں</button>
-            </div>
+        people.sort((a, b) => parseInt(a.id || 0) - parseInt(b.id || 0));
 
-            <div class="card" style="padding:0; overflow:hidden;">
-                <table style="width:100%;">
-                    <thead>
-                        <tr>
-                            <th>نام</th>
-                            ${type === 'student' ? '<th>درجہ / شعبہ</th>' : '<th>عہدہ</th>'}
-                            <th style="text-align:center;">حاضر (P)</th>
-                            <th style="text-align:center;">غیر حاضر (A)</th>
-                            <th style="text-align:center;">رخصت (L)</th>
-                            <th style="text-align:center;">فیصد (%)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${people.map(p => {
-                            const pAtt = allAtt.filter(a => a.personId === p.id);
-                            const pCount = pAtt.filter(a => a.status === 'Present').length;
-                            const aCount = pAtt.filter(a => a.status === 'Absent').length;
-                            const lCount = pAtt.filter(a => a.status === 'Leave').length;
-                            const total = pCount + aCount + lCount;
-                            const percent = total > 0 ? Math.round((pCount / total) * 100) : 0;
-                            
-                            return `
+        const allAtt = (await MadrassahDB.getAttendanceByMonth(type, month, section)) || [];
+
+        const [yearStr, monthStr] = month.split('-');
+        const year = parseInt(yearStr);
+        const monthNum = parseInt(monthStr);
+        const urduMonths = ['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'];
+        const monthUrdu = urduMonths[monthNum - 1] || monthStr;
+
+        let totalP = 0, totalA = 0, totalL = 0;
+        const processed = people.map((p, idx) => {
+            const code = p.uniqueCode || (type === 'student' ? ('STU-' + (1000 + parseInt(p.id))) : ('EMP-' + (100 + parseInt(p.id))));
+            const pAtt = allAtt.filter(a => a.personId === p.id || a.studentId === p.id);
+            const pCount = pAtt.filter(a => a.status === 'Present' || a.status === 'حاضر').length;
+            const aCount = pAtt.filter(a => a.status === 'Absent' || a.status === 'غیر حاضر').length;
+            const lCount = pAtt.filter(a => a.status === 'Leave' || a.status === 'رخصت').length;
+            const marked = pCount + aCount + lCount;
+            const percent = marked > 0 ? Math.round((pCount / marked) * 100) : 0;
+            
+            totalP += pCount;
+            totalA += aCount;
+            totalL += lCount;
+
+            let grade = 'تسلی بخش';
+            let gradeBg = '#f1f5f9', gradeColor = '#475569';
+            if (percent >= 90) { grade = 'ممتاز (A+)'; gradeBg = '#ecfdf5'; gradeColor = '#065f46'; }
+            else if (percent >= 80) { grade = 'بہت خوب (A)'; gradeBg = '#f0fdf4'; gradeColor = '#16a34a'; }
+            else if (percent >= 65) { grade = 'مناسب (B)'; gradeBg = '#fffbeb'; gradeColor = '#d97706'; }
+            else { grade = 'توجہ طلب (C)'; gradeBg = '#fef2f2'; gradeColor = '#dc2626'; }
+
+            return {
+                idx: idx + 1,
+                code,
+                name: p.name,
+                fatherOrDesig: type === 'student' ? (p.fatherName || '---') : (p.designation || 'ملازم'),
+                subTitle: type === 'student' ? (p.className || p.department || '---') : (p.staffType === 'teaching' ? 'تدریسی' : 'انتظامی'),
+                pCount,
+                aCount,
+                lCount,
+                percent,
+                grade,
+                gradeBg,
+                gradeColor
+            };
+        });
+
+        const overallTotal = totalP + totalA + totalL;
+        const overallPct = overallTotal > 0 ? Math.round((totalP / overallTotal) * 100) : 0;
+        const sectionName = isBanat ? 'شعبہ بنات (طالبات)' : (isBanin ? 'شعبہ بنین (طلباء)' : 'اساتذہ و انتظامی عملہ');
+        const themeColor = isBanat ? '#9d174d' : (isBanin ? '#065f46' : '#1e40af');
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert('براہ کرم پاپ اپ ونڈو کھولنے کی اجازت دیجیے۔');
+            return;
+        }
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html lang="ur" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>ماہانہ حاضری خلاصہ رپورٹ - ${sectionName} (${monthUrdu} ${year})</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+                <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+                <style>
+                    @page { size: A4 portrait; margin: 8mm 10mm; }
+                    * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; font-family: 'Jameel Noori Nastaleeq', 'Amiri', 'Noto Nastaliq Urdu', 'Segoe UI', Tahoma, sans-serif; }
+                    body { background: #f8fafc; color: #0f172a; margin: 0; padding: 12px; direction: rtl; }
+                    .summary-sheet { width: 100%; max-width: 210mm; margin: 0 auto; background: white; border: 2px solid ${themeColor}; border-radius: 8px; padding: 14px 18px; position: relative; box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
+                    .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 380px; opacity: 0.05; pointer-events: none; }
+                    .header-box { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px double ${themeColor}; padding-bottom: 8px; margin-bottom: 12px; position: relative; z-index: 2; }
+                    .logo-img { width: 62px; height: 62px; border-radius: 50%; border: 1.5px solid ${themeColor}; padding: 2px; object-fit: contain; }
+                    .madrsa-name { color: ${themeColor}; font-size: 1.6rem; font-weight: bold; margin: 0; text-align: center; }
+                    .title-badge { background: ${themeColor}; color: white; padding: 2px 20px; border-radius: 14px; font-size: 1rem; font-weight: bold; display: inline-block; margin-top: 4px; }
+                    
+                    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; position: relative; z-index: 2; }
+                    .kpi-card { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; text-align: center; }
+                    .kpi-card span { font-size: 0.78rem; color: #64748b; display: block; }
+                    .kpi-card b { font-size: 1.1rem; color: #0f172a; }
+
+                    table { width: 100%; border-collapse: collapse; font-size: 0.84rem; position: relative; z-index: 2; margin-bottom: 16px; }
+                    th, td { border: 1px solid #cbd5e1; padding: 6px 4px; text-align: center; vertical-align: middle; }
+                    th { background: #f1f5f9; color: #0f172a; font-weight: bold; }
+                    .code-span { font-family: monospace; font-size: 0.8rem; background: #eff6ff; color: #1e40af; padding: 1px 4px; border-radius: 4px; }
+                    .prog-bar-wrap { width: 90px; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 5px; }
+
+                    .footer-sigs { display: flex; justify-content: space-between; margin-top: 25px; padding: 0 20px; position: relative; z-index: 2; }
+                    .sig-line { border-top: 1.5px dashed ${themeColor}; width: 140px; text-align: center; padding-top: 4px; font-size: 0.88rem; font-weight: bold; color: #334155; }
+                    .no-print { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
+                    .btn-act { padding: 8px 24px; border-radius: 20px; font-weight: bold; cursor: pointer; border: none; font-size: 0.95rem; font-family: inherit; }
+                    @media print { body { background: white !important; padding: 0 !important; } .summary-sheet { border: 2px solid ${themeColor} !important; box-shadow: none !important; width: 100% !important; max-width: 100% !important; } .no-print { display: none !important; } }
+                </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
+                <script>
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'ماہانہ_حاضری_خلاصہ_رپورٹ') + '.pdf';
+                    const targetEl = document.querySelector('.summary-sheet') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            let renderWidth = pWidth;
+                            let renderHeight = renderWidth * (imgProps.height / imgProps.width);
+                            if (renderHeight > pHeight) { renderHeight = pHeight; renderWidth = renderHeight * (imgProps.width / imgProps.height); }
+                            const x = (pWidth - renderWidth) / 2;
+                            const y = 0;
+                            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight, undefined, 'FAST');
+                            pdf.save(safeName);
+                        } catch(err) { console.error('PDF error:', err); window.print(); }
+                        finally { if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                    };
+                    if (typeof html2canvas !== 'undefined' && targetEl) {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }).then(canvas => doExport(canvas)).catch(err => { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } });
+                    } else { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
+                </script>
+            </head>
+            <body>
+                <div class="summary-sheet">
+                    <img src="logo.jpg" class="watermark">
+                    <div class="header-box">
+                        <div style="width:25%; text-align:right;">
+                            <img src="madrsa-title.png" style="max-height:40px; object-fit:contain; mix-blend-mode:multiply;">
+                            <div style="font-size:0.85rem; color:${themeColor}; font-weight:bold;">${sectionName}</div>
+                        </div>
+                        <div style="text-align:center; flex-grow:1;">
+                            <h1 class="madrsa-name">جامعہ و مدرسہ عبد الرحمن بن عوف غفوریہ</h1>
+                            <div class="title-badge"><i class="fas fa-chart-pie"></i> ماہانہ حاضری خلاصہ و کارکردگی رپورٹ</div>
+                        </div>
+                        <div style="width:25%; text-align:left; display:flex; align-items:center; justify-content:flex-end; gap:8px;">
+                            <div style="font-size:0.8rem; color:#64748b; text-align:left;">
+                                <div>ماہ: <b style="color:${themeColor};">${monthUrdu} ${year}ء</b></div>
+                                <div>تاریخ: <b>${new Date().toLocaleDateString('ur-PK')}</b></div>
+                            </div>
+                            <img src="logo.jpg" class="logo-img">
+                        </div>
+                    </div>
+
+                    <div class="kpi-grid">
+                        <div class="kpi-card"><span>کل اراکین</span><b>${people.length}</b></div>
+                        <div class="kpi-card"><span>مجموعی حاضریاں</span><b style="color:#059669;">${totalP}</b></div>
+                        <div class="kpi-card"><span>غیر حاضریاں</span><b style="color:#dc2626;">${totalA}</b></div>
+                        <div class="kpi-card"><span>رخصتیں</span><b style="color:#d97706;">${totalL}</b></div>
+                        <div class="kpi-card"><span>اوسط شرح</span><b style="color:${overallPct >= 80 ? '#059669' : '#d97706'};">${overallPct}%</b></div>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:30px;">#</th>
+                                <th style="width:75px;">کوڈ</th>
+                                <th style="text-align:right; padding-right:8px;">نام</th>
+                                <th style="text-align:right; padding-right:6px;">ولدیت / عہدہ</th>
+                                <th style="width:60px; color:#059669;">حاضر (P)</th>
+                                <th style="width:60px; color:#dc2626;">غیر حاضر (A)</th>
+                                <th style="width:60px; color:#d97706;">رخصت (L)</th>
+                                <th style="width:130px;">شرحِ حاضری (%)</th>
+                                <th style="width:90px;">درجہ بندی</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${processed.map(p => `
                                 <tr>
-                                    <td><b style="color:var(--primary);">${p.name}</b></td>
-                                    <td>${type === 'student' ? (p.className || p.department || '---') : (p.designation || 'استاد')}</td>
-                                    <td style="text-align:center; color:#059669; font-weight:bold;">${pCount}</td>
-                                    <td style="text-align:center; color:#dc2626; font-weight:bold;">${aCount}</td>
-                                    <td style="text-align:center; color:#d97706; font-weight:bold;">${lCount}</td>
-                                    <td style="text-align:center;">
-                                        <div style="display:flex; align-items:center; gap:8px; justify-content:center;">
-                                            <div style="width:100px; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
-                                                <div style="width:${percent}%; height:100%; background:${percent > 80 ? '#059669' : (percent > 50 ? '#d97706' : '#dc2626')};"></div>
-                                            </div>
-                                            <span style="font-weight:bold;">${percent}%</span>
+                                    <td>${p.idx}</td>
+                                    <td><span class="code-span">${p.code}</span></td>
+                                    <td style="text-align:right; font-weight:bold; padding-right:8px; color:#0f172a;">${p.name}</td>
+                                    <td style="text-align:right; padding-right:6px; color:#475569; font-size:0.8rem;">${p.fatherOrDesig}</td>
+                                    <td style="font-weight:bold; color:#059669;">${p.pCount}</td>
+                                    <td style="font-weight:bold; color:#dc2626;">${p.aCount}</td>
+                                    <td style="font-weight:bold; color:#d97706;">${p.lCount}</td>
+                                    <td>
+                                        <div class="prog-bar-wrap">
+                                            <div style="width:${p.percent}%; height:100%; background:${p.percent >= 80 ? '#059669' : (p.percent >= 60 ? '#d97706' : '#dc2626')};"></div>
                                         </div>
+                                        <b style="font-size:0.85rem;">${p.percent}%</b>
+                                    </td>
+                                    <td>
+                                        <span style="background:${p.gradeBg}; color:${p.gradeColor}; padding:2px 8px; border-radius:10px; font-weight:bold; font-size:0.78rem;">
+                                            ${p.grade}
+                                        </span>
                                     </td>
                                 </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-            <div style="margin-top:2rem; text-align:center;">
-                <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> رپورٹ پرنٹ کریں</button>
-            </div>
-        `;
+                            `).join('') || `<tr><td colspan="9" style="padding:2rem; color:#94a3b8;">کوئی ریکارڈ نہیں ملا</td></tr>`}
+                        </tbody>
+                    </table>
+
+                    <div class="footer-sigs">
+                        <div class="sig-line">دستخط نگران درجہ / استاد</div>
+                        <div class="sig-line">دستخط ناظمِ تعلیمات</div>
+                        <div class="sig-line">مہر و دستخط مہتمم</div>
+                    </div>
+                </div>
+
+                <div class="no-print">
+                    <button class="btn-act" onclick="window.print()" style="background:#065f46; color:white;"><i class="fas fa-print"></i> پرنٹ کریں (A4)</button>
+                    <button class="btn-act btn-pdf-download" onclick="downloadPDF('ماہانہ_حاضری_خلاصہ_${monthUrdu}_${year}', 'portrait', 'a4')" style="background:#dc2626; color:white; display:inline-flex; align-items:center; gap:6px;"><i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)</button>
+                    <button class="btn-act" onclick="window.close()" style="background:#64748b; color:white;"><i class="fas fa-times"></i> بند کریں</button>
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
     }
 
     getIDCardPrintStyles() {
@@ -7545,21 +9431,44 @@ downloadReceiptImageDirect(options) {
                 <style>
                     ${this.getIDCardPrintStyles()}
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
                 <script>
-                function downloadDoc(filename) {
-                    const clone = document.documentElement.cloneNode(true);
-                    clone.querySelectorAll('.no-print').forEach(el => el.remove());
-                    const htmlContent = '<!DOCTYPE html>\n' + clone.outerHTML;
-                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = (filename || 'دستاویز') + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'شناختی_کارڈ') + '.pdf';
+                    const targetEl = document.querySelector('.cards-wrapper') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            let renderWidth = pWidth;
+                            let renderHeight = renderWidth * (imgProps.height / imgProps.width);
+                            if (renderHeight > pHeight) { renderHeight = pHeight; renderWidth = renderHeight * (imgProps.width / imgProps.height); }
+                            const x = (pWidth - renderWidth) / 2;
+                            const y = 0;
+                            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight, undefined, 'FAST');
+                            pdf.save(safeName);
+                        } catch(err) { console.error('PDF error:', err); window.print(); }
+                        finally { if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                    };
+                    if (typeof html2canvas !== 'undefined' && targetEl) {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }).then(canvas => doExport(canvas)).catch(err => { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } });
+                    } else { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
                 }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
                 </script>
             </head>
             <body>
@@ -7568,7 +9477,7 @@ downloadReceiptImageDirect(options) {
                 </div>
                 <div class="no-print" style="text-align:center; margin-top:30px; display:flex; justify-content:center; gap:15px;">
                     <button onclick="window.print()" style="padding:10px 40px; background:#065f46; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px rgba(0,0,0,0.2);"><i class="fas fa-print"></i> پرنٹ کریں (A4)</button>
-                    <button onclick="downloadDoc('شناختی_کارڈ_${s.name ? s.name.replace(/['&quot;\s]+/g, '_') : 'Student'}')" style="padding:10px 40px; background:#0284c7; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px rgba(0,0,0,0.2);"><i class="fas fa-download"></i> ڈاؤن لوڈ کریں</button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('شناختی_کارڈ_${s.name ? s.name.replace(/['&quot;\\s]+/g, '_') : 'Student'}', 'portrait', 'a4')" style="padding:10px 35px; background:#dc2626; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px rgba(220,38,38,0.35); font-weight:bold; display:inline-flex; align-items:center; gap:8px;"><i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)</button>
                 </div>
             </body>
             </html>
@@ -7724,19 +9633,44 @@ downloadReceiptImageDirect(options) {
                 <style>
                     ${this.getIDCardPrintStyles()}
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
                 <script>
-                function downloadDoc(filename) {
-                    const htmlContent = document.documentElement.outerHTML;
-                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = (filename || 'شناختی_کارڈ') + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'شناختی_کارڈ') + '.pdf';
+                    const targetEl = document.querySelector('.cards-wrapper') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            let renderWidth = pWidth;
+                            let renderHeight = renderWidth * (imgProps.height / imgProps.width);
+                            if (renderHeight > pHeight) { renderHeight = pHeight; renderWidth = renderHeight * (imgProps.width / imgProps.height); }
+                            const x = (pWidth - renderWidth) / 2;
+                            const y = 0;
+                            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight, undefined, 'FAST');
+                            pdf.save(safeName);
+                        } catch(err) { console.error('PDF error:', err); window.print(); }
+                        finally { if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                    };
+                    if (typeof html2canvas !== 'undefined' && targetEl) {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }).then(canvas => doExport(canvas)).catch(err => { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } });
+                    } else { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
                 }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
                 <\/script>
             </head>
             <body>
@@ -7745,7 +9679,7 @@ downloadReceiptImageDirect(options) {
                 </div>
                 <div class="no-print" style="text-align:center; margin-top:30px; display:flex; justify-content:center; gap:15px;">
                     <button onclick="window.print()" style="padding:10px 40px; background:#065f46; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px rgba(0,0,0,0.2);"><i class="fas fa-print"></i> پرنٹ کریں (A4)</button>
-                    <button onclick="downloadDoc('اسٹاف_کارڈ_${staff.name ? staff.name.replace(/['"\\s]+/g, '_') : 'Staff'}')" style="padding:10px 40px; background:#0284c7; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px rgba(0,0,0,0.2);"><i class="fas fa-download"></i> ڈاؤن لوڈ کریں</button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('اسٹاف_کارڈ_${staff.name ? staff.name.replace(/['&quot;\\s]+/g, '_') : 'Staff'}', 'portrait', 'a4')" style="padding:10px 35px; background:#dc2626; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px rgba(220,38,38,0.35); font-weight:bold; display:inline-flex; align-items:center; gap:8px;"><i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)</button>
                 </div>
             </body>
             </html>
@@ -7771,19 +9705,44 @@ downloadReceiptImageDirect(options) {
                 <style>
                     ${this.getIDCardPrintStyles()}
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
                 <script>
-                function downloadDoc(filename) {
-                    const htmlContent = document.documentElement.outerHTML;
-                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = (filename || 'تمام_اسٹاف_کارڈز') + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'تمام_اسٹاف_کارڈز') + '.pdf';
+                    const targetEl = document.querySelector('.cards-wrapper') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            let renderWidth = pWidth;
+                            let renderHeight = renderWidth * (imgProps.height / imgProps.width);
+                            if (renderHeight > pHeight) { renderHeight = pHeight; renderWidth = renderHeight * (imgProps.width / imgProps.height); }
+                            const x = (pWidth - renderWidth) / 2;
+                            const y = 0;
+                            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight, undefined, 'FAST');
+                            pdf.save(safeName);
+                        } catch(err) { console.error('PDF error:', err); window.print(); }
+                        finally { if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                    };
+                    if (typeof html2canvas !== 'undefined' && targetEl) {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }).then(canvas => doExport(canvas)).catch(err => { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } });
+                    } else { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
                 }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
                 <\/script>
             </head>
             <body>
@@ -7792,7 +9751,7 @@ downloadReceiptImageDirect(options) {
                 </div>
                 <div class="no-print" style="text-align:center; margin-top:30px; display:flex; justify-content:center; gap:15px;">
                     <button onclick="window.print()" style="padding:10px 40px; background:#065f46; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px rgba(0,0,0,0.2);"><i class="fas fa-print"></i> تمام کارڈز پرنٹ کریں (A4)</button>
-                    <button onclick="downloadDoc('تمام_اسٹاف_شناختی_کارڈز')" style="padding:10px 40px; background:#0284c7; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px rgba(0,0,0,0.2);"><i class="fas fa-download"></i> ڈاؤن لوڈ کریں</button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('تمام_اسٹاف_شناختی_کارڈز', 'portrait', 'a4')" style="padding:10px 35px; background:#dc2626; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px rgba(220,38,38,0.35); font-weight:bold; display:inline-flex; align-items:center; gap:8px;"><i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)</button>
                 </div>
             </body>
             </html>
@@ -7801,12 +9760,13 @@ downloadReceiptImageDirect(options) {
     }
 
     async printClassIDCards() {
-        const students = await MadrassahDB.getAllStudents(this.currentSection);
+        const activeSec = (this.currentSection === 'banat' || this.currentSection === 'بنات') ? 'banat' : 'banin';
+        const students = await MadrassahDB.getAllStudents(activeSec);
         if (!students || students.length === 0) {
             alert('اس سیکشن میں طلباء کا کوئی ریکارڈ نہیں ملا!');
             return;
         }
-        const isBanat = this.currentSection === 'banat';
+        const isBanat = activeSec === 'banat';
 
         const printWindow = window.open('', '_blank');
         printWindow.document.write(`
@@ -7819,19 +9779,44 @@ downloadReceiptImageDirect(options) {
                 <style>
                     ${this.getIDCardPrintStyles()}
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
                 <script>
-                function downloadDoc(filename) {
-                    const htmlContent = document.documentElement.outerHTML;
-                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = (filename || 'کلاس_شناختی_کارڈز') + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'کلاس_شناختی_کارڈز') + '.pdf';
+                    const targetEl = document.querySelector('.cards-wrapper') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            let renderWidth = pWidth;
+                            let renderHeight = renderWidth * (imgProps.height / imgProps.width);
+                            if (renderHeight > pHeight) { renderHeight = pHeight; renderWidth = renderHeight * (imgProps.width / imgProps.height); }
+                            const x = (pWidth - renderWidth) / 2;
+                            const y = 0;
+                            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight, undefined, 'FAST');
+                            pdf.save(safeName);
+                        } catch(err) { console.error('PDF error:', err); window.print(); }
+                        finally { if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                    };
+                    if (typeof html2canvas !== 'undefined' && targetEl) {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }).then(canvas => doExport(canvas)).catch(err => { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } });
+                    } else { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
                 }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
                 <\/script>
             </head>
             <body>
@@ -7840,7 +9825,7 @@ downloadReceiptImageDirect(options) {
                 </div>
                 <div class="no-print" style="text-align:center; margin-top:30px; display:flex; justify-content:center; gap:15px;">
                     <button onclick="window.print()" style="padding:10px 40px; background:${isBanat ? '#9d174d' : '#065f46'}; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px rgba(0,0,0,0.2);"><i class="fas fa-print"></i> تمام کارڈز پرنٹ کریں (A4)</button>
-                    <button onclick="downloadDoc('${isBanat ? 'طالبات_کارڈز' : 'طلباء_کارڈز'}')" style="padding:10px 40px; background:#0284c7; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px rgba(0,0,0,0.2);"><i class="fas fa-download"></i> ڈاؤن لوڈ کریں</button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('${isBanat ? 'طالبات_کارڈز' : 'طلباء_کارڈز'}', 'portrait', 'a4')" style="padding:10px 35px; background:#dc2626; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px rgba(220,38,38,0.35); font-weight:bold; display:inline-flex; align-items:center; gap:8px;"><i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)</button>
                 </div>
             </body>
             </html>
@@ -7852,11 +9837,39 @@ downloadReceiptImageDirect(options) {
     async renderExamsModule(container) {
         const exams = await MadrassahDB.getAllExams();
         container.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap:wrap; gap:10px;">
                 <h2 style="color:var(--primary); margin:0;"><i class="fas fa-file-signature"></i> امتحانی نظام (Examination System)</h2>
-                <div style="display:flex; gap:1rem;">
+                <div style="display:flex; gap:0.8rem; flex-wrap:wrap;">
                     <button class="btn btn-secondary" onclick="app.renderGradingSettings()"><i class="fas fa-award"></i> تقدیر کی ترتیب (Grading)</button>
+                    <button class="btn" style="background:#7c3aed; color:white; font-weight:bold; box-shadow:0 2px 6px rgba(124,58,237,0.3);" onclick="app.showDateSheetExamPicker()"><i class="fas fa-calendar-alt"></i> ڈیٹ شیٹ بنائیں / سیٹ کریں</button>
                     <button class="btn btn-primary" onclick="app.showCreateExamForm()"><i class="fas fa-plus"></i> نیا امتحان شامل کریں</button>
+                </div>
+            </div>
+
+            <!-- Quick Exam Selector Bar -->
+            <div class="card" style="background:linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border:1.5px solid #a7f3d0; padding:1.2rem; border-radius:12px; margin-bottom:1.5rem; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:15px;">
+                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                        <span style="font-weight:bold; font-size:1.15rem; color:#065f46;"><i class="fas fa-book-open-reader"></i> امتحان منتخب کریں (Select Exam):</span>
+                        <select id="quick_exam_select" onchange="app.handleQuickExamSelect(this.value)" style="padding:10px 18px; font-size:1.1rem; border:2px solid #059669; border-radius:10px; min-width:320px; font-weight:bold; color:#065f46; background:#fff; cursor:pointer; box-shadow:0 2px 5px rgba(5,150,105,0.15);">
+                            <option value="">-- امتحان کا انتخاب فرمائیں --</option>
+                            ${exams.map(e => {
+                                const isH = (e.department && e.department.includes('حفظ')) || (e.title && e.title.includes('حفظ'));
+                                return `<option value="${e.id}">${isH ? '📖 [شعبہ حفظ] ' : '📚 '} ${e.title} (${e.department}${e.className ? ' - ' + e.className : ''})</option>`;
+                            }).join('')}
+                        </select>
+                    </div>
+                    <div id="quick_exam_actions" style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-sm" style="background:#7c3aed; color:white; font-weight:bold; padding:8px 16px; border-radius:8px; font-size:0.95rem; box-shadow:0 2px 4px rgba(124,58,237,0.25);" onclick="app.executeSelectedExamAction('datesheet')">
+                            <i class="fas fa-calendar-alt"></i> ڈیٹ شیٹ بنائیں / سیٹ کریں
+                        </button>
+                        <button type="button" class="btn btn-sm" style="background:#0284c7; color:white; font-weight:bold; padding:8px 16px; border-radius:8px; font-size:0.95rem;" onclick="app.executeSelectedExamAction('marks')">
+                            <i class="fas fa-keyboard"></i> نمبر درج کریں
+                        </button>
+                        <button type="button" class="btn btn-sm" style="background:#ea580c; color:white; font-weight:bold; padding:8px 16px; border-radius:8px; font-size:0.95rem;" onclick="app.executeSelectedExamAction('print')">
+                            <i class="fas fa-print"></i> پرنٹ / PDF
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -7871,19 +9884,25 @@ downloadReceiptImageDirect(options) {
                         </tr>
                     </thead>
                     <tbody>
-                        ${exams.map(e => `
+                        ${exams.map(e => {
+                            const isH = (e.department && e.department.includes('حفظ')) || (e.title && e.title.includes('حفظ'));
+                            return `
                             <tr>
-                                <td style="font-weight:bold; color:var(--primary);">${e.title}</td>
+                                <td style="font-weight:bold; color:var(--primary);">
+                                    ${isH ? '<span style="background:#ecfdf5; color:#059669; padding:2px 8px; border-radius:6px; font-size:0.85rem; margin-left:6px;"><i class="fas fa-quran"></i> حفظ</span>' : ''}
+                                    ${e.title}
+                                </td>
                                 <td>${e.department} ${e.className ? `(${e.className})` : ''}</td>
                                 <td>${new Date(e.date).toLocaleDateString('ur-PK')}</td>
-                                <td style="display:flex; justify-content:center; gap:0.5rem;">
-                                    <button class="btn btn-sm" style="background:#f0f9ff; color:#0369a1;" onclick="app.showEnterMarks(${e.id})" title="نمبر درج کریں"><i class="fas fa-keyboard"></i></button>
-                                    <button class="btn btn-sm" style="background:#f5f3ff; color:#7c3aed;" onclick="app.showExamSubjectSettings(${e.id})" title="نمبرات اور ڈیٹ شیٹ سیٹ کریں"><i class="fas fa-cog"></i></button>
-                                    <button class="btn btn-sm" style="background:#fff7ed; color:#ea580c;" onclick="app.printDateSheet(${e.id})" title="ڈیٹ شیٹ پرنٹ کریں"><i class="fas fa-calendar-alt"></i></button>
-                                    <button class="btn btn-sm" style="background:#fef2f2; color:#dc2626;" onclick="app.deleteExam(${e.id})" title="ڈیلیٹ"><i class="fas fa-trash"></i></button>
+                                <td style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap;">
+                                    <button class="btn btn-sm" style="background:#7c3aed; color:white; font-weight:bold; padding:6px 12px; display:inline-flex; align-items:center; gap:6px;" onclick="app.showExamSubjectSettings(${e.id})" title="ڈیٹ شیٹ بنائیں اور سیٹ کریں"><i class="fas fa-calendar-alt"></i> ڈیٹ شیٹ بنائیں</button>
+                                    <button class="btn btn-sm" style="background:#0284c7; color:white; font-weight:bold; padding:6px 12px; display:inline-flex; align-items:center; gap:6px;" onclick="app.showEnterMarks(${e.id})" title="نمبر درج کریں"><i class="fas fa-keyboard"></i> نمبر درج کریں</button>
+                                    <button class="btn btn-sm" style="background:#fff7ed; color:#ea580c; font-weight:bold; border:1px solid #fed7aa; padding:6px 10px;" onclick="app.printDateSheet(${e.id})" title="ڈیٹ شیٹ پرنٹ کریں"><i class="fas fa-print"></i> پرنٹ</button>
+                                    <button class="btn btn-sm" style="background:#fef2f2; color:#dc2626; padding:6px 10px;" onclick="app.deleteExam(${e.id})" title="ڈیلیٹ"><i class="fas fa-trash"></i></button>
                                 </td>
                             </tr>
-                        `).join('') || '<tr><td colspan="4" style="text-align:center; padding:3rem;">کوئی امتحان ریکارڈ نہیں ملا</td></tr>'}
+                            `;
+                        }).join('') || '<tr><td colspan="4" style="text-align:center; padding:3rem;">کوئی امتحان ریکارڈ نہیں ملا</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -7891,36 +9910,177 @@ downloadReceiptImageDirect(options) {
         `;
     }
 
+    handleQuickExamSelect(examId) {
+        if (!examId) return;
+        this.showExamSubjectSettings(parseInt(examId));
+        const target = document.getElementById('exam_sub_container');
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    executeSelectedExamAction(actionType) {
+        const select = document.getElementById('quick_exam_select');
+        const examId = select ? parseInt(select.value) : null;
+        if (!examId) {
+            alert('براہِ کرم پہلے اوپر دی گئی فہرست سے امتحان منتخب فرمائیں!');
+            if (select) select.focus();
+            return;
+        }
+        if (actionType === 'datesheet') {
+            this.showExamSubjectSettings(examId);
+        } else if (actionType === 'marks') {
+            this.showEnterMarks(examId);
+        } else if (actionType === 'print') {
+            this.printDateSheet(examId);
+        }
+        const target = document.getElementById('exam_sub_container');
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async showDateSheetExamPicker() {
+        const exams = await MadrassahDB.getAllExams();
+        if (!exams || exams.length === 0) {
+            alert('کوئی امتحان موجود نہیں ہے! پہلے نیا امتحان شامل فرمائیں۔');
+            this.showCreateExamForm();
+            return;
+        }
+        const select = document.getElementById('quick_exam_select');
+        if (select && select.value) {
+            this.showExamSubjectSettings(parseInt(select.value));
+        } else if (select) {
+            select.value = exams[0].id;
+            this.showExamSubjectSettings(exams[0].id);
+        }
+        const target = document.getElementById('exam_sub_container');
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+    }
+
     showCreateExamForm() {
         const container = document.getElementById('exam_sub_container');
+        const todayStr = new Date().toISOString().split('T')[0];
+        const defaultEnd = new Date();
+        defaultEnd.setDate(defaultEnd.getDate() + 14);
+        const defaultEndStr = defaultEnd.toISOString().split('T')[0];
+
         container.innerHTML = `
-            <div class="card" style="border-top: 5px solid var(--primary); animation: slideUp 0.3s ease-out;">
-                <h3 style="color:var(--primary); margin-bottom:1.5rem;"><i class="fas fa-plus-circle"></i> نئے امتحان کا اندراج</h3>
+            <div class="card" style="border-top: 5px solid #7c3aed; animation: slideUp 0.3s ease-out; box-shadow:0 8px 25px rgba(0,0,0,0.08);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; border-bottom:1px solid #e2e8f0; padding-bottom:12px;">
+                    <h3 style="color:#7c3aed; margin:0;"><i class="fas fa-calendar-plus"></i> نئے امتحان و ڈیٹ شیٹ کا تفصیلی اندراج</h3>
+                    <button type="button" class="btn btn-sm" onclick="document.getElementById('exam_sub_container').innerHTML=''" style="background:#f1f5f9; color:#64748b;">
+                        <i class="fas fa-times"></i> بند کریں
+                    </button>
+                </div>
                 <form onsubmit="app.handleExamSubmit(event)">
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem;">
-                        <div class="tt-form-group"><label>امتحان کا عنوان (مثلاً سالانہ 2026)</label><input type="text" name="title" required></div>
-                        <div class="tt-form-group"><label>تاریخِ ابتداء (امتحان شروع ہونے کی تاریخ)</label><input type="date" name="date" value="${new Date().toISOString().split('T')[0]}" required></div>
+                    <!-- Basic Info -->
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:1.2rem; margin-bottom:1.2rem;">
                         <div class="tt-form-group">
-                            <label>شعبہ (Department)</label>
-                            <select name="department" id="exam_dept" onchange="app.updateExamClasses(this.value)" required>
+                            <label style="font-weight:bold; color:#1e293b;"><i class="fas fa-heading"></i> امتحان کا عنوان (مثلاً سالانہ 2026 / ششماہی)</label>
+                            <input type="text" name="title" required placeholder="مثلاً: سالانہ امتحانات 1447ھ / 2026ء" style="font-size:1.05rem; padding:9px;">
+                        </div>
+                        <div class="tt-form-group">
+                            <label style="font-weight:bold; color:#1e293b;"><i class="fas fa-building-columns"></i> شعبہ (Department)</label>
+                            <select name="department" id="exam_dept" onchange="app.updateExamClasses(this.value)" required style="padding:9px; font-size:1rem;">
                                 <option value="">انتخاب کریں</option>
                                 ${Object.keys(this.madrsaDepartments).map(dept => `<option value="${dept}">${dept}</option>`).join('')}
                             </select>
                         </div>
                         <div class="tt-form-group" id="exam_class_container" style="display:none;">
-                            <label>درجہ (Class)</label>
-                            <select name="className" id="exam_class" onchange="app.autoPopulateExamSubjects()">
+                            <label style="font-weight:bold; color:#1e293b;"><i class="fas fa-graduation-cap"></i> درجہ (Class)</label>
+                            <select name="className" id="exam_class" onchange="app.autoPopulateExamSubjects()" style="padding:9px; font-size:1rem;">
                                 <option value="">انتخاب کریں</option>
                             </select>
                         </div>
-                        <div class="tt-form-group" style="grid-column: span 2;">
-                            <label>مضامین (کاما لگا کر لکھیں - آپ ان میں ترمیم کر سکتے ہیں)</label>
-                            <input type="text" name="subjects" id="exam_subjects_input" placeholder="قرآن، نحو، صرف، فقہ" required style="font-size:1.1rem; padding:10px;">
-                            <small style="color:#059669; font-weight:bold; margin-top:6px; display:block;"><i class="fas fa-magic"></i> منتخب شعبہ/درجہ کے کتب مضامین خودکار درج ہو گئے ہیں۔ آپ ان میں حسبِ ضرورت تبدیلی یا نئی کتب شامل کر سکتے ہیں۔</small>
+                    </div>
+
+                    <!-- Dates & Timing Box -->
+                    <div style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:12px; padding:1.2rem; margin-bottom:1.2rem;">
+                        <div style="font-weight:bold; font-size:1.05rem; color:#065f46; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-calendar-alt"></i> امتحانی تواریخ، اوقات اور چھٹیوں کے اصول (Dates, Timing & Holidays):
+                        </div>
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:1.2rem;">
+                            <div class="tt-form-group">
+                                <label style="font-weight:bold; color:#0f172a;"><i class="fas fa-play" style="color:#059669; font-size:0.85rem;"></i> امتحان شروع ہونے کی تاریخ (Start Date)</label>
+                                <input type="date" name="date" id="create_exam_start_date" value="${todayStr}" required style="padding:8px; border:1.5px solid #059669; border-radius:8px; font-weight:bold;">
+                            </div>
+                            <div class="tt-form-group">
+                                <label style="font-weight:bold; color:#0f172a;"><i class="fas fa-flag-checkered" style="color:#dc2626; font-size:0.85rem;"></i> امتحان اختتام کی تاریخ (End Date)</label>
+                                <input type="date" name="endDate" id="create_exam_end_date" value="${defaultEndStr}" style="padding:8px; border:1.5px solid #dc2626; border-radius:8px; font-weight:bold;">
+                            </div>
+                            <div class="tt-form-group">
+                                <label style="font-weight:bold; color:#0f172a;"><i class="fas fa-clock" style="color:#7c3aed;"></i> امتحانی وقت (Exam Time)</label>
+                                <div style="display:flex; flex-direction:column; gap:4px;">
+                                    <select onchange="document.getElementById('create_exam_time').value=this.value" style="padding:6px; font-size:0.9rem; border:1px solid #cbd5e1; border-radius:6px; background:#fff;">
+                                        <option value="08:00 AM سے 11:00 AM">08:00 AM سے 11:00 AM (صبحِ اول)</option>
+                                        <option value="08:30 AM سے 11:30 AM">08:30 AM سے 11:30 AM</option>
+                                        <option value="09:00 AM سے 12:00 PM">09:00 AM سے 12:00 PM</option>
+                                        <option value="01:30 PM سے 04:30 PM">01:30 PM سے 04:30 PM (بعد دوپہر)</option>
+                                        <option value="02:00 PM سے 05:00 PM">02:00 PM سے 05:00 PM</option>
+                                    </select>
+                                    <input type="text" name="time" id="create_exam_time" value="08:00 AM سے 11:00 AM" placeholder="وقت لکھیں..." style="padding:6px; border:1px solid #cbd5e1; border-radius:6px; text-align:center;">
+                                </div>
+                            </div>
+                            <div class="tt-form-group">
+                                <label style="font-weight:bold; color:#0f172a;"><i class="fas fa-hourglass-half" style="color:#7c3aed;"></i> پیپر کا دورانیہ (Duration)</label>
+                                <div style="display:flex; flex-direction:column; gap:4px;">
+                                    <select onchange="document.getElementById('create_exam_duration').value=this.value" style="padding:6px; font-size:0.9rem; border:1px solid #cbd5e1; border-radius:6px; background:#fff;">
+                                        <option value="3 گھنٹے">3 گھنٹے</option>
+                                        <option value="2.5 گھنٹے">2.5 گھنٹے</option>
+                                        <option value="2 گھنٹے">2 گھنٹے</option>
+                                        <option value="1.5 گھنٹہ">1.5 گھنٹہ</option>
+                                        <option value="1 گھنٹہ">1 گھنٹہ</option>
+                                    </select>
+                                    <input type="text" name="duration" id="create_exam_duration" value="3 گھنٹے" style="padding:6px; border:1px solid #cbd5e1; border-radius:6px; text-align:center;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Holiday Settings -->
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:1.2rem; margin-top:1rem; padding-top:1rem; border-top:1px dashed #cbd5e1;">
+                            <div>
+                                <label style="font-weight:bold; font-size:0.9rem; color:#1e293b; display:block; margin-bottom:5px;"><i class="fas fa-umbrella-beach" style="color:#b45309;"></i> ہفتہ وار تعطیلات (Weekly Holidays):</label>
+                                <div style="display:flex; flex-wrap:wrap; gap:10px; background:#fff; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px;">
+                                    <label style="display:flex; align-items:center; gap:4px; font-size:0.9rem; cursor:pointer; color:#065f46; font-weight:bold;">
+                                        <input type="checkbox" name="holiday_fri" checked> جمعۃ المبارک
+                                    </label>
+                                    <label style="display:flex; align-items:center; gap:4px; font-size:0.9rem; cursor:pointer; color:#b45309; font-weight:bold;">
+                                        <input type="checkbox" name="holiday_sun" checked> اتوار
+                                    </label>
+                                    <label style="display:flex; align-items:center; gap:4px; font-size:0.9rem; cursor:pointer; color:#475569;">
+                                        <input type="checkbox" name="holiday_thu"> جمعرات
+                                    </label>
+                                    <label style="display:flex; align-items:center; gap:4px; font-size:0.9rem; cursor:pointer; color:#475569;">
+                                        <input type="checkbox" name="holiday_sat"> ہفتہ
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style="font-weight:bold; font-size:0.9rem; color:#1e293b; display:block; margin-bottom:5px;"><i class="fas fa-calendar-day" style="color:#2563eb;"></i> پرچوں کے درمیان تیاری کی چھٹی / ناغہ:</label>
+                                <select name="gapDays" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.95rem; background:#fff;">
+                                    <option value="0">بلا ناغہ (روزانہ امتحان - 0 دن)</option>
+                                    <option value="1">1 دن ناغہ (ہر پیپر کے بعد 1 دن تیاری کی چھٹی)</option>
+                                    <option value="2">2 دن ناغہ (ہر پیپر کے بعد 2 دن تیاری کی چھٹی)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:10px;">
+                            <label style="display:inline-flex; align-items:center; gap:8px; font-size:0.9rem; font-weight:bold; color:#065f46; cursor:pointer;">
+                                <input type="checkbox" name="insertHolidayRows" checked> ڈیٹ شیٹ میں چھٹی / ناغہ کو الگ سطر (Row) کے طور پر ظاہر کریں
+                            </label>
                         </div>
                     </div>
-                    <div style="margin-top:1.5rem; text-align:center;">
-                        <button type="submit" class="btn btn-primary" style="min-width:200px;">امتحان محفوظ کریں</button>
+
+                    <!-- Subjects -->
+                    <div class="tt-form-group" style="margin-bottom:1.5rem;">
+                        <label style="font-weight:bold; color:#1e293b;"><i class="fas fa-books"></i> مضامین (کاما لگا کر لکھیں - آپ ان میں ترمیم یا اضافہ کر سکتے ہیں)</label>
+                        <input type="text" name="subjects" id="exam_subjects_input" placeholder="قرآن، نحو، صرف، فقہ" required style="font-size:1.1rem; padding:10px;">
+                        <small style="color:#059669; font-weight:bold; margin-top:6px; display:block;"><i class="fas fa-magic"></i> منتخب شعبہ/درجہ کے کتب مضامین خودکار درج ہو گئے ہیں۔ آپ ان میں حسبِ ضرورت تبدیلی یا نئی کتب شامل کر سکتے ہیں۔</small>
+                    </div>
+
+                    <div style="text-align:center;">
+                        <button type="submit" class="btn btn-primary" style="min-width:240px; font-size:1.1rem; padding:12px 25px; font-weight:bold; background:#7c3aed;">
+                            <i class="fas fa-save"></i> امتحان محفوظ کریں اور ڈیٹ شیٹ بنائیں
+                        </button>
                     </div>
                 </form>
             </div>
@@ -7972,41 +10132,127 @@ downloadReceiptImageDirect(options) {
         e.preventDefault();
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData.entries());
-        let rawSubjects = data.subjects.split('،').map(s => s.trim()).filter(s => s);
-        if (rawSubjects.length === 0) rawSubjects = formData.get('subjects').split(',').map(s => s.trim()).filter(s => s);
+        let rawSubjects = (data.subjects || '').split('،').map(s => s.trim()).filter(s => s);
+        if (rawSubjects.length === 0) rawSubjects = (data.subjects || '').split(',').map(s => s.trim()).filter(s => s);
         
         const isHifz = (data.department === 'حفظ');
         const startDateStr = data.date || new Date().toISOString().split('T')[0];
+        const endDateStr = data.endDate || '';
+        const paperTime = (data.time || '08:00 AM سے 11:00 AM').trim();
+        const paperDuration = (data.duration || '3 گھنٹے').trim();
+        const gapDays = parseInt(data.gapDays || '0');
+        const skipFriday = formData.get('holiday_fri') !== null;
+        const skipSunday = formData.get('holiday_sun') !== null;
+        const skipThursday = formData.get('holiday_thu') !== null;
+        const skipSaturday = formData.get('holiday_sat') !== null;
+        const insertHolidayRows = formData.get('insertHolidayRows') !== null;
+
+        const isWeeklyOff = (dateObj) => {
+            const day = dateObj.getDay();
+            if (day === 5 && skipFriday) return { isOff: true, title: 'تعطیل جمعۃ المبارک' };
+            if (day === 0 && skipSunday) return { isOff: true, title: 'تعطیل اتوار' };
+            if (day === 4 && skipThursday) return { isOff: true, title: 'تعطیل جمعرات' };
+            if (day === 6 && skipSaturday) return { isOff: true, title: 'تعطیل ہفتہ' };
+            return { isOff: false, title: '' };
+        };
+
+        const structuredSubjects = [];
         let currDate = new Date(startDateStr);
 
-        const structuredSubjects = rawSubjects.map((subjName, idx) => {
-            if (isHifz || idx === 0) {
-                // Keep same date for Hifz or first paper
-            } else {
-                currDate.setDate(currDate.getDate() + 1);
-                // Skip Friday & Sunday by default so exams fall on working days
-                if (currDate.getDay() === 5 || currDate.getDay() === 0) {
-                    currDate.setDate(currDate.getDate() + 1);
-                    if (currDate.getDay() === 5 || currDate.getDay() === 0) {
-                        currDate.setDate(currDate.getDate() + 1);
+        rawSubjects.forEach((subjName, idx) => {
+            if (isHifz) {
+                structuredSubjects.push({
+                    name: subjName,
+                    totalMarks: 100,
+                    date: startDateStr,
+                    time: paperTime,
+                    duration: paperDuration,
+                    isHoliday: false
+                });
+                return;
+            }
+
+            // Skip weekly off for current paper date
+            while (true) {
+                const offCheck = isWeeklyOff(currDate);
+                if (offCheck.isOff) {
+                    if (insertHolidayRows) {
+                        structuredSubjects.push({
+                            name: offCheck.title,
+                            totalMarks: 0,
+                            date: currDate.toISOString().split('T')[0],
+                            time: 'تعطیل',
+                            duration: '',
+                            isHoliday: true
+                        });
                     }
+                    currDate.setDate(currDate.getDate() + 1);
+                } else {
+                    break;
                 }
             }
-            const dateStr = currDate.toISOString().split('T')[0];
-            return {
+
+            // Assign paper
+            structuredSubjects.push({
                 name: subjName,
                 totalMarks: 100,
-                date: dateStr,
-                time: '08:00 AM سے 11:00 AM',
-                duration: '3 گھنٹے',
+                date: currDate.toISOString().split('T')[0],
+                time: paperTime,
+                duration: paperDuration,
                 isHoliday: false
-            };
+            });
+
+            // Gap days
+            if (idx < rawSubjects.length - 1) {
+                for (let g = 0; g < gapDays; g++) {
+                    currDate.setDate(currDate.getDate() + 1);
+                    const offCheck = isWeeklyOff(currDate);
+                    if (offCheck.isOff) {
+                        if (insertHolidayRows) {
+                            structuredSubjects.push({
+                                name: offCheck.title,
+                                totalMarks: 0,
+                                date: currDate.toISOString().split('T')[0],
+                                time: 'تعطیل',
+                                duration: '',
+                                isHoliday: true
+                            });
+                        }
+                    } else {
+                        if (insertHolidayRows) {
+                            structuredSubjects.push({
+                                name: 'تیاری کی چھٹی / ناغہ',
+                                totalMarks: 0,
+                                date: currDate.toISOString().split('T')[0],
+                                time: 'تعطیل',
+                                duration: '',
+                                isHoliday: true
+                            });
+                        }
+                    }
+                }
+                currDate.setDate(currDate.getDate() + 1);
+            }
         });
 
+        const actualEndDate = structuredSubjects.length > 0 ? structuredSubjects[structuredSubjects.length - 1].date : startDateStr;
+        data.startDate = startDateStr;
+        data.endDate = endDateStr || actualEndDate;
         data.subjects = structuredSubjects;
-        
-        await MadrassahDB.saveExam(data);
-        this.renderExamsModule(document.getElementById('main-content'));
+
+        delete data.holiday_fri;
+        delete data.holiday_sun;
+        delete data.holiday_thu;
+        delete data.holiday_sat;
+        delete data.insertHolidayRows;
+        delete data.gapDays;
+
+        const newId = await MadrassahDB.saveExam(data);
+        await this.renderExamsModule(document.getElementById('main-content'));
+        const examIdToOpen = newId || data.id;
+        if (examIdToOpen) {
+            this.showExamSubjectSettings(examIdToOpen);
+        }
     }
 
     async deleteExam(id) {
@@ -8030,7 +10276,20 @@ downloadReceiptImageDirect(options) {
         if (!exam || !container) return;
 
         const subjects = Array.isArray(exam.subjects) ? exam.subjects : [];
-        const startDateVal = (subjects.length > 0 && subjects[0].date) ? subjects[0].date : (exam.date || new Date().toISOString().split('T')[0]);
+        const startDateVal = (subjects.length > 0 && subjects[0].date) ? subjects[0].date : (exam.startDate || exam.date || new Date().toISOString().split('T')[0]);
+        let endDateVal = exam.endDate || '';
+        if (!endDateVal && subjects.length > 0) {
+            const lastWithDate = subjects.slice().reverse().find(s => s.date);
+            if (lastWithDate) endDateVal = lastWithDate.date;
+        }
+        if (!endDateVal) {
+            const d = new Date(startDateVal);
+            d.setDate(d.getDate() + 14);
+            endDateVal = d.toISOString().split('T')[0];
+        }
+
+        const defaultTime = (subjects.length > 0 && subjects[0].time && subjects[0].time !== 'تعطیل') ? subjects[0].time : '08:00 AM سے 11:00 AM';
+        const defaultDuration = (subjects.length > 0 && subjects[0].duration) ? subjects[0].duration : '3 گھنٹے';
 
         container.innerHTML = `
             <div class="card" style="border-top: 5px solid #7c3aed; animation: slideUp 0.3s ease-out; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);">
@@ -8038,124 +10297,145 @@ downloadReceiptImageDirect(options) {
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:1.5rem; padding-bottom:1rem; border-bottom:1px solid #e2e8f0;">
                     <div>
                         <h3 style="color:#7c3aed; margin:0; font-size:1.5rem;">
-                            <i class="fas fa-calendar-alt"></i> نمبرات اور امتحانی ڈیٹ شیٹ کی تفصیلی ترتیب
+                            <i class="fas fa-calendar-alt"></i> ڈیٹ شیٹ بنائیں و امتحانی اوقات کی تفصیلی ترتیب
                         </h3>
                         <div style="font-size:1rem; color:#64748b; margin-top:4px;">
                             امتحان: <b style="color:#1e293b;">${exam.title}</b> | شعبہ: <b style="color:#1e293b;">${exam.department}</b> ${exam.className ? `(${exam.className})` : ''}
                         </div>
                     </div>
                     <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                        <button type="button" class="btn btn-sm" style="background:#f3e8ff; color:#7c3aed; border:1px solid #d8b4fe; font-weight:bold;" onclick="app.toggleAutoSchedulerPanel()">
-                            <i class="fas fa-magic"></i> خودکار شیڈولر و تعطیلات
-                        </button>
-                        <button type="button" class="btn btn-sm" style="background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; font-weight:bold;" onclick="app.addExamSubjectRow(false)">
+                        <button type="button" class="btn btn-sm" style="background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; font-weight:bold; padding:6px 12px;" onclick="app.addExamSubjectRow(false)">
                             <i class="fas fa-plus-circle"></i> نیا پرچہ شامل کریں
                         </button>
-                        <button type="button" class="btn btn-sm" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a; font-weight:bold;" onclick="app.addExamSubjectRow(true)">
+                        <button type="button" class="btn btn-sm" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a; font-weight:bold; padding:6px 12px;" onclick="app.addExamSubjectRow(true)">
                             <i class="fas fa-umbrella-beach"></i> چھٹی کی سطر شامل کریں
                         </button>
-                        <button type="button" class="btn btn-sm" onclick="document.getElementById('exam_sub_container').innerHTML=''" style="background:#f1f5f9; color:#64748b;">
+                        <button type="button" class="btn btn-sm" style="background:#fff7ed; color:#ea580c; border:1px solid #fed7aa; font-weight:bold; padding:6px 12px;" onclick="app.printDateSheet(${examId})">
+                            <i class="fas fa-print"></i> ڈیٹ شیٹ پرنٹ / PDF
+                        </button>
+                        <button type="button" class="btn btn-sm" onclick="document.getElementById('exam_sub_container').innerHTML=''" style="background:#f1f5f9; color:#64748b; padding:6px 12px;">
                             <i class="fas fa-times"></i> بند کریں
                         </button>
                     </div>
                 </div>
 
-                <!-- Bulk Time & Duration Setter Bar -->
-                <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:15px 20px; margin-bottom:1.5rem;">
-                    <div style="font-weight:bold; color:#1e293b; margin-bottom:10px; display:flex; align-items:center; gap:8px;">
-                        <i class="fas fa-clock" style="color:#7c3aed;"></i>
-                        <span>تمام پرچوں پر امتحانی وقت اور دورانیہ کا بیک وقت اطلاق (Bulk Apply):</span>
-                    </div>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) 180px; gap:12px; align-items:end;">
-                        <div>
-                            <label style="font-size:0.85rem; color:#475569; font-weight:bold; display:block; margin-bottom:4px;">امتحان کا وقت (منتخب کریں یا خود لکھیں):</label>
-                            <div style="display:flex; flex-direction:column; gap:4px;">
-                                <select id="bulk_time_select" onchange="document.getElementById('bulk_time_input').value = this.value" style="padding:6px; font-size:0.9rem; border:1px solid #cbd5e1; border-radius:6px; background:#fff;">
-                                    <option value="08:00 AM سے 11:00 AM">08:00 AM سے 11:00 AM (صبحِ اول)</option>
-                                    <option value="08:30 AM سے 11:30 AM">08:30 AM سے 11:30 AM</option>
-                                    <option value="09:00 AM سے 12:00 PM">09:00 AM سے 12:00 PM</option>
-                                    <option value="09:30 AM سے 12:30 PM">09:30 AM سے 12:30 PM</option>
-                                    <option value="01:30 PM سے 04:30 PM">01:30 PM سے 04:30 PM (بعد دوپہر)</option>
-                                    <option value="02:00 PM سے 05:00 PM">02:00 PM سے 05:00 PM</option>
-                                </select>
-                                <input type="text" id="bulk_time_input" value="08:00 AM سے 11:00 AM" placeholder="وقت خود لکھیں..." style="padding:6px; font-size:0.95rem; border:1px solid #cbd5e1; border-radius:6px; text-align:center;">
-                            </div>
-                        </div>
-
-                        <div>
-                            <label style="font-size:0.85rem; color:#475569; font-weight:bold; display:block; margin-bottom:4px;">پیپر کا دورانیہ (منتخب کریں یا خود لکھیں):</label>
-                            <div style="display:flex; flex-direction:column; gap:4px;">
-                                <select id="bulk_duration_select" onchange="document.getElementById('bulk_duration_input').value = this.value" style="padding:6px; font-size:0.9rem; border:1px solid #cbd5e1; border-radius:6px; background:#fff;">
-                                    <option value="3 گھنٹے">3 گھنٹے</option>
-                                    <option value="2.5 گھنٹے">2.5 گھنٹے</option>
-                                    <option value="2 گھنٹے">2 گھنٹے</option>
-                                    <option value="1.5 گھنٹہ">1.5 گھنٹہ</option>
-                                    <option value="1 گھنٹہ">1 گھنٹہ</option>
-                                    <option value="45 منٹ">45 منٹ</option>
-                                </select>
-                                <input type="text" id="bulk_duration_input" value="3 گھنٹے" placeholder="دورانیہ خود لکھیں..." style="padding:6px; font-size:0.95rem; border:1px solid #cbd5e1; border-radius:6px; text-align:center;">
-                            </div>
-                        </div>
-
-                        <div>
-                            <button type="button" class="btn" onclick="app.applyBulkTimeAndDuration()" style="background:#7c3aed; color:white; font-weight:bold; width:100%; padding:10px; border-radius:6px; height:42px;">
-                                <i class="fas fa-check-double"></i> تمام پر لاگو کریں
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Auto-Scheduler & Holiday Rules Panel (Collapsible) -->
-                <div id="exam_auto_scheduler_panel" style="background:#f0fdf4; border:2px dashed #10b981; border-radius:10px; padding:18px; margin-bottom:1.5rem; display:none; animation: fadeIn 0.2s ease-in-out;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <h4 style="color:#065f46; margin:0; font-size:1.15rem;">
-                            <i class="fas fa-cogs"></i> شیڈول اور تعطیلات کی خودکار منصوبہ بندی (Auto-Scheduler Settings)
+                <!-- Unified Date Sheet Generator Panel (Dates, Timing & Holidays) -->
+                <div style="background:linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border:2px solid #cbd5e1; border-radius:12px; padding:18px 20px; margin-bottom:1.5rem; box-shadow:0 3px 10px rgba(0,0,0,0.03);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                        <h4 style="color:#0f172a; margin:0; font-size:1.2rem; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-magic" style="color:#7c3aed;"></i>
+                            <span>ڈیٹ شیٹ شیڈولر: تواریخ، امتحانی وقت اور تعطیلات (Date Sheet Settings)</span>
                         </h4>
-                        <span style="font-size:0.85rem; color:#059669; font-weight:bold;">خودکار شیڈول تاریخیں سیٹ کرے گا</span>
+                        <span style="font-size:0.85rem; color:#047857; background:#dcfce7; padding:4px 10px; border-radius:6px; font-weight:bold;">
+                            <i class="fas fa-check-circle"></i> شروع و اختتام کی تاریخیں اور چھٹیاں خودکار لاگو ہوں گی
+                        </span>
                     </div>
 
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px; margin-bottom:15px;">
+                    <!-- Row 1: Start Date, End Date, Time, Duration -->
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap:14px; margin-bottom:14px;">
                         <div>
-                            <label style="font-size:0.9rem; font-weight:bold; color:#1e293b; display:block; margin-bottom:5px;">تاریخِ آغاز (پہلے پیپر کی تاریخ):</label>
-                            <input type="date" id="sched_start_date" value="${startDateVal}" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95rem;">
+                            <label style="font-size:0.9rem; font-weight:bold; color:#0f172a; display:block; margin-bottom:5px;">
+                                <i class="fas fa-play" style="color:#059669; font-size:0.85rem;"></i> امتحان شروع ہونے کی تاریخ:
+                            </label>
+                            <input type="date" id="sched_start_date" value="${startDateVal}" style="width:100%; padding:8px 10px; border:1.5px solid #059669; border-radius:8px; font-size:0.95rem; font-weight:bold; background:#fff;">
                         </div>
 
                         <div>
-                            <label style="font-size:0.9rem; font-weight:bold; color:#1e293b; display:block; margin-bottom:5px;">ہفتہ وار تعطیلات (Weekly Holidays):</label>
-                            <div style="display:flex; flex-wrap:wrap; gap:10px; background:#fff; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px;">
-                                <label style="display:flex; align-items:center; gap:4px; font-size:0.9rem; cursor:pointer; color:#065f46; font-weight:bold;">
+                            <label style="font-size:0.9rem; font-weight:bold; color:#0f172a; display:block; margin-bottom:5px;">
+                                <i class="fas fa-flag-checkered" style="color:#dc2626; font-size:0.85rem;"></i> امتحان کے اختتام کی تاریخ:
+                            </label>
+                            <input type="date" id="sched_end_date" value="${endDateVal}" style="width:100%; padding:8px 10px; border:1.5px solid #dc2626; border-radius:8px; font-size:0.95rem; font-weight:bold; background:#fff;">
+                        </div>
+
+                        <div>
+                            <label style="font-size:0.9rem; font-weight:bold; color:#0f172a; display:block; margin-bottom:5px;">
+                                <i class="fas fa-clock" style="color:#7c3aed;"></i> امتحانی وقت (Time):
+                            </label>
+                            <div style="display:flex; flex-direction:column; gap:4px;">
+                                <select onchange="document.getElementById('sched_bulk_time').value = this.value" style="padding:6px; font-size:0.85rem; border:1px solid #cbd5e1; border-radius:6px; background:#fff;">
+                                    <option value="08:00 AM سے 11:00 AM" ${defaultTime === '08:00 AM سے 11:00 AM' ? 'selected' : ''}>08:00 AM سے 11:00 AM (صبحِ اول)</option>
+                                    <option value="08:30 AM سے 11:30 AM" ${defaultTime === '08:30 AM سے 11:30 AM' ? 'selected' : ''}>08:30 AM سے 11:30 AM</option>
+                                    <option value="09:00 AM سے 12:00 PM" ${defaultTime === '09:00 AM سے 12:00 PM' ? 'selected' : ''}>09:00 AM سے 12:00 PM</option>
+                                    <option value="09:30 AM سے 12:30 PM" ${defaultTime === '09:30 AM سے 12:30 PM' ? 'selected' : ''}>09:30 AM سے 12:30 PM</option>
+                                    <option value="01:30 PM سے 04:30 PM" ${defaultTime === '01:30 PM سے 04:30 PM' ? 'selected' : ''}>01:30 PM سے 04:30 PM (بعد دوپہر)</option>
+                                    <option value="02:00 PM سے 05:00 PM" ${defaultTime === '02:00 PM سے 05:00 PM' ? 'selected' : ''}>02:00 PM سے 05:00 PM</option>
+                                </select>
+                                <input type="text" id="sched_bulk_time" value="${defaultTime}" placeholder="وقت خود درج کریں..." style="padding:6px; font-size:0.9rem; border:1px solid #cbd5e1; border-radius:6px; text-align:center; background:#fff;">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label style="font-size:0.9rem; font-weight:bold; color:#0f172a; display:block; margin-bottom:5px;">
+                                <i class="fas fa-hourglass-half" style="color:#7c3aed;"></i> پیپر کا دورانیہ (Duration):
+                            </label>
+                            <div style="display:flex; flex-direction:column; gap:4px;">
+                                <select onchange="document.getElementById('sched_bulk_duration').value = this.value" style="padding:6px; font-size:0.85rem; border:1px solid #cbd5e1; border-radius:6px; background:#fff;">
+                                    <option value="3 گھنٹے" ${defaultDuration === '3 گھنٹے' ? 'selected' : ''}>3 گھنٹے</option>
+                                    <option value="2.5 گھنٹے" ${defaultDuration === '2.5 گھنٹے' ? 'selected' : ''}>2.5 گھنٹے</option>
+                                    <option value="2 گھنٹے" ${defaultDuration === '2 گھنٹے' ? 'selected' : ''}>2 گھنٹے</option>
+                                    <option value="1.5 گھنٹہ" ${defaultDuration === '1.5 گھنٹہ' ? 'selected' : ''}>1.5 گھنٹہ</option>
+                                    <option value="1 گھنٹہ" ${defaultDuration === '1 گھنٹہ' ? 'selected' : ''}>1 گھنٹہ</option>
+                                    <option value="45 منٹ" ${defaultDuration === '45 منٹ' ? 'selected' : ''}>45 منٹ</option>
+                                </select>
+                                <input type="text" id="sched_bulk_duration" value="${defaultDuration}" placeholder="دورانیہ خود لکھیں..." style="padding:6px; font-size:0.9rem; border:1px solid #cbd5e1; border-radius:6px; text-align:center; background:#fff;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Holiday Rules & Gap Days -->
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-bottom:14px; padding-top:12px; border-top:1px dashed #cbd5e1;">
+                        <div>
+                            <label style="font-size:0.9rem; font-weight:bold; color:#1e293b; display:block; margin-bottom:5px;">
+                                <i class="fas fa-umbrella-beach" style="color:#b45309;"></i> ہفتہ وار تعطیلات (Weekly Holidays):
+                            </label>
+                            <div style="display:flex; flex-wrap:wrap; gap:10px; background:#fff; padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px;">
+                                <label style="display:flex; align-items:center; gap:4px; font-size:0.85rem; cursor:pointer; color:#065f46; font-weight:bold;">
                                     <input type="checkbox" id="sched_holiday_fri" checked> جمعۃ المبارک
                                 </label>
-                                <label style="display:flex; align-items:center; gap:4px; font-size:0.9rem; cursor:pointer; color:#b45309; font-weight:bold;">
+                                <label style="display:flex; align-items:center; gap:4px; font-size:0.85rem; cursor:pointer; color:#b45309; font-weight:bold;">
                                     <input type="checkbox" id="sched_holiday_sun" checked> اتوار
                                 </label>
-                                <label style="display:flex; align-items:center; gap:4px; font-size:0.9rem; cursor:pointer; color:#475569;">
+                                <label style="display:flex; align-items:center; gap:4px; font-size:0.85rem; cursor:pointer; color:#475569;">
                                     <input type="checkbox" id="sched_holiday_thu"> جمعرات
                                 </label>
-                                <label style="display:flex; align-items:center; gap:4px; font-size:0.9rem; cursor:pointer; color:#475569;">
+                                <label style="display:flex; align-items:center; gap:4px; font-size:0.85rem; cursor:pointer; color:#475569;">
                                     <input type="checkbox" id="sched_holiday_sat"> ہفتہ
                                 </label>
                             </div>
                         </div>
 
                         <div>
-                            <label style="font-size:0.9rem; font-weight:bold; color:#1e293b; display:block; margin-bottom:5px;">پرچوں کے درمیان تیاری کی چھٹی / ناغہ:</label>
-                            <select id="sched_gap_days" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95rem; background:#fff;">
+                            <label style="font-size:0.9rem; font-weight:bold; color:#1e293b; display:block; margin-bottom:5px;">
+                                <i class="fas fa-calendar-day" style="color:#2563eb;"></i> پرچوں کے درمیان تیاری کی چھٹی / ناغہ:
+                            </label>
+                            <select id="sched_gap_days" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.95rem; background:#fff;">
                                 <option value="0">بلا ناغہ (روزانہ امتحان - 0 دن)</option>
                                 <option value="1">1 دن ناغہ (ہر پیپر کے بعد 1 دن تیاری کی چھٹی)</option>
                                 <option value="2">2 دن ناغہ (ہر پیپر کے بعد 2 دن تیاری کی چھٹی)</option>
                             </select>
                         </div>
+
+                        <div style="display:flex; align-items:center;">
+                            <label style="display:inline-flex; align-items:center; gap:8px; font-weight:bold; color:#065f46; cursor:pointer; font-size:0.9rem; background:#ecfdf5; padding:8px 12px; border-radius:8px; border:1px solid #a7f3d0; width:100%;">
+                                <input type="checkbox" id="sched_insert_holiday_rows" checked>
+                                <span>ڈیٹ شیٹ میں چھٹی / ناغہ کو الگ سطر (Row) کے طور پر ظاہر کریں</span>
+                            </label>
+                        </div>
                     </div>
 
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; background:#fff; padding:10px 15px; border-radius:8px; border:1px solid #bbf7d0;">
-                        <label style="display:flex; align-items:center; gap:8px; font-weight:bold; color:#065f46; cursor:pointer;">
-                            <input type="checkbox" id="sched_insert_holiday_rows" checked>
-                            <span>ڈیٹ شیٹ میں چھٹی / ناغہ کو الگ سطر (Row) کے طور پر ظاہر کریں</span>
-                        </label>
-                        <button type="button" class="btn" onclick="app.generateAutoExamSchedule(${examId})" style="background:#059669; color:white; font-weight:bold; padding:8px 25px; border-radius:6px;">
-                            <i class="fas fa-play-circle"></i> شیڈول خودکار لاگو کریں
-                        </button>
+                    <!-- Row 3: Action Buttons -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding-top:10px;">
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <button type="button" class="btn" onclick="app.generateAutoExamSchedule(${examId})" style="background:#059669; color:white; font-weight:bold; padding:10px 22px; border-radius:8px; font-size:1rem; box-shadow:0 3px 8px rgba(5,150,105,0.25);">
+                                <i class="fas fa-play-circle"></i> خودکار ڈیٹ شیٹ شیڈول بنائیں (Generate Schedule)
+                            </button>
+                            <button type="button" class="btn" onclick="app.applyBulkTimeAndDuration()" style="background:#7c3aed; color:white; font-weight:bold; padding:10px 18px; border-radius:8px; font-size:0.95rem;">
+                                <i class="fas fa-clock"></i> وقت و دورانیہ تمام پر لاگو کریں
+                            </button>
+                        </div>
+                        <div style="font-size:0.85rem; color:#64748b;">
+                            * شیڈول بننے کے بعد آپ نیچے جدول میں کسی بھی تاریخ یا وقت کو دستی تبدیل بھی کر سکتے ہیں۔
+                        </div>
                     </div>
                 </div>
 
@@ -8184,7 +10464,7 @@ downloadReceiptImageDirect(options) {
                     </div>
 
                     <div style="margin-top:2rem; display:flex; justify-content:center; gap:15px;">
-                        <button type="submit" class="btn btn-primary" style="background:#7c3aed; min-width:280px; font-size:1.15rem; padding:12px 30px; font-weight:bold;">
+                        <button type="submit" class="btn btn-primary" style="background:#7c3aed; min-width:280px; font-size:1.15rem; padding:12px 30px; font-weight:bold; box-shadow:0 4px 12px rgba(124,58,237,0.3);">
                             <i class="fas fa-save"></i> تمام سیٹنگز محفوظ کریں
                         </button>
                     </div>
@@ -8356,8 +10636,8 @@ downloadReceiptImageDirect(options) {
             name: isHoliday ? 'تیاری کی چھٹی' : '',
             totalMarks: isHoliday ? 0 : 100,
             date: lastDate,
-            time: isHoliday ? 'تعطیل' : (document.getElementById('bulk_time_input')?.value || '08:00 AM سے 11:00 AM'),
-            duration: isHoliday ? '' : (document.getElementById('bulk_duration_input')?.value || '3 گھنٹے'),
+            time: isHoliday ? 'تعطیل' : (document.getElementById('sched_bulk_time')?.value || document.getElementById('bulk_time_input')?.value || '08:00 AM سے 11:00 AM'),
+            duration: isHoliday ? '' : (document.getElementById('sched_bulk_duration')?.value || document.getElementById('bulk_duration_input')?.value || '3 گھنٹے'),
             isHoliday: isHoliday
         };
 
@@ -8394,13 +10674,15 @@ downloadReceiptImageDirect(options) {
         const isCurrentHoliday = row.getAttribute('data-is-holiday') === 'true';
         const nameVal = row.querySelector('.exam-row-name')?.value || '';
         const dateVal = row.querySelector('.exam-row-date')?.value || '';
+        const defaultTime = (document.getElementById('sched_bulk_time')?.value || document.getElementById('bulk_time_input')?.value || '08:00 AM سے 11:00 AM');
+        const defaultDuration = (document.getElementById('sched_bulk_duration')?.value || document.getElementById('bulk_duration_input')?.value || '3 گھنٹے');
 
         const updatedData = {
             name: nameVal,
             totalMarks: isCurrentHoliday ? 100 : 0,
             date: dateVal,
-            time: isCurrentHoliday ? (document.getElementById('bulk_time_input')?.value || '08:00 AM سے 11:00 AM') : 'تعطیل',
-            duration: isCurrentHoliday ? (document.getElementById('bulk_duration_input')?.value || '3 گھنٹے') : '',
+            time: isCurrentHoliday ? defaultTime : 'تعطیل',
+            duration: isCurrentHoliday ? defaultDuration : '',
             isHoliday: !isCurrentHoliday
         };
 
@@ -8412,8 +10694,8 @@ downloadReceiptImageDirect(options) {
     }
 
     applyBulkTimeAndDuration() {
-        const timeVal = document.getElementById('bulk_time_input')?.value.trim();
-        const durationVal = document.getElementById('bulk_duration_input')?.value.trim();
+        const timeVal = (document.getElementById('sched_bulk_time')?.value || document.getElementById('bulk_time_input')?.value || '').trim();
+        const durationVal = (document.getElementById('sched_bulk_duration')?.value || document.getElementById('bulk_duration_input')?.value || '').trim();
 
         const rows = document.querySelectorAll('#exam_subjects_table_body tr.exam-subject-row');
         let count = 0;
@@ -8433,7 +10715,15 @@ downloadReceiptImageDirect(options) {
 
     generateAutoExamSchedule(examId) {
         const startDateInput = document.getElementById('sched_start_date');
+        const endDateInput = document.getElementById('sched_end_date');
         const startDateStr = startDateInput ? startDateInput.value : new Date().toISOString().split('T')[0];
+        const userEndDateStr = endDateInput ? endDateInput.value : '';
+
+        if (userEndDateStr && new Date(userEndDateStr) < new Date(startDateStr)) {
+            alert('انتباہ: امتحان کے اختتام کی تاریخ لازماً آغاز کی تاریخ سے بعد ہونی چاہیے!');
+            return;
+        }
+
         const skipFriday = document.getElementById('sched_holiday_fri')?.checked ?? true;
         const skipSunday = document.getElementById('sched_holiday_sun')?.checked ?? true;
         const skipThursday = document.getElementById('sched_holiday_thu')?.checked ?? false;
@@ -8441,8 +10731,8 @@ downloadReceiptImageDirect(options) {
         const gapDays = parseInt(document.getElementById('sched_gap_days')?.value || '0');
         const insertHolidayRows = document.getElementById('sched_insert_holiday_rows')?.checked ?? true;
 
-        const defaultTime = document.getElementById('bulk_time_input')?.value.trim() || '08:00 AM سے 11:00 AM';
-        const defaultDuration = document.getElementById('bulk_duration_input')?.value.trim() || '3 گھنٹے';
+        const defaultTime = (document.getElementById('sched_bulk_time')?.value || document.getElementById('bulk_time_input')?.value || '08:00 AM سے 11:00 AM').trim();
+        const defaultDuration = (document.getElementById('sched_bulk_duration')?.value || document.getElementById('bulk_duration_input')?.value || '3 گھنٹے').trim();
 
         // Collect existing academic subjects
         const currentRows = document.querySelectorAll('#exam_subjects_table_body tr.exam-subject-row');
@@ -8501,8 +10791,8 @@ downloadReceiptImageDirect(options) {
                 name: paper.name,
                 totalMarks: paper.totalMarks,
                 date: currDate.toISOString().split('T')[0],
-                time: paper.time,
-                duration: paper.duration,
+                time: defaultTime || paper.time,
+                duration: defaultDuration || paper.duration,
                 isHoliday: false
             });
 
@@ -8540,14 +10830,24 @@ downloadReceiptImageDirect(options) {
             }
         });
 
+        // Determine actual end date
+        const actualEndDate = newSchedule.length > 0 ? newSchedule[newSchedule.length - 1].date : startDateStr;
+        if (endDateInput) {
+            endDateInput.value = actualEndDate;
+        }
+
         // Re-render table rows
         const tbody = document.getElementById('exam_subjects_table_body');
         tbody.innerHTML = newSchedule.map((s, idx) => this.renderExamSubjectRowHtml(s, idx + 1)).join('');
-        alert('خودکار شیڈول کامیابی سے تیار کر لیا گیا ہے۔ آپ نیچے جدول میں تاریخیں اور تفصیلات دیکھ سکتے ہیں اور حسبِ ضرورت ترمیم کر کے "تمام سیٹنگز محفوظ کریں" کا بٹن دبائیں۔');
+
+        if (userEndDateStr && actualEndDate > userEndDateStr) {
+            alert(`انتباہ: پرچوں اور تعطیلات کی تعداد کے پیشِ نظر امتحان ${actualEndDate} کو اختتام پذیر ہوگا، جو کہ آپ کی منتخب کردہ آخری تاریخ (${userEndDateStr}) سے بعد ہے۔ اختتام کی تاریخ کو اپ ڈیٹ کر کے ${actualEndDate} کر دیا گیا ہے۔`);
+        } else {
+            alert(`خودکار ڈیٹ شیٹ کامیابی سے تیار ہو چکی ہے!\nامتحانی دورانیہ: ${startDateStr} تا ${actualEndDate}\nکل پرچے: ${academicList.length}\nبراہِ کرم جدول کا جائزہ لے کر "تمام سیٹنگز محفوظ کریں" کا بٹن دبائیں۔`);
+        }
     }
 
     async autoSequenceExamDates(examId) {
-        this.toggleAutoSchedulerPanel();
         this.generateAutoExamSchedule(examId);
     }
 
@@ -8581,16 +10881,42 @@ downloadReceiptImageDirect(options) {
             };
         });
 
+        const startInput = document.getElementById('sched_start_date');
+        const endInput = document.getElementById('sched_end_date');
+        const firstItem = updatedSubjects[0];
+        const lastItem = updatedSubjects[updatedSubjects.length - 1];
+
+        exam.startDate = startInput?.value || (firstItem?.date) || exam.date;
+        exam.endDate = endInput?.value || (lastItem?.date) || exam.startDate;
+        exam.date = exam.startDate;
         exam.subjects = updatedSubjects;
+
         await MadrassahDB.saveExam(exam);
 
-        alert('مضامین کی تفصیلات، اوقات، دورانیہ اور تعطیلات کامیابی سے محفوظ کر لی گئی ہیں۔');
+        alert('امتحانی ڈیٹ شیٹ، تواریخ، اوقات اور تعطیلات کامیابی سے محفوظ کر لی گئی ہیں۔');
         this.renderExamsModule(document.getElementById('main-content'));
     }
 
     async printDateSheet(examId) {
         const exam = await MadrassahDB.getExamById(examId);
         if (!exam) return;
+
+        const subjects = Array.isArray(exam.subjects) ? exam.subjects : [];
+        const startDate = exam.startDate || (subjects.length > 0 && subjects[0].date ? subjects[0].date : exam.date);
+        let endDate = exam.endDate || '';
+        if (!endDate && subjects.length > 0) {
+            const lastDate = subjects.slice().reverse().find(s => s.date);
+            if (lastDate) endDate = lastDate.date;
+        }
+        const startDateFormatted = startDate ? new Date(startDate).toLocaleDateString('ur-PK') : '';
+        const endDateFormatted = endDate ? new Date(endDate).toLocaleDateString('ur-PK') : '';
+        let durationRangeHtml = '';
+        if (startDateFormatted && endDateFormatted) {
+            durationRangeHtml = `<div><b>امتحانی دورانیہ:</b> <span dir="ltr" style="font-weight:bold; color:#1e3a8a;">${startDateFormatted} تا ${endDateFormatted}</span></div>`;
+        } else if (startDateFormatted) {
+            durationRangeHtml = `<div><b>شروع تاریخ:</b> <span dir="ltr" style="font-weight:bold; color:#1e3a8a;">${startDateFormatted}</span></div>`;
+        }
+
         const printWindow = window.open('', '_blank');
         
         printWindow.document.write(`
@@ -8605,7 +10931,7 @@ downloadReceiptImageDirect(options) {
                     .madrsa-name { font-size: 2.8rem; color: #1e3a8a; margin: 0; }
                     .sheet-title { font-size: 2rem; color: #d97706; margin-top: 5px; }
                     
-                    .exam-info { background: #f8fafc; padding: 15px; border-radius: 10px; margin-bottom: 30px; display: flex; justify-content: center; gap: 40px; font-size: 1.3rem; border: 1px solid #e2e8f0; }
+                    .exam-info { background: #f8fafc; padding: 15px; border-radius: 10px; margin-bottom: 30px; display: flex; justify-content: center; flex-wrap: wrap; gap: 15px 35px; font-size: 1.3rem; border: 1px solid #e2e8f0; }
                     
                     table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 1.25rem; }
                     th, td { border: 1px solid #1e3a8a; padding: 12px; text-align: center; }
@@ -8615,21 +10941,44 @@ downloadReceiptImageDirect(options) {
                     .sig { border-top: 2px solid #1e3a8a; width: 200px; text-align: center; padding-top: 10px; font-weight: bold; }
                     @media print { .no-print { display: none; } }
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
                 <script>
-                function downloadDoc(filename) {
-                    const clone = document.documentElement.cloneNode(true);
-                    clone.querySelectorAll('.no-print').forEach(el => el.remove());
-                    const htmlContent = '<!DOCTYPE html>\\n' + clone.outerHTML;
-                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = (filename || 'دستاویز') + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'ڈیٹ_شیٹ') + '.pdf';
+                    const targetEl = document.querySelector('.sheet-container') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            let renderWidth = pWidth;
+                            let renderHeight = renderWidth * (imgProps.height / imgProps.width);
+                            if (renderHeight > pHeight) { renderHeight = pHeight; renderWidth = renderHeight * (imgProps.width / imgProps.height); }
+                            const x = (pWidth - renderWidth) / 2;
+                            const y = 0;
+                            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight, undefined, 'FAST');
+                            pdf.save(safeName);
+                        } catch(err) { console.error('PDF error:', err); window.print(); }
+                        finally { if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                    };
+                    if (typeof html2canvas !== 'undefined' && targetEl) {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }).then(canvas => doExport(canvas)).catch(err => { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } });
+                    } else { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
                 }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
                 </script>
             </head>
             <body>
@@ -8647,6 +10996,7 @@ downloadReceiptImageDirect(options) {
                             <div><b>شعبہ:</b> ${exam.department}</div>
                             <div><b>درجہ / کلاس:</b> ${exam.className || 'تمام درجات'}</div>
                             <div><b>سیشن:</b> ${exam.session || '2025-2026'}</div>
+                            ${durationRangeHtml}
                         </div>
 
                         <table>
@@ -8712,7 +11062,7 @@ downloadReceiptImageDirect(options) {
                 </div>
                 <div class="no-print" style="text-align:center; margin-top:30px; display:flex; justify-content:center; gap:15px;">
                     <button onclick="window.print()" style="padding:12px 40px; background:#1e3a8a; color:white; border:none; border-radius:30px; font-size:1.3rem; cursor:pointer;"><i class="fas fa-print"></i> ڈیٹ شیٹ پرنٹ کریں</button>
-                    <button onclick="downloadDoc('ڈیٹ_شیٹ_${exam.title ? exam.title.replace(/['&quot;\\s]+/g, '_') : 'DateSheet'}')" style="padding:12px 40px; background:#0284c7; color:white; border:none; border-radius:30px; font-size:1.3rem; cursor:pointer;"><i class="fas fa-download"></i> ڈاؤن لوڈ کریں</button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('ڈیٹ_شیٹ_${exam.title ? exam.title.replace(/['&quot;\\s]+/g, '_') : 'DateSheet'}', 'portrait', 'a4')" style="padding:12px 35px; background:#dc2626; color:white; border:none; border-radius:30px; font-size:1.3rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 10px rgba(220,38,38,0.35); display:inline-flex; align-items:center; gap:8px;"><i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)</button>
                 </div>
             </body>
             </html>
@@ -8720,69 +11070,216 @@ downloadReceiptImageDirect(options) {
         printWindow.document.close();
     }
 
+    filterMarksTable(query) {
+        const q = (query || '').trim().toLowerCase();
+        const rows = document.querySelectorAll('#marks_entry_tbody tr');
+        rows.forEach(tr => {
+            const text = tr.innerText.toLowerCase();
+            tr.style.display = (!q || text.includes(q)) ? '' : 'none';
+        });
+    }
+
     async showEnterMarks(examId) {
         const exam = await MadrassahDB.getExamById(examId);
+        if (!exam) {
+            alert('امتحان کا ریکارڈ نہیں ملا!');
+            return;
+        }
+
+        const deptStr = (exam.department || '').trim().toLowerCase();
+        const titleStr = (exam.title || '').trim().toLowerCase();
+        const classStr = (exam.className || '').trim().toLowerCase();
+        const isHifz = deptStr.includes('حفظ') || deptStr.includes('hifz') || 
+                       titleStr.includes('حفظ') || titleStr.includes('hifz') ||
+                       classStr.includes('حفظ') || classStr.includes('hifz');
+
         const students = await MadrassahDB.getAllStudents('banin'); 
         const girls = await MadrassahDB.getAllStudents('banat');
-        const allStudents = [...students, ...girls].filter(s => 
-            s.department === exam.department && 
-            (!exam.className || s.className === exam.className || s.class === exam.className)
-        );
+        const studentMapById = new Map();
+        [...students, ...girls].forEach(s => {
+            if (s && s.id && !studentMapById.has(parseInt(s.id))) {
+                studentMapById.set(parseInt(s.id), s);
+            }
+        });
+
+        let allStudents = [];
+        let enrollmentMap = new Map();
+        let teacherMap = new Map();
+
+        if (isHifz) {
+            const enrollments = (await MadrassahDB.getAllHifzEnrollments()) || [];
+            enrollments.forEach(en => enrollmentMap.set(parseInt(en.studentId), en));
+            const teachers = (await MadrassahDB.getAllTeachers()) || [];
+            teachers.forEach(t => teacherMap.set(t.id, t.name));
+
+            // Include any student enrolled in Hifz, or whose department/class contains 'حفظ'
+            studentMapById.forEach(s => {
+                const sId = parseInt(s.id);
+                const dept = (s.department || '').trim();
+                const cls = (s.className || s.class || '').trim();
+                if (enrollmentMap.has(sId) || dept.includes('حفظ') || cls.includes('حفظ')) {
+                    if (!exam.section || exam.section === 'all' || s.section === exam.section ||
+                        (exam.section === 'banin' && s.section !== 'banat') ||
+                        (exam.section === 'banat' && s.section === 'banat')) {
+                        allStudents.push(s);
+                    }
+                }
+            });
+
+            // Make sure students in enrollments who might have been missed are also fetched
+            for (const en of enrollments) {
+                const sId = parseInt(en.studentId);
+                if (sId && !allStudents.some(s => parseInt(s.id) === sId)) {
+                    const extraSt = await MadrassahDB.getStudentById(sId);
+                    if (extraSt) {
+                        if (!exam.section || exam.section === 'all' || extraSt.section === exam.section ||
+                            (exam.section === 'banin' && extraSt.section !== 'banat') ||
+                            (exam.section === 'banat' && extraSt.section === 'banat')) {
+                            allStudents.push(extraSt);
+                        }
+                    }
+                }
+            }
+            allStudents.sort((a, b) => parseInt(a.id || 0) - parseInt(b.id || 0));
+        } else {
+            const examDept = (exam.department || '').trim();
+            const examClass = (exam.className || '').trim();
+            allStudents = Array.from(studentMapById.values()).filter(s => {
+                const sDept = (s.department || '').trim();
+                const sClass = (s.className || s.class || '').trim();
+                const deptMatch = !examDept || sDept === examDept;
+                const classMatch = !examClass || sClass === examClass;
+                return deptMatch && classMatch;
+            });
+            allStudents.sort((a, b) => parseInt(a.id || 0) - parseInt(b.id || 0));
+        }
         
         const results = await MadrassahDB.getExamResults(examId);
         const container = document.getElementById('exam_sub_container');
-        const academicSubjects = (exam.subjects || []).filter(s => !(typeof s === 'object' && s.isHoliday));
+        let academicSubjects = (exam.subjects || []).filter(s => !(typeof s === 'object' && s.isHoliday));
+        if (academicSubjects.length === 0) {
+            if (isHifz) {
+                academicSubjects = [
+                    { name: 'حفظِ قرآن', totalMarks: 50 },
+                    { name: 'تجوید و ترتیل', totalMarks: 25 },
+                    { name: 'مخارج و قواعد', totalMarks: 25 }
+                ];
+            } else {
+                academicSubjects = [{ name: 'کل پرچہ / مضمون', totalMarks: 100 }];
+            }
+        }
         
         container.innerHTML = `
-            <div class="card" style="border-top: 5px solid #0369a1;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
-                    <h3 style="color:#0369a1; margin:0;"><i class="fas fa-keyboard"></i> نمبروں کا اندراج: ${exam.title} (${exam.department})</h3>
-                    <button class="btn btn-sm" onclick="document.getElementById('exam_sub_container').innerHTML=''" style="background:#f1f5f9; color:#64748b;">بند کریں</button>
+            <div class="card" style="border-top: 5px solid #0369a1; animation: slideUp 0.3s ease-out;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <h3 style="color:#0369a1; margin:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-keyboard"></i> نمبروں کا اندراج: ${exam.title} 
+                            <span style="background:#e0f2fe; color:#0369a1; font-size:0.9rem; padding:3px 10px; border-radius:20px; font-weight:bold;">
+                                ${exam.department}${exam.className ? ' (' + exam.className + ')' : ''}
+                            </span>
+                            <span style="background:#dcfce7; color:#15803d; font-size:0.9rem; padding:3px 10px; border-radius:20px; font-weight:bold;">
+                                <i class="fas fa-users"></i> کل طلباء: ${allStudents.length}
+                            </span>
+                        </h3>
+                        ${isHifz ? `
+                            <p style="margin:6px 0 0 0; color:#065f46; font-size:0.95rem; font-weight:600;">
+                                <i class="fas fa-info-circle"></i> شعبہ حفظ القرآن میں چونکہ ہر طالب علم کا سبق و پارہ انفرادی ہوتا ہے، لہٰذا تمام حفاظ طلباء لوڈ ہو چکے ہیں۔ ہر طالب علم کا مخصوص امتحانی سبق سامنے دی گئی فیلڈ میں درج کریں۔
+                            </p>
+                        ` : ''}
+                    </div>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="text" id="marksStudentSearch" placeholder="نام یا رول نمبر سے تلاش کریں..." oninput="app.filterMarksTable(this.value)" style="padding:7px 14px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.95rem; width:230px;">
+                        <button class="btn btn-sm" onclick="document.getElementById('exam_sub_container').innerHTML=''" style="background:#f1f5f9; color:#64748b; padding:7px 14px;">بند کریں</button>
+                    </div>
                 </div>
                 
                 <div style="overflow-x:auto;">
                     <form onsubmit="app.handleResultsSubmit(event)">
                         <input type="hidden" name="examId" value="${examId}">
-                        <table style="width:100%; border-collapse:collapse;">
+                        <table style="width:100%; border-collapse:collapse;" id="marks_entry_table">
                             <thead>
                                 <tr style="background:#f8fafc;">
-                                    <th style="padding:10px; border:1px solid #ddd;">طالب علم</th>
+                                    <th style="padding:10px; border:1px solid #ddd; width:45px; text-align:center;">#</th>
+                                    <th style="padding:10px; border:1px solid #ddd; min-width:170px;">طالب علم کی تفصیل</th>
+                                    ${isHifz ? `
+                                        <th style="padding:10px; border:1px solid #ddd; background:#f0fdf4; color:#166534; min-width:130px; text-align:center;">حلقہ / استاد</th>
+                                        <th style="padding:10px; border:1px solid #ddd; background:#f0fdf4; color:#166534; min-width:130px; text-align:center;">موجودہ پیش رفت</th>
+                                        <th style="padding:10px; border:1px solid #ddd; background:#dcfce7; color:#15803d; min-width:180px; text-align:center;">امتحانی سبق / مقدار (انفرادی)</th>
+                                    ` : ''}
                                     ${academicSubjects.map(s => {
                                         const name = typeof s === 'string' ? s : s.name;
                                         const total = typeof s === 'string' ? 100 : (s.totalMarks || 100);
-                                        return `<th style="padding:10px; border:1px solid #ddd; font-size:0.9rem;">${name}<br><small>(کل: ${total})</small></th>`;
+                                        return `<th style="padding:10px; border:1px solid #ddd; font-size:0.9rem; text-align:center; min-width:90px;">${name}<br><small style="color:#64748b;">(کل: ${total})</small></th>`;
                                     }).join('')}
-                                    <th style="padding:10px; border:1px solid #ddd;">ایکشن</th>
+                                    <th style="padding:10px; border:1px solid #ddd; text-align:center; min-width:90px;">ایکشن</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                ${allStudents.map(student => {
+                            <tbody id="marks_entry_tbody">
+                                ${allStudents.length === 0 ? `
+                                    <tr>
+                                        <td colspan="${isHifz ? (academicSubjects.length + 5) : (academicSubjects.length + 3)}" style="text-align:center; padding:3rem; color:#dc2626; font-size:1.1rem; font-weight:bold;">
+                                            اس شعبے یا امتحان کے لیے کوئی طالب علم نہیں ملا۔ براہِ کرم چیک کریں کہ طلباء کے ریکارڈ میں شعبہ حفظ درج ہے۔
+                                        </td>
+                                    </tr>
+                                ` : allStudents.map((student, idx) => {
                                     const res = results.find(r => r.studentId === student.id);
+                                    const en = enrollmentMap.get(parseInt(student.id));
+                                    const currentProgress = en ? `پارہ ${en.currentJuz || 1} (صفحہ ${en.currentPage || 1})` : 'درج نہیں';
+                                    const tName = en && en.teacherId ? teacherMap.get(en.teacherId) : null;
+                                    const halaqaText = en ? (en.halaqa || 'عام حلقہ') + (tName ? ` (${tName})` : '') : 'شعبہ حفظ';
+                                    const defaultPortion = (res && res.portion) ? res.portion : (en ? `پارہ ${en.currentJuz || 1}` : (exam.portion || 'مکمل قرآن'));
+                                    const isBanat = student.section === 'banat' || student.section === 'بنات';
+
                                     return `
                                         <tr>
+                                            <td style="padding:10px; border:1px solid #ddd; text-align:center; font-weight:bold; color:#64748b;">${idx + 1}</td>
                                             <td style="padding:10px; border:1px solid #ddd;">
-                                                <div style="font-weight:bold; font-size:1.2rem;">${student.name}</div>
-                                                <div style="font-size:0.8rem; color:#666;">#${student.id}</div>
+                                                <div style="font-weight:bold; font-size:1.15rem; color:#0f172a; display:flex; align-items:center; gap:6px;">
+                                                    ${student.name}
+                                                    <span style="font-size:0.75rem; padding:1px 6px; border-radius:4px; ${isBanat ? 'background:#fce7f3; color:#9d174d;' : 'background:#e0f2fe; color:#0369a1;'} font-weight:normal;">
+                                                        ${isBanat ? 'بنات' : 'بنین'}
+                                                    </span>
+                                                </div>
+                                                <div style="font-size:0.85rem; color:#64748b;">ولدیت: ${student.fatherName || '---'} | #${student.id}</div>
                                             </td>
+                                            ${isHifz ? `
+                                                <td style="padding:8px; border:1px solid #ddd; text-align:center; font-size:0.95rem; color:#334155; background:#fafffd;">
+                                                    <span style="background:#f1f5f9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:0.88rem;">${halaqaText}</span>
+                                                </td>
+                                                <td style="padding:8px; border:1px solid #ddd; text-align:center; font-size:0.95rem; font-weight:bold; color:#065f46; background:#fafffd;">
+                                                    ${currentProgress}
+                                                </td>
+                                                <td style="padding:6px; border:1px solid #ddd; background:#f0fdf4; text-align:center;">
+                                                    <input type="text" name="portion_${student.id}" value="${defaultPortion}" placeholder="مثلاً: پارہ 1 تا 3" style="width:100%; padding:8px; border:1.5px solid #10b981; border-radius:6px; text-align:center; font-size:1rem; font-weight:bold; color:#065f46; background:#ffffff; box-shadow:inset 0 1px 2px rgba(0,0,0,0.05);" title="اس طالب علم کا انفرادی امتحانی سبق درج کریں">
+                                                </td>
+                                            ` : ''}
                                             ${academicSubjects.map(s => {
                                                 const subject = typeof s === 'string' ? s : s.name;
+                                                const maxMarks = typeof s === 'string' ? 100 : (s.totalMarks || 100);
+                                                const val = res && res.marks ? (res.marks[subject] !== undefined ? res.marks[subject] : '') : '';
                                                 return `
-                                                    <td style="padding:5px; border:1px solid #ddd; width:80px;">
-                                                        <input type="number" name="marks_${student.id}_${subject}" value="${res && res.marks ? res.marks[subject] || '' : ''}" style="width:100%; padding:10px 5px; border:1px solid #eee; text-align:center; font-size:1.2rem; font-weight:bold;">
+                                                    <td style="padding:5px; border:1px solid #ddd; width:95px; text-align:center;">
+                                                        <input type="number" max="${maxMarks}" min="0" name="marks_${student.id}_${subject}" value="${val}" placeholder="0" style="width:100%; padding:8px 5px; border:1px solid #cbd5e1; border-radius:6px; text-align:center; font-size:1.15rem; font-weight:bold; color:#0f172a;">
                                                     </td>
                                                 `;
                                             }).join('')}
                                             <td style="padding:10px; border:1px solid #ddd; text-align:center;">
-                                                <button type="button" class="btn btn-sm" style="background:#ecfdf5; color:#059669;" onclick="app.printResultCard(${student.id}, ${examId})"><i class="fas fa-print"></i> کارڈ</button>
+                                                <button type="button" class="btn btn-sm" style="background:#ecfdf5; color:#059669; font-weight:bold; border:1px solid #a7f3d0;" onclick="app.printResultCard(${student.id}, ${examId})"><i class="fas fa-print"></i> کارڈ</button>
                                             </td>
                                         </tr>
                                     `;
                                 }).join('')}
                             </tbody>
                         </table>
-                        <div style="margin-top:2rem; text-align:center;">
-                            <button type="submit" class="btn btn-primary" style="background:#0369a1; min-width:250px;">تمام رزلٹ محفوظ کریں</button>
-                        </div>
+                        ${allStudents.length > 0 ? `
+                            <div style="margin-top:2rem; text-align:center; display:flex; justify-content:center; gap:15px; align-items:center;">
+                                <button type="submit" class="btn btn-primary" style="background:#0369a1; min-width:280px; font-size:1.15rem; padding:12px 30px; box-shadow:0 4px 12px rgba(3,105,161,0.25);">
+                                    <i class="fas fa-save"></i> تمام طلباء کے نمبرات و اسباق محفوظ کریں
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="document.getElementById('exam_sub_container').innerHTML=''" style="padding:12px 25px;">منسوخ</button>
+                            </div>
+                        ` : ''}
                     </form>
                 </div>
             </div>
@@ -8796,14 +11293,79 @@ downloadReceiptImageDirect(options) {
         const exam = await MadrassahDB.getExamById(examId);
         if (!exam) return;
         
+        const deptStr = (exam.department || '').trim().toLowerCase();
+        const titleStr = (exam.title || '').trim().toLowerCase();
+        const classStr = (exam.className || '').trim().toLowerCase();
+        const isHifz = deptStr.includes('حفظ') || deptStr.includes('hifz') || 
+                       titleStr.includes('حفظ') || titleStr.includes('hifz') ||
+                       classStr.includes('حفظ') || classStr.includes('hifz');
+
         const students = await MadrassahDB.getAllStudents('banin');
         const girls = await MadrassahDB.getAllStudents('banat');
-        const allStudents = [...students, ...girls].filter(s => 
-            s.department === exam.department && 
-            (!exam.className || s.className === exam.className || s.class === exam.className)
-        );
+        const studentMapById = new Map();
+        [...students, ...girls].forEach(s => {
+            if (s && s.id && !studentMapById.has(parseInt(s.id))) {
+                studentMapById.set(parseInt(s.id), s);
+            }
+        });
 
-        const academicSubjects = (exam.subjects || []).filter(s => !(typeof s === 'object' && s.isHoliday));
+        let allStudents = [];
+        if (isHifz) {
+            const enrollments = (await MadrassahDB.getAllHifzEnrollments()) || [];
+            const enrollmentMap = new Map();
+            enrollments.forEach(en => enrollmentMap.set(parseInt(en.studentId), en));
+
+            studentMapById.forEach(s => {
+                const sId = parseInt(s.id);
+                const dept = (s.department || '').trim();
+                const cls = (s.className || s.class || '').trim();
+                if (enrollmentMap.has(sId) || dept.includes('حفظ') || cls.includes('حفظ')) {
+                    if (!exam.section || exam.section === 'all' || s.section === exam.section ||
+                        (exam.section === 'banin' && s.section !== 'banat') ||
+                        (exam.section === 'banat' && s.section === 'banat')) {
+                        allStudents.push(s);
+                    }
+                }
+            });
+            for (const en of enrollments) {
+                const sId = parseInt(en.studentId);
+                if (sId && !allStudents.some(s => parseInt(s.id) === sId)) {
+                    const extraSt = await MadrassahDB.getStudentById(sId);
+                    if (extraSt) {
+                        if (!exam.section || exam.section === 'all' || extraSt.section === exam.section ||
+                            (exam.section === 'banin' && extraSt.section !== 'banat') ||
+                            (exam.section === 'banat' && extraSt.section === 'banat')) {
+                            allStudents.push(extraSt);
+                        }
+                    }
+                }
+            }
+            allStudents.sort((a, b) => parseInt(a.id || 0) - parseInt(b.id || 0));
+        } else {
+            const examDept = (exam.department || '').trim();
+            const examClass = (exam.className || '').trim();
+            allStudents = Array.from(studentMapById.values()).filter(s => {
+                const sDept = (s.department || '').trim();
+                const sClass = (s.className || s.class || '').trim();
+                const deptMatch = !examDept || sDept === examDept;
+                const classMatch = !examClass || sClass === examClass;
+                return deptMatch && classMatch;
+            });
+            allStudents.sort((a, b) => parseInt(a.id || 0) - parseInt(b.id || 0));
+        }
+
+        let academicSubjects = (exam.subjects || []).filter(s => !(typeof s === 'object' && s.isHoliday));
+        if (academicSubjects.length === 0) {
+            if (isHifz) {
+                academicSubjects = [
+                    { name: 'حفظِ قرآن', totalMarks: 50 },
+                    { name: 'تجوید و ترتیل', totalMarks: 25 },
+                    { name: 'مخارج و قواعد', totalMarks: 25 }
+                ];
+            } else {
+                academicSubjects = [{ name: 'کل پرچہ / مضمون', totalMarks: 100 }];
+            }
+        }
 
         for (const student of allStudents) {
             let marks = {};
@@ -8813,7 +11375,8 @@ downloadReceiptImageDirect(options) {
             academicSubjects.forEach(s => {
                 const subject = typeof s === 'string' ? s : s.name;
                 const maxMarks = typeof s === 'string' ? 100 : (s.totalMarks || 100);
-                const val = parseInt(formData.get(`marks_${student.id}_${subject}`) || 0);
+                const rawVal = formData.get(`marks_${student.id}_${subject}`);
+                const val = rawVal !== null && rawVal !== '' ? parseInt(rawVal) : 0;
                 
                 marks[subject] = val;
                 obtainedTotal += val;
@@ -8822,11 +11385,13 @@ downloadReceiptImageDirect(options) {
 
             const percentage = totalPossible > 0 ? (obtainedTotal / totalPossible) * 100 : 0;
             const grade = await this.calculateGrade(percentage);
+            const studentPortion = (formData.get(`portion_${student.id}`) || '').trim();
 
             await MadrassahDB.saveResult({
                 examId: examId,
                 studentId: student.id,
                 studentName: student.name,
+                portion: studentPortion,
                 marks: marks,
                 totalPossible: totalPossible,
                 obtainedTotal: obtainedTotal,
@@ -8836,7 +11401,7 @@ downloadReceiptImageDirect(options) {
             });
         }
 
-        alert('تمام طلباء کے نمبرات کامیابی سے محفوظ کر لیے گئے ہیں۔');
+        alert(`شعبہ ${exam.department || 'حفظ'} کے تمام طلباء (${allStudents.length}) کے نمبرات اور انفرادی اسباق کامیابی سے محفوظ کر لیے گئے ہیں۔`);
         this.showEnterMarks(examId);
     }
 
@@ -8930,6 +11495,21 @@ downloadReceiptImageDirect(options) {
 
         if (!res) { alert('پہلے نمبرات محفوظ کریں!'); return; }
 
+        let cardSubjects = (exam.subjects || []).filter(s => !(typeof s === 'object' && s.isHoliday));
+        if (cardSubjects.length === 0) {
+            if (res && res.marks && Object.keys(res.marks).length > 0) {
+                cardSubjects = Object.keys(res.marks).map(k => ({ name: k, totalMarks: 100 }));
+            } else if (exam.department && exam.department.includes('حفظ')) {
+                cardSubjects = [
+                    { name: 'حفظِ قرآن', totalMarks: 50 },
+                    { name: 'تجوید و ترتیل', totalMarks: 25 },
+                    { name: 'مخارج و قواعد', totalMarks: 25 }
+                ];
+            } else {
+                cardSubjects = [{ name: 'کل پرچہ / مضمون', totalMarks: 100 }];
+            }
+        }
+
         const printWindow = window.open('', '_blank');
         printWindow.document.write(`
             <html lang="ur" dir="rtl">
@@ -8955,21 +11535,63 @@ downloadReceiptImageDirect(options) {
                     .sig { border-top: 2px solid #065f46; width: 180px; text-align: center; padding-top: 10px; font-weight: bold; }
                     @media print { .no-print { display: none; } }
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
                 <script>
-                function downloadDoc(filename) {
-                    const clone = document.documentElement.cloneNode(true);
-                    clone.querySelectorAll('.no-print').forEach(el => el.remove());
-                    const htmlContent = '<!DOCTYPE html>\n' + clone.outerHTML;
-                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = (filename || 'دستاویز') + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'رزلٹ_کارڈ') + '.pdf';
+                    const targetEl = document.querySelector('.result-container') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            const margin = 5;
+                            const maxW = pWidth - (margin * 2);
+                            const maxH = pHeight - (margin * 2);
+                            let finalW = maxW;
+                            let finalH = (imgProps.height * maxW) / imgProps.width;
+                            if (finalH > maxH) {
+                                finalH = maxH;
+                                finalW = (imgProps.width * maxH) / imgProps.height;
+                            }
+                            const x = (pWidth - finalW) / 2;
+                            const y = (pHeight - finalH) / 2;
+                            pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
+                            pdf.save(safeName);
+                        } catch (err) {
+                            console.error('PDF export error:', err);
+                            window.print();
+                        } finally {
+                            if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        }
+                    };
+                    if (typeof html2canvas !== 'undefined') {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' })
+                            .then(doExport)
+                            .catch(err => {
+                                console.error('html2canvas error:', err);
+                                if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                                window.print();
+                            });
+                    } else {
+                        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        window.print();
+                    }
                 }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
                 </script>
             </head>
             <body>
@@ -8985,8 +11607,13 @@ downloadReceiptImageDirect(options) {
                         <div class="info-grid">
                             <div class="info-item"><span class="label">نام طالب علم:</span> <span>${student.name}</span></div>
                             <div class="info-item"><span class="label">رجسٹریشن نمبر:</span> <span>#${student.id}</span></div>
-                            <div class="info-item"><span class="label">ولدیت:</span> <span>${student.fatherName}</span></div>
-                            <div class="info-item"><span class="label">درجہ / شعبہ:</span> <span>${exam.className || exam.department}</span></div>
+                            <div class="info-item"><span class="label">ولدیت:</span> <span>${student.fatherName || '---'}</span></div>
+                            <div class="info-item"><span class="label">درجہ / شعبہ:</span> <span>${exam.className ? (exam.department + ' (' + exam.className + ')') : exam.department}</span></div>
+                            ${(res && res.portion) || (exam.department && exam.department.includes('حفظ')) ? `
+                            <div class="info-item" style="grid-column: span 2; background:#f0fdf4; border:1.5px solid #a7f3d0; border-radius:8px; padding:10px 18px; margin-top:6px; display:flex; justify-content:space-between; align-items:center;">
+                                <span class="label" style="color:#065f46; font-size:1.35rem;"><i class="fas fa-book-quran"></i> امتحانی سبق / پارہ جات (انفرادی):</span> 
+                                <span style="font-weight:bold; font-size:1.45rem; color:#065f46; background:#fff; padding:4px 16px; border-radius:6px; border:1px solid #a7f3d0;">${res && res.portion ? res.portion : (exam.portion || 'مکمل قرآن')}</span>
+                            </div>` : ''}
                         </div>
 
                         <table>
@@ -8999,10 +11626,10 @@ downloadReceiptImageDirect(options) {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${(exam.subjects || []).filter(s => !(typeof s === 'object' && s.isHoliday)).map((s, index) => {
+                                ${cardSubjects.map((s, index) => {
                                     const subject = typeof s === 'string' ? s : s.name;
                                     const maxMarks = typeof s === 'string' ? 100 : (s.totalMarks || 100);
-                                    const obtained = res.marks[subject] || 0;
+                                    const obtained = (res.marks && res.marks[subject] !== undefined) ? res.marks[subject] : 0;
                                     return `
                                         <tr>
                                             <td>${index + 1}</td>
@@ -9030,7 +11657,7 @@ downloadReceiptImageDirect(options) {
                 </div>
                 <div class="no-print" style="text-align:center; margin-top:30px; display:flex; justify-content:center; gap:15px;">
                     <button onclick="window.print()" style="padding:12px 40px; background:#065f46; color:white; border:none; border-radius:30px; font-size:1.3rem; cursor:pointer;"><i class="fas fa-print"></i> رزلٹ کارڈ پرنٹ کریں</button>
-                    <button onclick="downloadDoc('رزلٹ_کارڈ_${student.name ? student.name.replace(/['&quot;\s]+/g, '_') : 'ResultCard'}')" style="padding:12px 40px; background:#0284c7; color:white; border:none; border-radius:30px; font-size:1.3rem; cursor:pointer;"><i class="fas fa-download"></i> ڈاؤن لوڈ کریں</button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('رزلٹ_کارڈ_${student.name ? student.name.replace(/['&quot;\\s]+/g, '_') : 'ResultCard'}', 'portrait', 'a4')" style="padding:12px 35px; background:#dc2626; color:white; border:none; border-radius:30px; font-size:1.3rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 10px rgba(220,38,38,0.35); display:inline-flex; align-items:center; gap:8px;"><i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)</button>
                 </div>
             </body>
             </html>
@@ -9649,6 +12276,7 @@ downloadReceiptImageDirect(options) {
 
         const hasReceipt = this.hasReceiptTemplate();
         const receiptUri = this.getReceiptTemplateUri();
+        const storedPass = (await MadrassahDB.getSetting('app_password')) || '123';
 
         container.innerHTML = `
             <div style="max-width: 960px; margin: 0 auto; direction: rtl;">
@@ -9788,29 +12416,39 @@ downloadReceiptImageDirect(options) {
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <i class="fas fa-lock" style="color: #4f46e5; font-size: 1.3rem;"></i>
-                            <h3 style="margin: 0; color: #3730a3; font-size: 1.2rem;">سیکیورٹی پاسورڈ</h3>
+                            <div>
+                                <h3 style="margin: 0; color: #3730a3; font-size: 1.2rem;">سیکیورٹی پاسورڈ</h3>
+                                <p style="margin: 2px 0 0 0; color: #64748b; font-size: 0.85rem;">سافٹ ویئر لاگ ان اور حساس ڈیٹا کی حفاظت کے لیے پاسورڈ</p>
+                            </div>
                         </div>
-                        <span style="font-size: 0.85rem; color: #64748b;">ڈیفالٹ پاسورڈ: <b>123</b></span>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <span style="font-size: 0.88rem; color: #475569;">
+                                فعال پاسورڈ: <strong id="settings-active-password-text" style="font-family: monospace; font-size: 1.15rem; color: #4338ca; background: #eef2ff; padding: 3px 10px; border-radius: 6px; border: 1px solid #c7d2fe; letter-spacing: 1px;">${storedPass}</strong>
+                            </span>
+                            <button type="button" onclick="app.resetPasswordToDefault()" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 5px 12px; border-radius: 6px; font-weight: bold; font-size: 0.82rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                <i class="fas fa-rotate-left"></i> ڈیفالٹ 123 پر ری سیٹ کریں
+                            </button>
+                        </div>
                     </div>
 
                     <form onsubmit="app.handlePasswordChange(event)">
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;">
                             <div>
                                 <label style="display: block; font-size: 0.85rem; font-weight: bold; color: #334155; margin-bottom: 4px;">موجودہ پاسورڈ:</label>
-                                <input type="password" id="current-pass-input" placeholder="موجودہ پاسورڈ" required style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem;">
+                                <input type="text" id="current-pass-input" value="${storedPass}" placeholder="موجودہ پاسورڈ (یا 123)" style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; font-family: monospace;">
                             </div>
                             <div>
                                 <label style="display: block; font-size: 0.85rem; font-weight: bold; color: #334155; margin-bottom: 4px;">نیا پاسورڈ:</label>
-                                <input type="password" id="new-pass-input" placeholder="نیا پاسورڈ" required style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem;">
+                                <input type="text" id="new-pass-input" placeholder="نیا پاسورڈ درج کریں" required style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; font-family: monospace;">
                             </div>
                             <div>
-                                <label style="display: block; font-size: 0.85rem; font-weight: bold; color: #334155; margin-bottom: 4px;">پاسورڈ تصدیق:</label>
-                                <input type="password" id="confirm-pass-input" placeholder="دوبارہ درج کریں" required style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem;">
+                                <label style="display: block; font-size: 0.85rem; font-weight: bold; color: #334155; margin-bottom: 4px;">نیا پاسورڈ تصدیق:</label>
+                                <input type="text" id="confirm-pass-input" placeholder="دوبارہ درج کریں" required style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; font-family: monospace;">
                             </div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <button type="submit" class="btn btn-primary" style="background: #4f46e5; border: none; padding: 7px 18px; font-size: 0.9rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
-                                <i class="fas fa-check"></i> پاسورڈ تبدیل کریں
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <button type="submit" class="btn btn-primary" style="background: #4f46e5; border: none; padding: 7px 18px; font-size: 0.9rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-weight: bold;">
+                                <i class="fas fa-check"></i> نیا پاسورڈ محفوظ کریں
                             </button>
                             <span id="pass-change-msg" style="font-weight: bold; font-size: 0.9rem; display: none;"></span>
                         </div>
@@ -10842,6 +13480,7 @@ downloadReceiptImageDirect(options) {
                                     </td>
                                     <td style="padding:12px 12px; text-align:center; vertical-align:middle; white-space:nowrap;">
                                         <button class="btn btn-sm" style="padding:5px 10px; background:#eff6ff; color:#1d4ed8; margin-left:4px; border:1px solid #bfdbfe; border-radius:8px;" onclick="app.showUniversalDossier(${s.id}, 'teacher')" title="۳۶۰° جامع رپورٹ و بائیو ڈیٹا"><i class="fas fa-fingerprint"></i> ۳۶۰°</button>
+                                        <button class="btn btn-sm" style="padding:5px 10px; background:#f0fdf4; color:#16a34a; margin-left:4px; border:1px solid #bbf7d0; border-radius:8px; font-weight:bold;" onclick="app.printStaffForm(${s.id})" title="تفصیلی ملازمت فارم ملاحظہ و پرنٹ کریں (A4)"><i class="fas fa-file-invoice"></i> تفصیلی فارم</button>
                                         <button class="btn btn-sm" style="padding:5px 10px; background:#ecfdf5; color:#065f46; margin-left:4px; border:1px solid #a7f3d0; border-radius:8px; font-weight:bold;" onclick="app.printStaffCard(${s.id})" title="پی وی سی شناختی کارڈ پرنٹ کریں"><i class="fas fa-id-card"></i> کارڈ</button>
                                         <button class="btn btn-sm" style="padding:5px 10px; background:#f1f5f9; color:var(--primary); margin-left:4px; border-radius:8px;" onclick="app.editStaff(${s.id})" title="کوائف تبدیل کریں"><i class="fas fa-edit"></i></button>
                                         <button class="btn btn-sm" style="padding:5px 10px; background:#fef2f2; color:#ef4444; border-radius:8px;" onclick="app.deleteStaff(${s.id})" title="حذف کریں"><i class="fas fa-trash"></i></button>
@@ -11026,6 +13665,7 @@ downloadReceiptImageDirect(options) {
                                     </td>
                                     <td style="padding:10px 14px; text-align:center; white-space:nowrap;">
                                         <button class="btn btn-sm" style="padding:4px 9px; background:#eff6ff; color:#1d4ed8; margin-left:4px; border:1px solid #bfdbfe; border-radius:8px;" onclick="app.showUniversalDossier(${s.id}, 'teacher')" title="۳۶۰° جامع رپورٹ و بائیو ڈیٹا"><i class="fas fa-fingerprint"></i> ۳۶۰°</button>
+                                        <button class="btn btn-sm" style="padding:4px 9px; background:#f0fdf4; color:#16a34a; margin-left:4px; border:1px solid #bbf7d0; border-radius:8px; font-weight:bold;" onclick="app.printStaffForm(${s.id})" title="تفصیلی ملازمت فارم ملاحظہ و پرنٹ کریں (A4)"><i class="fas fa-file-invoice"></i> تفصیلی فارم</button>
                                         <button class="btn btn-sm" style="padding:4px 9px; background:#ecfdf5; color:#065f46; margin-left:4px; border:1px solid #a7f3d0; border-radius:8px; font-weight:bold;" onclick="app.printStaffCard(${s.id})" title="پی وی سی شناختی کارڈ پرنٹ کریں"><i class="fas fa-id-card"></i> کارڈ</button>
                                         <button class="btn btn-sm" style="padding:4px 9px; background:#f1f5f9; color:var(--primary); margin-left:4px; border-radius:8px;" onclick="app.editStaff(${s.id})" title="کوائف تبدیل کریں"><i class="fas fa-edit"></i></button>
                                         <button class="btn btn-sm" style="padding:4px 9px; background:#fef2f2; color:#ef4444; border-radius:8px;" onclick="app.deleteStaff(${s.id})" title="حذف کریں"><i class="fas fa-trash"></i></button>
@@ -11188,8 +13828,8 @@ downloadReceiptImageDirect(options) {
                         <button type="submit" class="btn btn-primary" style="min-width:300px; font-size:1.3rem;">
                             <i class="fas fa-save"></i> ${staff ? 'تبدیلی محفوظ کریں' : 'ڈیٹا محفوظ کریں'}
                         </button>
-                        <button type="button" class="btn" style="background: #64748b; color: white;" onclick="window.print()">
-                            <i class="fas fa-print"></i> پرنٹ فارم
+                        <button type="button" class="btn" style="background: #059669; color: white;" onclick="${staff && staff.id ? `app.printStaffForm(${staff.id})` : "alert('براہ کرم پہلے عملہ کے کوائف محفوظ فرمائیں، اس کے بعد تفصیلی فارم پرنٹ کیا جا سکتا ہے!')"}">
+                            <i class="fas fa-print"></i> پرنٹ فارم (A4)
                         </button>
                     </div>
                 </form>
@@ -11233,6 +13873,421 @@ downloadReceiptImageDirect(options) {
             await MadrassahDB.deleteTeacher(id);
             this.render();
         }
+    }
+
+    async printStaffForm(staffId) {
+        const staff = await MadrassahDB.getTeacherById(staffId);
+        if (!staff) {
+            alert('عملہ کا ریکارڈ نہیں ملا!');
+            return;
+        }
+
+        const isTeaching = (staff.staffType === 'teaching' || !staff.staffType);
+        const code = staff.uniqueCode || ('EMP-' + (100 + parseInt(staff.id || 0)));
+        
+        // Fetch assigned books from syllabus if any
+        let assignedBooks = [];
+        try {
+            const syllabus = (await MadrassahDB.getAllSyllabusBooks()) || [];
+            assignedBooks = syllabus.filter(b => b.teacherId === staff.id || b.teacherName === staff.name);
+        } catch (e) {
+            console.warn('Could not fetch syllabus for staff:', e);
+        }
+
+        // Format religious education
+        let religiousEduStr = '---';
+        if (staff.religiousEdu) {
+            if (Array.isArray(staff.religiousEdu)) {
+                religiousEduStr = staff.religiousEdu.join('، ') || '---';
+            } else {
+                religiousEduStr = String(staff.religiousEdu);
+            }
+        }
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert('براہ کرم پاپ اپ (Pop-up) ونڈو کھولنے کی اجازت دیں تاکہ تفصیلی فارم ملاحظہ کیا جا سکے۔');
+            return;
+        }
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html lang="ur" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>کوائف نامہ و تقرری فارم - ${staff.name} (${code})</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+                <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+                <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+                <style>
+                    @page {
+                        size: A4 portrait;
+                        margin: 8mm 10mm;
+                    }
+                    * {
+                        box-sizing: border-box;
+                        font-family: 'Jameel Noori Nastaleeq', 'Noto Sans Urdu', 'Inter', 'Segoe UI', Tahoma, sans-serif;
+                    }
+                    body {
+                        background: #f8fafc;
+                        color: #1e293b;
+                        direction: rtl;
+                        margin: 0;
+                        padding: 15px;
+                        font-size: 1.02rem;
+                    }
+                    .form-container {
+                        max-width: 210mm;
+                        margin: 0 auto;
+                        background: white;
+                        border: 2px solid #1e3a8a;
+                        border-radius: 12px;
+                        padding: 15px 20px;
+                        box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+                        position: relative;
+                    }
+                    .form-watermark {
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 380px;
+                        height: 380px;
+                        opacity: 0.08;
+                        pointer-events: none;
+                        z-index: 0;
+                        object-fit: contain;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    .header-box {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-bottom: 2.5px double #1e3a8a;
+                        padding-bottom: 10px;
+                        margin-bottom: 12px;
+                        gap: 15px;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .logo-box {
+                        width: 105px;
+                        height: 105px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        flex-shrink: 0;
+                        background: #ffffff;
+                        border-radius: 50%;
+                        border: 3px solid #1e3a8a;
+                        padding: 3px;
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+                    }
+                    .logo-img { width: 100%; height: 100%; object-fit: contain; border-radius: 50%; }
+                    .madrsa-title {
+                        text-align: center;
+                        flex-grow: 1;
+                    }
+                    .madrsa-title h1 {
+                        font-family: 'Aref Ruqaa', serif;
+                        font-size: 2.2rem;
+                        color: #1e3a8a;
+                        margin: 0;
+                        line-height: 1.1;
+                    }
+                    .madrsa-title h2 {
+                        font-size: 1.2rem;
+                        background: linear-gradient(135deg, #1e3a8a, #2563eb);
+                        color: white;
+                        display: inline-block;
+                        padding: 3px 25px;
+                        border-radius: 20px;
+                        margin: 4px 0 0 0;
+                        font-weight: bold;
+                    }
+                    .photo-frame {
+                        width: 105px;
+                        height: 125px;
+                        border: 2px solid #1e3a8a;
+                        border-radius: 10px;
+                        overflow: hidden;
+                        background: #f1f5f9;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        flex-shrink: 0;
+                    }
+                    .photo-frame img { width: 100%; height: 100%; object-fit: cover; }
+                    
+                    .section-header {
+                        background: #eff6ff;
+                        color: #1e3a8a;
+                        border: 1px solid #bfdbfe;
+                        border-right: 5px solid #1e3a8a;
+                        padding: 3px 12px;
+                        font-size: 1.05rem;
+                        font-weight: bold;
+                        border-radius: 6px;
+                        margin: 10px 0 6px 0;
+                    }
+
+                    .info-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 6px;
+                    }
+                    .info-table td {
+                        padding: 5px 8px;
+                        border: 1px solid #e2e8f0;
+                        font-size: 1rem;
+                    }
+                    .info-table .lbl {
+                        background: #f8fafc;
+                        font-weight: bold;
+                        color: #1e3a8a;
+                        width: 18%;
+                        white-space: nowrap;
+                    }
+                    .info-table .val {
+                        width: 32%;
+                        color: #0f172a;
+                    }
+
+                    .declaration-box {
+                        border: 1px solid #cbd5e1;
+                        background: #f8fafc;
+                        border-radius: 8px;
+                        padding: 8px 12px;
+                        margin-top: 10px;
+                        font-size: 0.92rem;
+                        line-height: 1.5;
+                        color: #334155;
+                    }
+
+                    .sign-row {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-end;
+                        margin-top: 24px;
+                        padding-top: 8px;
+                    }
+                    .sign-line {
+                        text-align: center;
+                        width: 28%;
+                        border-top: 2px dashed #1e3a8a;
+                        padding-top: 5px;
+                        font-weight: bold;
+                        font-size: 0.95rem;
+                        color: #334155;
+                    }
+
+                    @media print {
+                        body { background: white; padding: 0; }
+                        .form-container {
+                            border: 2px solid #1e3a8a !important;
+                            box-shadow: none !important;
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            padding: 12px 16px !important;
+                        }
+                        .no-print { display: none !important; }
+                        .section-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        .madrsa-title h2 { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        .info-table .lbl { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        .form-watermark { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    }
+                </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
+                <script>
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'ملازمت_فارم') + '.pdf';
+                    const targetEl = document.querySelector('.form-container') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            const margin = 5;
+                            const maxW = pWidth - (margin * 2);
+                            const maxH = pHeight - (margin * 2);
+                            let finalW = maxW;
+                            let finalH = (imgProps.height * maxW) / imgProps.width;
+                            if (finalH > maxH) {
+                                finalH = maxH;
+                                finalW = (imgProps.width * maxH) / imgProps.height;
+                            }
+                            const x = (pWidth - finalW) / 2;
+                            const y = (pHeight - finalH) / 2;
+                            pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
+                            pdf.save(safeName);
+                        } catch (err) {
+                            console.error('PDF export error:', err);
+                            window.print();
+                        } finally {
+                            if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        }
+                    };
+                    if (typeof html2canvas !== 'undefined') {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' })
+                            .then(doExport)
+                            .catch(err => {
+                                console.error('html2canvas error:', err);
+                                if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                                window.print();
+                            });
+                    } else {
+                        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        window.print();
+                    }
+                }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
+                </script>
+            </head>
+            <body>
+                <div class="form-container">
+                    <img src="${LOGO_DATA_URI}" alt="Watermark" class="form-watermark">
+                    <div class="header-box">
+                        <div class="logo-box">
+                            <img src="${LOGO_DATA_URI}" alt="لوگو" class="logo-img">
+                        </div>
+                        <div class="madrsa-title">
+                            <img src="${TITLE_DATA_URI}" alt="مدرسہ عبد الرحمن بن عوف غفوریہ" style="max-height:70px; max-width:100%; object-fit:contain; mix-blend-mode:multiply; display:block; margin:0 auto 3px auto;">
+                            <h2>کوائف نامہ و تقرری فارم برائے عملہ و اساتذہ</h2>
+                            <div style="font-size:0.92rem; font-weight:bold; color:#065f46; margin-top:3px;">چک نمبر 10-28 آر بوسال کالونی، ضلع خانیوال</div>
+                        </div>
+                        <div class="photo-frame">
+                            ${staff.photo ? `<img src="${staff.photo}">` : `<i class="fas ${isTeaching ? 'fa-chalkboard-teacher' : 'fa-user-tie'}" style="font-size:3rem; color:#cbd5e1;"></i>`}
+                        </div>
+                    </div>
+
+                    <!-- 1. Basic Details -->
+                    <div class="section-header"><i class="fas fa-user"></i> ۱۔ بنیادی و ذاتی کوائف (Personal Information)</div>
+                    <table class="info-table">
+                        <tr>
+                            <td class="lbl">ملازم کوڈ (EMP Code):</td>
+                            <td class="val"><b style="font-family:monospace; color:#1e3a8a; font-size:1.05rem;">${code}</b></td>
+                            <td class="lbl">نامِ ملازم / استاد:</td>
+                            <td class="val"><b>${staff.name || '---'}</b></td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">ولدیت / زوجیت:</td>
+                            <td class="val">${staff.fatherName || '---'}</td>
+                            <td class="lbl">شناختی کارڈ نمبر (CNIC):</td>
+                            <td class="val" dir="ltr" style="font-family:monospace; font-size:0.95rem; text-align:right;">${staff.cnic || '---'}</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">تاریخِ پیدائش:</td>
+                            <td class="val">${staff.dob || '---'}</td>
+                            <td class="lbl">بلڈ گروپ (Blood Group):</td>
+                            <td class="val"><b style="color:#b91c1c;">${staff.bloodGroup || '---'}</b></td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">رابطہ نمبر (Phone):</td>
+                            <td class="val" dir="ltr" style="text-align:right;">${staff.phone || '---'}</td>
+                            <td class="lbl">حیثیت / کیٹیگری:</td>
+                            <td class="val"><b>${isTeaching ? 'تدریسی عملہ (استاد / مدرس)' : 'انتظامی و دفتری عملہ'}</b></td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">مستقل / موجودہ پتہ:</td>
+                            <td class="val" colspan="3">${staff.address || '---'}</td>
+                        </tr>
+                    </table>
+
+                    <!-- 2. Job & Professional Details -->
+                    <div class="section-header"><i class="fas fa-briefcase"></i> ۲۔ پیشہ ورانہ و انتظامی کوائف (Employment & Designation)</div>
+                    <table class="info-table">
+                        <tr>
+                            <td class="lbl">عہدہ / منصب:</td>
+                            <td class="val"><b style="color:#065f46;">${staff.designation || (isTeaching ? 'مدرس' : 'ملازم')}</b></td>
+                            <td class="lbl">تاریخِ تقرری / شمولیت:</td>
+                            <td class="val">${staff.joinDate || (staff.joiningDate ? new Date(staff.joiningDate).toLocaleDateString('ur-PK') : '---')}</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">ڈیوٹی شفٹ:</td>
+                            <td class="val">${staff.shift || 'مکمل وقت (Full Time)'}</td>
+                            <td class="lbl">ماہانہ مشاہرہ (تنخواہ):</td>
+                            <td class="val"><b style="color:#15803d; font-size:1.05rem;">Rs. ${(parseFloat(staff.salary || 0)).toLocaleString()}/-</b></td>
+                        </tr>
+                        ${assignedBooks.length > 0 ? `
+                        <tr>
+                            <td class="lbl">تفویض شدہ کتب و درجات:</td>
+                            <td class="val" colspan="3">
+                                ${assignedBooks.map(b => `<span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:2px 8px; border-radius:4px; font-size:0.88rem; margin-left:4px; display:inline-block;">${b.bookName} (${b.className || 'عمومی'})</span>`).join('')}
+                            </td>
+                        </tr>
+                        ` : ''}
+                    </table>
+
+                    <!-- 3. Education & Religious Qualifications -->
+                    <div class="section-header"><i class="fas fa-graduation-cap"></i> ۳۔ تعلیمی و دینی قابلیت (Academic & Religious Qualifications)</div>
+                    <table class="info-table">
+                        <tr>
+                            <td class="lbl">دنیوی / عصری تعلیم:</td>
+                            <td class="val"><b>${staff.qualification || '---'} ${staff.subject ? `(${staff.subject})` : ''}</b></td>
+                            <td class="lbl">دینی قابلیت / وفاق اسناد:</td>
+                            <td class="val"><b>${religiousEduStr}</b></td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">سابقہ تدریسی/عملی تجربہ:</td>
+                            <td class="val" colspan="3">${staff.experience || '---'}</td>
+                        </tr>
+                    </table>
+
+                    <!-- 4. Bank & Emergency Contacts -->
+                    <div class="section-header"><i class="fas fa-money-check-alt"></i> ۴۔ مالیاتی و ہنگامی کوائف (Financial & Emergency Contacts)</div>
+                    <table class="info-table">
+                        <tr>
+                            <td class="lbl">بینک / اکاؤنٹ نمبر:</td>
+                            <td class="val" dir="ltr" style="font-family:monospace; text-align:right;">${staff.bankAccount || staff.accountNumber || (staff.bankName ? staff.bankName : '---')}</td>
+                            <td class="lbl">ہنگامی رابطہ شخص و نمبر:</td>
+                            <td class="val">${staff.emergencyContact || '---'}</td>
+                        </tr>
+                    </table>
+
+                    <!-- 5. Terms of Service & Declaration -->
+                    <div class="declaration-box">
+                        <b>اقرار نامہ و عہد نامہ:</b> میں اقرار کرتا/کرتی ہوں کہ اس فارم میں درج کردہ تمام کوائف اور تفصیلات بالکل درست اور مبنی بر حقیقت ہیں۔ میں مدرسہ عبد الرحمن بن عوف کے تمام شرعی و انتظامی قواعد و ضوابط، ڈیوٹی اوقات اور نظم و ضبط کی دیانتداری سے پابندی کرنے کا عہد کرتا/کرتی ہوں۔ ادارے کے وقار اور دینی ماحول کی حفاظت میری اولین ترجیح ہوگی۔
+                    </div>
+
+                    <!-- Signatures -->
+                    <div class="sign-row">
+                        <div class="sign-line">دستخط ملازم / استاد</div>
+                        <div class="sign-line">دستخط ناظمِ تعلیمات / دفتر</div>
+                        <div class="sign-line">مہر و دستخط مہتمم / پرنسپل</div>
+                    </div>
+                </div>
+
+                <!-- Floating Buttons (No Print) -->
+                <div class="no-print" style="position:fixed; bottom:20px; left:0; right:0; text-align:center; z-index:999; display:flex; justify-content:center; gap:12px;">
+                    <button onclick="window.print()" style="padding:12px 35px; background:#1e3a8a; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.15rem; font-weight:bold; box-shadow:0 6px 16px rgba(30,58,138,0.35); font-family:inherit;">
+                        <i class="fas fa-print"></i> پرنٹ کریں (A4)
+                    </button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('ملازمت_فارم_${(staff.name || 'Staff').replace(/['\"\\s]+/g, '_')}', 'portrait', 'a4')" style="padding:12px 30px; background:#dc2626; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.15rem; font-weight:bold; box-shadow:0 6px 16px rgba(220,38,38,0.35); font-family:inherit; display:inline-flex; align-items:center; gap:8px;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)
+                    </button>
+                    <button onclick="window.close()" style="padding:12px 25px; background:#64748b; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.15rem; font-weight:bold; box-shadow:0 6px 16px rgba(100,116,139,0.25); font-family:inherit;">
+                        <i class="fas fa-times"></i> بند کریں
+                    </button>
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
     }
 
     // =========================================================================
@@ -11320,18 +14375,8 @@ downloadReceiptImageDirect(options) {
             }
         }
 
-        // Determine default student to display (prefer student with arrears, e.g. Badruddin)
-        let defaultStudentId = null;
-        if (this.currentFeeStudent) {
-            const exists = students.find(s => String(s.id) === String(this.currentFeeStudent.id));
-            if (exists) defaultStudentId = exists.id;
-        }
-        if (!defaultStudentId && students.length > 0) {
-            const withArrears = students.find(s => parseInt(s.arrears || 0) > 0);
-            defaultStudentId = withArrears ? withArrears.id : students[0].id;
-        }
-
         this.feeAllStudents = students;
+        this.currentFeeStudent = null; // Default: show directory list first!
 
         // Distinct departments & classes
         const existingDepts = [...new Set(students.map(s => (s.department || '').trim()).filter(Boolean))];
@@ -11438,10 +14483,8 @@ downloadReceiptImageDirect(options) {
             </div>
         `;
 
-        this.populateFeeStudentDropdown(students, defaultStudentId);
-        if (defaultStudentId) {
-            this.selectStudentForFee(defaultStudentId);
-        }
+        this.populateFeeStudentDropdown(students, null);
+        this.renderFeeStudentsListView(students);
     }
 
     switchFeeSection(section) {
@@ -11454,41 +14497,21 @@ downloadReceiptImageDirect(options) {
         const select = document.getElementById('fee_filter_student');
         if (!select) return;
 
-        if (!filteredStudents || filteredStudents.length === 0) {
-            select.innerHTML = '<option value="">کوئی طالب علم موجود نہیں</option>';
-            return;
-        }
+        let options = `<option value="" ${!activeId ? 'selected' : ''}>-- تمام طلباء کی فہرست دیکھیں (${(filteredStudents || []).length}) --</option>`;
 
-        select.innerHTML = filteredStudents.map(s => {
-            const arr = parseInt(s.arrears || 0);
-            const statusText = arr > 0 ? ` [بقایا: Rs. ${arr.toLocaleString()}]` : ' [بے باق ✓]';
-            const code = s.uniqueCode || ('#' + s.id);
-            const isSel = activeId && String(activeId) === String(s.id);
-            return `<option value="${s.id}" ${isSel ? 'selected' : ''}>${s.name} ولد ${s.fatherName || '---'} — (${code})${statusText}</option>`;
-        }).join('');
+        if (filteredStudents && filteredStudents.length > 0) {
+            options += filteredStudents.map(s => {
+                const arr = parseInt(s.arrears || 0);
+                const statusText = arr > 0 ? ` [بقایا: Rs. ${arr.toLocaleString()}]` : ' [بے باق ✓]';
+                const code = s.uniqueCode || ('#' + s.id);
+                const isSel = activeId && String(activeId) === String(s.id);
+                return `<option value="${s.id}" ${isSel ? 'selected' : ''}>${s.name} ولد ${s.fatherName || '---'} — (${code})${statusText}</option>`;
+            }).join('');
+        }
+        select.innerHTML = options;
     }
 
     handleFeeRegNoInput(val) {
-        const q = (val || '').trim().toLowerCase().replace(/^#/, '');
-        if (!q) {
-            this.filterFeeStudentsList();
-            return;
-        }
-
-        const students = this.feeAllStudents || [];
-        // Exact match check on ID or uniqueCode
-        const exactMatch = students.find(s => {
-            const idStr = String(s.id);
-            const codeStr = (s.uniqueCode || '').toLowerCase();
-            const cleanCode = codeStr.replace(/^stu-/, '');
-            return idStr === q || codeStr === q || cleanCode === q;
-        });
-
-        if (exactMatch) {
-            this.selectStudentForFee(exactMatch.id);
-            return;
-        }
-
         this.filterFeeStudentsList();
     }
 
@@ -11543,17 +14566,20 @@ downloadReceiptImageDirect(options) {
     }
 
     handleFeeStudentDropdownChange(studentId) {
-        if (!studentId) return;
+        if (!studentId) {
+            this.closeStudentFeeDetails();
+            return;
+        }
         this.selectStudentForFee(parseInt(studentId));
     }
 
-    filterFeeStudentsList() {
+    getFilteredFeeStudents() {
         const students = this.feeAllStudents || [];
         const dept = (document.getElementById('fee_filter_department')?.value || '').trim();
         const cls = (document.getElementById('fee_filter_class')?.value || '').trim();
         const reg = (document.getElementById('fee_filter_reg_no')?.value || '').trim().toLowerCase().replace(/^#/, '');
 
-        const filtered = students.filter(s => {
+        return students.filter(s => {
             const sDept = (s.department || '').toLowerCase();
             const sClass = (s.className || s.class || '').toLowerCase();
             const sId = String(s.id);
@@ -11574,15 +14600,24 @@ downloadReceiptImageDirect(options) {
             }
             return true;
         });
+    }
 
-        const activeId = this.currentFeeStudent?.id;
-        const stillSelected = filtered.find(s => s.id === activeId);
-        const nextSelectedId = stillSelected ? activeId : (filtered[0]?.id || null);
+    filterFeeStudentsList() {
+        const filtered = this.getFilteredFeeStudents();
 
-        this.populateFeeStudentDropdown(filtered, nextSelectedId);
+        if (this.currentFeeStudent) {
+            const activeId = this.currentFeeStudent.id;
+            const stillSelected = filtered.find(s => s.id === activeId);
+            if (!stillSelected) {
+                this.currentFeeStudent = null;
+            }
+        }
 
-        if (nextSelectedId && nextSelectedId !== activeId) {
-            this.selectStudentForFee(nextSelectedId);
+        if (this.currentFeeStudent) {
+            this.populateFeeStudentDropdown(filtered, this.currentFeeStudent.id);
+        } else {
+            this.populateFeeStudentDropdown(filtered, null);
+            this.renderFeeStudentsListView(filtered);
         }
     }
 
@@ -11591,18 +14626,224 @@ downloadReceiptImageDirect(options) {
         const deptSelect = document.getElementById('fee_filter_department');
         const classWrap = document.getElementById('fee_filter_class_wrap');
         const classSelect = document.getElementById('fee_filter_class');
+        const studentSelect = document.getElementById('fee_filter_student');
 
         if (regInput) regInput.value = '';
         if (deptSelect) deptSelect.value = '';
         if (classWrap) classWrap.style.display = 'none';
         if (classSelect) classSelect.value = '';
+        if (studentSelect) studentSelect.value = '';
 
+        this.currentFeeStudent = null;
         const students = this.feeAllStudents || [];
-        const defaultId = students[0]?.id || null;
-        this.populateFeeStudentDropdown(students, defaultId);
-        if (defaultId) {
-            this.selectStudentForFee(defaultId);
+        this.populateFeeStudentDropdown(students, null);
+        this.renderFeeStudentsListView(students);
+    }
+
+    closeStudentFeeDetails() {
+        this.currentFeeStudent = null;
+        const studentSelect = document.getElementById('fee_filter_student');
+        if (studentSelect) studentSelect.value = '';
+        const regInput = document.getElementById('fee_filter_reg_no');
+        if (regInput) regInput.value = '';
+        this.filterFeeStudentsList();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async renderFeeStudentsListView(filteredList = null) {
+        const container = document.getElementById('fee_details_container');
+        if (!container) return;
+
+        let students = filteredList;
+        if (!students) {
+            students = this.getFilteredFeeStudents();
         }
+
+        // Load fees to compute monthly progress and paid totals
+        let allFees = [];
+        try {
+            allFees = await MadrassahDB.getAllFees();
+        } catch (e) {
+            console.warn('Error loading all fees:', e);
+        }
+
+        // Calculate quick stats across these students
+        const totalStudents = students.length;
+        const withArrearsStudents = students.filter(s => parseInt(s.arrears || 0) > 0);
+        const clearedStudents = students.filter(s => parseInt(s.arrears || 0) <= 0);
+        const totalOutstandingArrears = students.reduce((sum, s) => sum + (parseInt(s.arrears || 0) || 0), 0);
+
+        let html = `
+            <div class="card" style="background:white; border-radius:14px; padding:1.2rem 1.4rem; box-shadow:0 2px 8px rgba(0,0,0,0.04); border:1px solid #e2e8f0; overflow-x:auto;">
+                <!-- Top Summary Bar -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; flex-wrap:wrap; gap:12px; border-bottom:1px solid #f1f5f9; padding-bottom:1rem;">
+                    <div>
+                        <h3 style="margin:0; font-size:1.3rem; color:#0f172a; font-family:'Aref Ruqaa', 'Amiri', serif; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-list-check" style="color:var(--primary);"></i> فہرستِ طلباء و فیس گوشوارہ (Students Fee Directory)
+                        </h3>
+                        <div style="color:#64748b; font-size:0.85rem; margin-top:3px;">
+                            طالب علم کا مکمل ۱۲ ماہ کا کھاتہ، رسیدات اور فیس وصولی کے لیے سامنے موجود <b>"تفصیل چیک کریں"</b> کا بٹن دبائیں۔
+                        </div>
+                    </div>
+
+                    <!-- Mini KPI Badges -->
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                        <div style="background:#f1f5f9; padding:6px 12px; border-radius:8px; font-size:0.85rem; color:#334155;">
+                            کل طلباء: <b style="color:#0f172a;">${totalStudents}</b>
+                        </div>
+                        <div style="background:#ecfdf5; border:1px solid #a7f3d0; padding:6px 12px; border-radius:8px; font-size:0.85rem; color:#065f46;">
+                            بے باق طلباء: <b>${clearedStudents.length}</b>
+                        </div>
+                        <div style="background:#fff1f2; border:1px solid #fecdd3; padding:6px 12px; border-radius:8px; font-size:0.85rem; color:#991b1b;">
+                            بقایا جات والے: <b>${withArrearsStudents.length}</b>
+                        </div>
+                        <div style="background:#fef3c7; border:1px solid #fde68a; padding:6px 12px; border-radius:8px; font-size:0.85rem; color:#92400e;">
+                            مجموعی واجب الادا: <b style="font-family:monospace;">Rs. ${totalOutstandingArrears.toLocaleString()}</b>
+                        </div>
+                    </div>
+                </div>
+        `;
+
+        if (!students || students.length === 0) {
+            html += `
+                <div style="text-align:center; padding:3.5rem 1rem; color:#94a3b8;">
+                    <div style="font-size:3rem; color:#cbd5e1; margin-bottom:10px;"><i class="fas fa-user-slash"></i></div>
+                    <h4 style="color:#475569; margin:0 0 6px 0;">مطلوبہ فلٹرز کے مطابق کوئی طالب علم نہیں ملا</h4>
+                    <p style="font-size:0.88rem; margin:0 0 1rem 0;">براہِ کرم شعبہ، درجہ یا رجسٹریشن نمبر تبدیل کریں یا ریسیٹ کا بٹن دبائیں۔</p>
+                    <button type="button" class="btn" onclick="app.resetFeeFilters()" style="background:#f1f5f9; border:1px solid #cbd5e1; padding:6px 16px; border-radius:8px; cursor:pointer; font-weight:bold;">
+                        <i class="fas fa-rotate-left"></i> تمام فلٹرز ریسیٹ کریں
+                    </button>
+                </div>
+            </div>`;
+            container.innerHTML = html;
+            return;
+        }
+
+        html += `
+            <table class="table" style="width:100%; border-collapse:collapse; font-size:0.92rem; text-align:right;">
+                <thead>
+                    <tr style="background:#f8fafc; color:#1e293b; border-bottom:2px solid #cbd5e1;">
+                        <th style="padding:10px 8px; text-align:center; width:40px;">#</th>
+                        <th style="padding:10px 8px; text-align:center; width:95px;">رجسٹریشن</th>
+                        <th style="padding:10px 12px;">طالب علم مع ولدیت</th>
+                        <th style="padding:10px 10px;">شعبہ و درجہ</th>
+                        <th style="padding:10px 10px; text-align:center;">طے شدہ فیس</th>
+                        <th style="padding:10px 10px; text-align:center; min-width:110px;">ماہانہ فیس پیش رفت</th>
+                        <th style="padding:10px 10px; text-align:center;">داخلہ کا بقایا</th>
+                        <th style="padding:10px 10px; text-align:center;">کل بقایا / کیفیت</th>
+                        <th style="padding:10px 12px; text-align:center; min-width:215px;">کارروائی (ایکشنز)</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        html += students.map((s, idx) => {
+            const sFees = allFees.filter(f => String(f.studentId) === String(s.id));
+            const paidMonthlyCount = sFees.filter(f => f.feeType === 'ماہانہ فیس').length;
+            const admFee = parseInt(s.admissionFee || 0);
+            const monFee = parseInt(s.monthlyFee || 0);
+            const totalFee = s.totalFee ? parseInt(s.totalFee) : (admFee + monFee);
+            const paidNow = parseInt(s.paidNow || 0);
+            const admArrears = s.admissionArrears !== undefined ? parseInt(s.admissionArrears) : Math.max(0, totalFee - paidNow);
+            const arrears = parseInt(s.arrears || 0);
+            const code = s.uniqueCode || ('STU-' + (1000 + parseInt(s.id)));
+            const progressPct = Math.min(100, Math.round((paidMonthlyCount / 12) * 100));
+
+            return `
+                <tr style="border-bottom:1px solid #f1f5f9; transition:background 0.15s;" onmouseover="this.style.background='#f8fafc';" onmouseout="this.style.background='white';">
+                    <td style="padding:10px 8px; text-align:center; color:#64748b; font-weight:bold;">${idx + 1}</td>
+                    
+                    <!-- Registration Code -->
+                    <td style="padding:10px 8px; text-align:center;">
+                        <span style="background:#eff6ff; color:#1d4ed8; font-family:monospace; font-size:0.82rem; font-weight:bold; padding:2px 7px; border-radius:6px; border:1px solid #bfdbfe;">
+                            ${code}
+                        </span>
+                    </td>
+
+                    <!-- Name & Father Name -->
+                    <td style="padding:10px 12px;">
+                        <div style="font-weight:bold; font-size:0.98rem; color:#0f172a;">
+                            ${s.name}
+                        </div>
+                        <div style="font-size:0.8rem; color:#64748b;">
+                            ولد ${s.fatherName || '---'}
+                        </div>
+                    </td>
+
+                    <!-- Department & Class -->
+                    <td style="padding:10px 10px; font-size:0.88rem;">
+                        <div style="color:#1e293b; font-weight:600;">${s.department || '---'}</div>
+                        <div style="font-size:0.78rem; color:#64748b;">${s.className || s.class || '---'}</div>
+                    </td>
+
+                    <!-- Agreed Fee Rates -->
+                    <td style="padding:10px 10px; text-align:center; font-size:0.85rem;">
+                        <div style="color:#0f172a; font-weight:bold; font-family:monospace;">
+                            Rs. ${monFee.toLocaleString()} <small style="font-weight:normal; color:#64748b;">/ ماہ</small>
+                        </div>
+                        ${admFee > 0 ? `<div style="font-size:0.75rem; color:#64748b;">داخلہ: Rs. ${admFee.toLocaleString()}</div>` : ''}
+                    </td>
+
+                    <!-- 12-Month Progress -->
+                    <td style="padding:10px 10px; text-align:center;">
+                        <div style="font-size:0.85rem; font-weight:bold; color:${paidMonthlyCount > 0 ? '#059669' : '#94a3b8'};">
+                            ${paidMonthlyCount} / ۱۲ ماہ
+                        </div>
+                        <div style="width:85px; height:5px; background:#e2e8f0; border-radius:3px; margin:3px auto 0 auto; overflow:hidden;">
+                            <div style="width:${progressPct}%; height:100%; background:#10b981;"></div>
+                        </div>
+                    </td>
+
+                    <!-- Admission Arrears -->
+                    <td style="padding:10px 10px; text-align:center; font-size:0.85rem;">
+                        ${admArrears > 0 
+                            ? `<span style="color:#dc2626; font-weight:bold; font-family:monospace;">Rs. ${admArrears.toLocaleString()}</span>`
+                            : `<span style="color:#16a34a; font-weight:bold; font-size:0.8rem;">بے باق ✓</span>`
+                        }
+                    </td>
+
+                    <!-- Total Arrears / Status -->
+                    <td style="padding:10px 10px; text-align:center;">
+                        ${arrears > 0 
+                            ? `<span style="background:#fee2e2; color:#b91c1c; font-weight:bold; font-size:0.8rem; padding:3px 8px; border-radius:6px; font-family:monospace; display:inline-block; border:1px solid #fecdd3;">
+                                Rs. ${arrears.toLocaleString()} واجب
+                               </span>`
+                            : `<span style="background:#dcfce7; color:#15803d; font-weight:bold; font-size:0.8rem; padding:3px 8px; border-radius:6px; display:inline-block; border:1px solid #bbf7d0;">
+                                بے باق ✓
+                               </span>`
+                        }
+                    </td>
+
+                    <!-- Actions -->
+                    <td style="padding:10px 12px; text-align:center;">
+                        <div style="display:inline-flex; gap:6px; align-items:center;">
+                            <!-- تفصیل چیک کریں (Check Details) -->
+                            <button type="button" class="btn btn-sm" onclick="app.selectStudentForFee(${s.id})" style="background:#0284c7; color:white; font-weight:bold; font-size:0.84rem; padding:5px 11px; border-radius:7px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 5px rgba(2,132,199,0.2);" title="اس طالب علم کا مکمل فیس کھاتہ و ۱۲ ماہ تفصیل دیکھیں">
+                                <i class="fas fa-eye"></i> تفصیل چیک کریں
+                            </button>
+
+                            <!-- رقم وصول کریں (Receive Fee) -->
+                            <button type="button" class="btn btn-sm" onclick="app.selectStudentForFee(${s.id}, true)" style="background:#059669; color:white; font-weight:bold; font-size:0.84rem; padding:5px 9px; border-radius:7px; border:none; cursor:pointer;" title="رقم وصول کریں">
+                                <i class="fas fa-hand-holding-dollar"></i> وصولی
+                            </button>
+
+                            <!-- پرنٹ کھاتہ (Print Ledger) -->
+                            <button type="button" class="btn btn-sm" onclick="app.printStudentLedger(${s.id})" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:5px 8px; border-radius:7px; cursor:pointer;" title="فیس کھاتہ پرنٹ">
+                                <i class="fas fa-print"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        html += `
+                </tbody>
+            </table>
+        </div>
+        `;
+
+        container.innerHTML = html;
     }
 
     syncFeeFiltersWithStudent(student) {
@@ -11651,7 +14892,7 @@ downloadReceiptImageDirect(options) {
         }
     }
 
-    async selectStudentForFee(id) {
+    async selectStudentForFee(id, focusForm = false) {
         const student = await MadrassahDB.getStudentById(id);
         if (!student) {
             alert('طالب علم کا ریکارڈ نہیں ملا!');
@@ -11814,6 +15055,26 @@ downloadReceiptImageDirect(options) {
 
         container.innerHTML = `
             <div style="display:flex; flex-direction:column; gap:1.2rem;">
+                <!-- Top Navigation & Return Bar (واپس تمام طلباء کی فہرست پر جائیں) -->
+                <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:12px 18px; border-radius:12px; border:1.5px solid #cbd5e1; box-shadow:0 2px 8px rgba(0,0,0,0.04); flex-wrap:wrap; gap:12px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <button type="button" onclick="app.closeStudentFeeDetails()" class="btn" style="background:#0f172a; color:white; font-weight:bold; padding:8px 18px; border-radius:8px; border:none; display:inline-flex; align-items:center; gap:8px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+                            <i class="fas fa-arrow-right"></i> واپس تمام طلباء کی فہرست پر جائیں
+                        </button>
+                        <span style="font-size:0.95rem; color:#475569;">
+                            طالب علم: <b style="color:#065f46; font-size:1.15rem;">${student.name}</b> (${student.uniqueCode || ('#' + student.id)}) کا فیس کھاتہ و ۱۲ ماہ کی تفصیل
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <button type="button" class="btn" onclick="app.openEditStudentFeesModal(${student.id})" style="background:#f8fafc; color:#334155; border:1.5px solid #cbd5e1; border-radius:8px; padding:7px 12px; font-weight:bold; display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:0.88rem;" title="داخلہ فیس، ماہانہ فیس یا بقایا درست کریں">
+                            <i class="fas fa-edit" style="color:var(--primary);"></i> فیس کوائف درست کریں
+                        </button>
+                        <button type="button" class="btn" onclick="app.printStudentLedger(${student.id})" style="background:#0284c7; color:white; border:none; border-radius:8px; padding:7px 14px; font-weight:bold; display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:0.88rem;">
+                            <i class="fas fa-print"></i> فیس کھاتہ پرنٹ کریں (A4)
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Student Header Card -->
                 <div class="card" style="padding:1.1rem 1.4rem; background:white; border-radius:12px; border:1px solid #e2e8f0; border-right:5px solid var(--primary); box-shadow:0 2px 8px rgba(0,0,0,0.03);">
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
@@ -12137,6 +15398,16 @@ downloadReceiptImageDirect(options) {
                 </div>
             </div>
         `;
+        this.updateFeeCalculationMath(false);
+
+        if (focusForm) {
+            setTimeout(() => {
+                const formEl = document.querySelector('#fee_details_container form');
+                if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 250);
+        } else {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     }
 
     updateFeeCalculation() {
@@ -13108,6 +16379,64 @@ downloadReceiptImageDirect(options) {
             }
         }
     </style>
+    <script src="assets/js/html2canvas.min.js"></script>
+    <script src="assets/js/jspdf.umd.min.js"></script>
+    <script>
+    if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+    if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+    </script>
+    <script>
+    function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+        const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+        const origHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+        const safeName = (filename || 'فیس_رسید_واؤچر') + '.pdf';
+        const targetEl = document.querySelector('.page-container') || document.body;
+        const doExport = (canvas) => {
+            try {
+                if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const { jsPDF } = window.jspdf;
+                const isLandscape = orientation === 'landscape';
+                const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                const imgProps = pdf.getImageProperties(imgData);
+                const margin = 4;
+                const maxW = pWidth - (margin * 2);
+                const maxH = pHeight - (margin * 2);
+                let finalW = maxW;
+                let finalH = (imgProps.height * maxW) / imgProps.width;
+                if (finalH > maxH) {
+                    finalH = maxH;
+                    finalW = (imgProps.width * maxH) / imgProps.height;
+                }
+                const x = (pWidth - finalW) / 2;
+                const y = (pHeight - finalH) / 2;
+                pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
+                pdf.save(safeName);
+            } catch (err) {
+                console.error('PDF export error:', err);
+                window.print();
+            } finally {
+                if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+            }
+        };
+        if (typeof html2canvas !== 'undefined') {
+            html2canvas(targetEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' })
+                .then(doExport)
+                .catch(err => {
+                    console.error('html2canvas error:', err);
+                    if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                    window.print();
+                });
+        } else {
+            if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+            window.print();
+        }
+    }
+    function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
+    </script>
 </head>
 <body>
     <!-- Top Action Bar (Screen Only) -->
@@ -13119,6 +16448,9 @@ downloadReceiptImageDirect(options) {
         <div class="toolbar-actions">
             <button type="button" class="btn-action btn-print" onclick="window.print()">
                 <i class="fas fa-print"></i> پرنٹ کریں (Print A4)
+            </button>
+            <button type="button" class="btn-action btn-pdf-download" onclick="downloadPDF('فیس_رسید_${(studentName || 'Student').replace(/[\'\"\\s]+/g, '_')}_${receiptNo}', 'portrait', 'a4')" style="background:#dc2626; color:white;">
+                <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)
             </button>
             <button type="button" class="btn-action btn-close" onclick="window.close()">
                 <i class="fas fa-times"></i> بند کریں
@@ -13295,21 +16627,63 @@ downloadReceiptImageDirect(options) {
                     .sig-line { border-top: 1px solid #334155; width: 140px; text-align: center; padding-top: 5px; font-size: 11px; color: #334155; }
                     @media print { .no-print { display: none; } body { padding: 0; } }
                 </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
                 <script>
-                function downloadDoc(filename) {
-                    const clone = document.documentElement.cloneNode(true);
-                    clone.querySelectorAll('.no-print').forEach(el => el.remove());
-                    const htmlContent = '<!DOCTYPE html>\\n' + clone.outerHTML;
-                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = (filename || 'لیجر') + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'لیجر') + '.pdf';
+                    const targetEl = document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            const margin = 5;
+                            const maxW = pWidth - (margin * 2);
+                            const maxH = pHeight - (margin * 2);
+                            let finalW = maxW;
+                            let finalH = (imgProps.height * maxW) / imgProps.width;
+                            if (finalH > maxH) {
+                                finalH = maxH;
+                                finalW = (imgProps.width * maxH) / imgProps.height;
+                            }
+                            const x = (pWidth - finalW) / 2;
+                            const y = (pHeight - finalH) / 2;
+                            pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
+                            pdf.save(safeName);
+                        } catch (err) {
+                            console.error('PDF export error:', err);
+                            window.print();
+                        } finally {
+                            if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        }
+                    };
+                    if (typeof html2canvas !== 'undefined') {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' })
+                            .then(doExport)
+                            .catch(err => {
+                                console.error('html2canvas error:', err);
+                                if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                                window.print();
+                            });
+                    } else {
+                        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        window.print();
+                    }
                 }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') { downloadPDF(filename, orientation, format); }
                 </script>
             </head>
             <body>
@@ -13415,8 +16789,8 @@ downloadReceiptImageDirect(options) {
                     <button onclick="window.print()" style="padding:9px 30px; background:#065f46; color:white; border:none; border-radius:20px; font-weight:bold; font-size:13px; cursor:pointer;">
                         <i class="fas fa-print"></i> پرنٹ کریں (Print)
                     </button>
-                    <button onclick="downloadDoc('لیجر_${student.name ? student.name.replace(/['\"\\s]+/g, '_') : 'Student'}')" style="padding:9px 25px; background:#0284c7; color:white; border:none; border-radius:20px; font-weight:bold; font-size:13px; cursor:pointer;">
-                        <i class="fas fa-download"></i> ڈاؤن لوڈ کریں (HTML)
+                    <button class="btn-pdf-download" onclick="downloadPDF('لیجر_${student.name ? student.name.replace(/['\"\\s]+/g, '_') : 'Student'}', 'portrait', 'a4')" style="padding:9px 25px; background:#dc2626; color:white; border:none; border-radius:20px; font-weight:bold; font-size:13px; cursor:pointer; box-shadow:0 4px 10px rgba(220,38,38,0.35); display:inline-flex; align-items:center; gap:6px;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)
                     </button>
                 </div>
             </body>
@@ -13426,93 +16800,189 @@ downloadReceiptImageDirect(options) {
     }
 
     // =========================================================================
-    // --- 3. SALARY MANAGEMENT MODULE (تنخواہوں کا نظام، ایڈوانس و پے سلپ) ---
+    // --- 3. SALARY MANAGEMENT MODULE (تنخواہوں کا نظام، اقساط و پے رول لیجر) ---
     // =========================================================================
     async renderSalaryModule(container) {
-        const staff = await MadrassahDB.getAllTeachers();
+        const staff = (await MadrassahDB.getAllTeachers()) || [];
         const now = new Date();
-        const currentMonth = ['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'][now.getMonth()];
+        const monthsUrdu = ['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'];
+        const currentMonth = monthsUrdu[now.getMonth()];
         const currentYear = now.getFullYear();
         
         const selectedMonth = this.salaryMonth || currentMonth;
-        const selectedYear = this.salaryYear || currentYear;
-        const salaries = await MadrassahDB.getSalariesByMonth(selectedMonth, selectedYear);
+        const selectedYear = parseInt(this.salaryYear || currentYear);
+        const salaries = (await MadrassahDB.getSalariesByMonth(selectedMonth, selectedYear)) || [];
+
+        // Calculate statistics
+        const totalStaff = staff.length;
+        const paidStaffCount = salaries.length;
+        const pendingStaffCount = Math.max(0, totalStaff - paidStaffCount);
+        const totalDisbursed = salaries.reduce((sum, sal) => sum + parseInt(sal.paidNow || sal.netSalary || sal.netPaid || 0), 0);
+        const totalBaseSalary = staff.reduce((sum, s) => sum + parseInt(s.salary || 0), 0);
 
         container.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <h2 style="color:var(--primary); margin:0;"><i class="fas fa-hand-holding-dollar"></i> تنخواہوں کا نظام (Payroll System)</h2>
-                <div style="display:flex; gap:0.8rem; background:white; padding:0.4rem; border-radius:16px; border:1px solid #e2e8f0; box-shadow: var(--shadow-sm);">
-                    <select id="salary_month" class="mms-select" onchange="app.updateSalaryFilter()" style="min-width:140px;">
-                        ${['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'].map(m => `<option value="${m}" ${selectedMonth === m ? 'selected' : ''}>${m}</option>`).join('')}
-                    </select>
-                    <select id="salary_year" class="mms-select" onchange="app.updateSalaryFilter()" style="min-width:110px;">
-                        ${[2024, 2025, 2026, 2027].map(y => `<option value="${y}" ${selectedYear == y ? 'selected' : ''}>${y}</option>`).join('')}
-                    </select>
-                </div>
-            </div>
-
-            <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 2rem;">
-                <div class="stat-card">
-                    <div class="stat-icon" style="background:#ecfdf5;color:var(--primary);"><i class="fas fa-users"></i></div>
-                    <div class="stat-info"><h3>کل اسٹاف</h3><p>${staff.length}</p></div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" style="background:#eff6ff;color:#2563eb;"><i class="fas fa-check-double"></i></div>
-                    <div class="stat-info"><h3>ادا شدہ</h3><p>${salaries.length}</p></div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" style="background:#fff7ed;color:#ea580c;"><i class="fas fa-clock"></i></div>
-                    <div class="stat-info"><h3>باقی</h3><p>${staff.length - salaries.length}</p></div>
-                </div>
-            </div>
-
-            <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap: 2rem;">
-                <div class="card" style="padding:0; overflow:hidden;">
-                    <div style="padding:1.2rem; background:white; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                        <h3 style="margin:0; color:var(--primary);"><i class="fas fa-list-check"></i> ادائیگی کی تفصیلات (${selectedMonth} ${selectedYear})</h3>
+            <!-- Top Header & Controls -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.8rem; flex-wrap:wrap; gap:1rem; background:white; padding:1.2rem 1.6rem; border-radius:18px; box-shadow:0 4px 20px rgba(0,0,0,0.05); border:1px solid #e2e8f0;">
+                <div>
+                    <h2 style="color:var(--primary); margin:0; font-size:1.8rem; font-family:'Aref Ruqaa', serif; display:flex; align-items:center; gap:10px;">
+                        <span style="background:var(--primary-subtle); color:var(--primary); width:42px; height:42px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; font-size:1.3rem; box-shadow:0 4px 10px rgba(6,95,70,0.15);">
+                            <i class="fas fa-hand-holding-dollar"></i>
+                        </span>
+                        تنخواہوں کا نظام و باضابطہ پے رول لیجر (Salary & Payroll)
+                    </h2>
+                    <div style="color:#64748b; font-size:0.95rem; margin-top:4px;">
+                        ماہانہ تنخواہوں کی ادائیگی، اقساط و ایڈوانس کٹوتی، اور ملازمین کا مکمل مالیاتی کھاتہ
                     </div>
-                    <table style="width:100%;">
-                        <thead>
-                            <tr>
-                                <th>نامِ عملہ</th>
-                                <th>بنیادی تنخواہ</th>
-                                <th>اسٹیٹس</th>
-                                <th>ایکشن</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${staff.map(s => {
-                                const paidRecord = salaries.find(sal => sal.staffId === s.id);
-                                return `
-                                    <tr>
-                                        <td style="font-weight:600;">${s.name}</td>
-                                        <td>${s.salary || 0}</td>
-                                        <td>
-                                            ${paidRecord 
-                                                ? `<span class="badge" style="background:#ecfdf5; color:#065f46; padding:4px 12px; border-radius:20px;">ادا شدہ (${new Date(paidRecord.paymentDate).toLocaleDateString('ur-PK')})</span>` 
-                                                : `<span class="badge" style="background:#fef2f2; color:#ef4444; padding:4px 12px; border-radius:20px;">باقی</span>`
-                                            }
-                                        </td>
-                                        <td>
-                                            <div style="display:flex; justify-content:center;">
-                                            ${paidRecord 
-                                                ? `<button class="btn btn-sm" style="background:#f1f5f9; color:var(--primary); width:100%; max-width:120px;" onclick="app.printPayslip(${paidRecord.id})"><i class="fas fa-print"></i> پرچی</button>` 
-                                                : `<button class="btn btn-sm btn-primary" style="width:100%; max-width:140px;" onclick="app.showPaySalaryForm(${s.id})"><i class="fas fa-money-check-dollar"></i> ادائیگی کریں</button>`
-                                            }
-                                            </div>
-                                        </td>
-                                    </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
                 </div>
 
+                <div style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center;">
+                    <!-- Month & Year Selectors -->
+                    <div style="display:flex; align-items:center; gap:6px; background:#f8fafc; padding:4px 8px; border-radius:12px; border:1.5px solid #cbd5e1;">
+                        <label style="font-size:0.85rem; font-weight:bold; color:#475569;"><i class="fas fa-calendar-alt"></i> برائے:</label>
+                        <select id="salary_month" onchange="app.updateSalaryFilter()" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px; font-weight:bold; color:#1e293b; background:white; cursor:pointer;">
+                            ${monthsUrdu.map(m => `<option value="${m}" ${selectedMonth === m ? 'selected' : ''}>${m}</option>`).join('')}
+                        </select>
+                        <select id="salary_year" onchange="app.updateSalaryFilter()" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px; font-weight:bold; color:#1e293b; background:white; cursor:pointer;">
+                            ${[2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => `<option value="${y}" ${selectedYear == y ? 'selected' : ''}>${y}</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <button class="btn" onclick="app.printMonthlyPayrollSheet('${selectedMonth}', ${selectedYear})" style="background:#0284c7; color:white; border:none; border-radius:10px; font-weight:bold; padding:9px 15px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(2,132,199,0.25); cursor:pointer;" title="اس ماہ کا مکمل پے رول گوشوارہ پرنٹ کریں (A4)">
+                        <i class="fas fa-file-invoice"></i> پے رول شیٹ (A4)
+                    </button>
+                    <button class="btn" onclick="app.renderAdvanceModule()" style="background:#f59e0b; color:#111827; border:none; border-radius:10px; font-weight:bold; padding:9px 15px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(245,158,11,0.25); cursor:pointer;">
+                        <i class="fas fa-hand-holding-hand"></i> ایڈوانس / قرض
+                    </button>
+                </div>
+            </div>
+
+            <!-- Top 4 Statistics Cards -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1.2rem; margin-bottom:1.8rem;">
+                <div class="card" style="margin:0; padding:1.2rem; display:flex; align-items:center; gap:1rem; border-right:4px solid #2563eb; background:#ffffff; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                    <div style="width:48px; height:48px; border-radius:12px; background:#eff6ff; display:flex; align-items:center; justify-content:center; color:#2563eb; font-size:1.4rem;">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:0.85rem; color:#64748b; font-weight:600;">کل عملہ و اساتذہ</div>
+                        <div style="font-size:1.6rem; font-weight:bold; color:#1e293b;">${totalStaff} <span style="font-size:0.85rem; font-weight:normal; color:#64748b;">افراد</span></div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin:0; padding:1.2rem; display:flex; align-items:center; gap:1rem; border-right:4px solid #059669; background:#ffffff; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                    <div style="width:48px; height:48px; border-radius:12px; background:#ecfdf5; display:flex; align-items:center; justify-content:center; color:#059669; font-size:1.4rem;">
+                        <i class="fas fa-check-double"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:0.85rem; color:#64748b; font-weight:600;">ادا شدہ (${selectedMonth})</div>
+                        <div style="font-size:1.6rem; font-weight:bold; color:#065f46;">${paidStaffCount} <span style="font-size:0.85rem; font-weight:normal; color:#64748b;">ملازمین</span></div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin:0; padding:1.2rem; display:flex; align-items:center; gap:1rem; border-right:4px solid #d97706; background:#ffffff; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                    <div style="width:48px; height:48px; border-radius:12px; background:#fffbeb; display:flex; align-items:center; justify-content:center; color:#d97706; font-size:1.4rem;">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:0.85rem; color:#64748b; font-weight:600;">باقی ملازمین</div>
+                        <div style="font-size:1.6rem; font-weight:bold; color:#b45309;">${pendingStaffCount} <span style="font-size:0.85rem; font-weight:normal; color:#64748b;">افراد</span></div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin:0; padding:1.2rem; display:flex; align-items:center; gap:1rem; border-right:4px solid #9333ea; background:#ffffff; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                    <div style="width:48px; height:48px; border-radius:12px; background:#faf5ff; display:flex; align-items:center; justify-content:center; color:#9333ea; font-size:1.4rem;">
+                        <i class="fas fa-money-bills"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:0.85rem; color:#64748b; font-weight:600;">تقسیم شدہ رقم (${selectedMonth})</div>
+                        <div style="font-size:1.5rem; font-weight:bold; color:#7e22ce;">Rs. ${totalDisbursed.toLocaleString()}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Two-Column Workspace -->
+            <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap: 1.8rem; align-items:start;">
+                <!-- Staff Salary Table (Left) -->
+                <div class="card" style="padding:0; overflow:hidden; border-radius:16px; border:1px solid #e2e8f0; box-shadow:0 4px 15px rgba(0,0,0,0.03);">
+                    <div style="padding:1.1rem 1.4rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                        <h3 style="margin:0; color:var(--primary); font-size:1.15rem; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-list-check"></i> فہرست عملہ برائے ادائیگی (${selectedMonth} ${selectedYear})
+                        </h3>
+                        <span style="font-size:0.88rem; color:#64748b; font-weight:600;">کل تخمینہ مشاہرہ: Rs. ${totalBaseSalary.toLocaleString()}</span>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; text-align:right;">
+                            <thead>
+                                <tr style="background:#f1f5f9; color:#475569; font-size:0.92rem;">
+                                    <th style="padding:12px 10px; width:14%; text-align:center;">کوڈ</th>
+                                    <th style="padding:12px 14px; width:26%;">نامِ عملہ</th>
+                                    <th style="padding:12px 14px; width:16%;">عہدہ</th>
+                                    <th style="padding:12px 12px; width:16%; text-align:center;">بنیادی تنخواہ</th>
+                                    <th style="padding:12px 12px; width:14%; text-align:center;">اسٹیٹس</th>
+                                    <th style="padding:12px 12px; width:14%; text-align:center; white-space:nowrap;">ایکشن</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${staff.map(s => {
+                                    const code = s.uniqueCode || ('EMP-' + (100 + parseInt(s.id || 0)));
+                                    const paidRecord = salaries.find(sal => sal.staffId === s.id);
+                                    return `
+                                        <tr style="border-bottom:1px solid #f1f5f9; transition:background 0.15s;">
+                                            <td style="padding:12px 10px; text-align:center; vertical-align:middle;">
+                                                <span style="background:#eff6ff; color:#1d4ed8; padding:3px 8px; border-radius:6px; font-family:monospace; font-size:0.88rem; font-weight:bold; border:1px solid #bfdbfe;">
+                                                    ${code}
+                                                </span>
+                                            </td>
+                                            <td style="padding:12px 14px; vertical-align:middle;">
+                                                <div style="font-weight:bold; color:#0f172a; font-size:1.05rem;">${s.name}</div>
+                                                <div style="font-size:0.8rem; color:#64748b;">${s.staffType === 'teaching' || !s.staffType ? 'تدریسی عملہ' : 'انتظامی عملہ'}</div>
+                                            </td>
+                                            <td style="padding:12px 14px; vertical-align:middle; color:#334155; font-size:0.92rem;">
+                                                ${s.designation || (s.staffType === 'teaching' || !s.staffType ? 'مدرس' : 'ملازم')}
+                                            </td>
+                                            <td style="padding:12px 12px; text-align:center; vertical-align:middle; font-weight:bold; font-family:monospace; color:#0f172a; font-size:0.95rem;">
+                                                Rs. ${(parseInt(s.salary || 0)).toLocaleString()}
+                                            </td>
+                                            <td style="padding:12px 12px; text-align:center; vertical-align:middle; white-space:nowrap;">
+                                                ${paidRecord 
+                                                    ? `<span style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; padding:4px 10px; border-radius:14px; font-size:0.82rem; font-weight:bold; display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-check-circle" style="color:#10b981;"></i> ادا شدہ</span>` 
+                                                    : `<span style="background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5; padding:4px 10px; border-radius:14px; font-size:0.82rem; font-weight:bold; display:inline-block;">باقی</span>`
+                                                }
+                                            </td>
+                                            <td style="padding:12px 12px; text-align:center; vertical-align:middle; white-space:nowrap;">
+                                                <div style="display:flex; justify-content:center; gap:5px;">
+                                                    ${paidRecord 
+                                                        ? `<button class="btn btn-sm" style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; padding:4px 9px; font-weight:bold; border-radius:8px;" onclick="app.printPayslip(${paidRecord.id})" title="ماہانہ تنخواہ پرچی پرنٹ کریں (A4)"><i class="fas fa-print"></i> پرچی</button>` 
+                                                        : `<button class="btn btn-sm btn-primary" style="padding:4px 10px; font-weight:bold; border-radius:8px;" onclick="app.showPaySalaryForm(${s.id})" title="تنخواہ ادا کریں"><i class="fas fa-money-check-dollar"></i> ادائیگی</button>`
+                                                    }
+                                                    <button class="btn btn-sm" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:4px 9px; font-weight:bold; border-radius:8px;" onclick="app.printStaffSalaryLedger(${s.id})" title="ملازم کا مکمل سالانہ تنخواہ کھاتہ و پے رول لیجر ملاحظہ و پرنٹ کریں (A4)"><i class="fas fa-book"></i> لیجر</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('') || '<tr><td colspan="6" style="text-align:center; padding:3rem; color:#94a3b8;">کوئی عملہ موجود نہیں ہے</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Salary Payment Form Container (Right) -->
                 <div id="salary_side_container">
-                    <div class="card" style="text-align:center; padding:4rem 2rem; background:#f8fafc; border:2px dashed #e2e8f0;">
-                        <i class="fas fa-calculator" style="font-size:3rem; color:#cbd5e1; margin-bottom:1rem;"></i>
-                        <h4 style="color:#94a3b8;">ادائیگی کے لیے کسی ملازم کا انتخاب کریں یا ایڈوانس کا ریکارڈ دیکھیں</h4>
-                        <button class="btn btn-sm" style="margin-top:1rem; border:1px solid #ddd;" onclick="app.renderAdvanceModule()">ایڈوانس ریکارڈ چیک کریں</button>
+                    <div class="card" style="text-align:center; padding:4rem 2rem; background:#f8fafc; border:2px dashed #cbd5e1; border-radius:16px;">
+                        <div style="width:70px; height:70px; border-radius:50%; background:#e2e8f0; display:inline-flex; align-items:center; justify-content:center; color:#64748b; font-size:2.2rem; margin-bottom:1.2rem;">
+                            <i class="fas fa-calculator"></i>
+                        </div>
+                        <h3 style="color:#334155; margin:0 0 0.5rem 0; font-size:1.25rem;">تنخواہ ادائیگی فارم</h3>
+                        <p style="color:#64748b; font-size:0.95rem; margin:0 0 1.5rem 0;">
+                            بائیں جانب سے کسی ملازم کے سامنے <b>"ادائیگی"</b> بٹن دبائیں تاکہ اس ماہ کی تنخواہ مع اقساط و بقایا جات حساب کر کے باضابطہ پرچی جاری کی جا سکے۔
+                        </p>
+                        <div style="display:flex; justify-content:center; gap:10px;">
+                            <button class="btn" style="background:#0284c7; color:white; border-radius:8px; padding:7px 14px; font-weight:600;" onclick="app.printMonthlyPayrollSheet('${selectedMonth}', ${selectedYear})">
+                                <i class="fas fa-file-invoice"></i> پے رول شیٹ
+                            </button>
+                            <button class="btn" style="background:#475569; color:white; border-radius:8px; padding:7px 14px; font-weight:600;" onclick="app.renderAdvanceModule()">
+                                <i class="fas fa-hand-holding-hand"></i> ایڈوانس ریکارڈ
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -13529,104 +16999,377 @@ downloadReceiptImageDirect(options) {
 
     async showPaySalaryForm(staffId) {
         const staff = await MadrassahDB.getTeacherById(staffId);
-        const advances = await MadrassahDB.getStaffAdvances(staffId);
+        if (!staff) {
+            alert('عملہ کا ریکارڈ نہیں ملا!');
+            return;
+        }
+
+        const staffSalaries = (await MadrassahDB.getStaffSalaries(staffId)) || [];
+        const advances = (await MadrassahDB.getStaffAdvances(staffId)) || [];
         const pendingAdvance = advances.filter(a => a.status === 'Pending').reduce((sum, a) => sum + parseInt(a.amount || 0), 0);
         
+        // Check previous pending arrears from most recent salary payment
+        const sortedSalaries = staffSalaries.slice().sort((a, b) => (b.paymentDate || 0) - (a.paymentDate || 0));
+        const lastSalary = sortedSalaries[0];
+        const previousArrears = lastSalary ? parseInt(lastSalary.arrears || 0) : 0;
+
+        const monthsUrdu = ['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'];
+        const defaultMonth = this.salaryMonth || monthsUrdu[new Date().getMonth()];
+        const defaultYear = parseInt(this.salaryYear || new Date().getFullYear());
+
+        // Map of already paid months for this employee in selected year
+        const paidMonthsMap = {};
+        staffSalaries.filter(s => parseInt(s.year) === defaultYear).forEach(s => {
+            paidMonthsMap[s.month] = s;
+        });
+
+        const code = staff.uniqueCode || ('EMP-' + (100 + parseInt(staff.id || 0)));
+        const baseSalary = parseInt(staff.salary || 0);
+
         const container = document.getElementById('salary_side_container');
         if (!container) return;
+
         container.innerHTML = `
-            <div class="card" style="border-right:5px solid var(--primary);">
-                <h3 style="color:var(--primary); margin-bottom:1.5rem; border-bottom:1px solid #eee; padding-bottom:0.5rem;">ادائیگیِ تنخواہ: ${staff.name}</h3>
+            <div class="card" style="border-radius:16px; border:1px solid #cbd5e1; border-top:5px solid var(--primary); box-shadow:0 10px 25px rgba(0,0,0,0.06); padding:1.5rem; animation:slideUp 0.25s ease-out;">
+                <!-- Staff Info Header -->
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1.5px solid #e2e8f0; padding-bottom:12px; margin-bottom:15px;">
+                    <div>
+                        <h3 style="color:var(--primary); margin:0 0 3px 0; font-size:1.3rem;">
+                            <i class="fas fa-hand-holding-dollar"></i> ادائیگی تنخواہ: ${staff.name}
+                        </h3>
+                        <div style="font-size:0.88rem; color:#64748b;">
+                            عہدہ: <b style="color:#334155;">${staff.designation || 'مدرس'}</b> | فون: <span dir="ltr">${staff.phone || '---'}</span>
+                        </div>
+                    </div>
+                    <span style="background:#eff6ff; color:#1d4ed8; font-family:monospace; font-weight:bold; font-size:0.95rem; padding:4px 10px; border-radius:8px; border:1px solid #bfdbfe;">
+                        ${code}
+                    </span>
+                </div>
+
                 <form onsubmit="app.handleSalarySubmit(event)">
                     <input type="hidden" name="staffId" value="${staff.id}">
                     <input type="hidden" name="staffName" value="${staff.name}">
-                    <input type="hidden" name="month" value="${this.salaryMonth || 'جنوری'}">
-                    <input type="hidden" name="year" value="${this.salaryYear || 2026}">
-                    
-                    <div class="tt-form-group"><label>بنیادی تنخواہ</label><input type="number" id="base_salary" name="baseSalary" value="${staff.salary || 0}" readonly style="background:#f1f5f9;"></div>
-                    <div class="tt-form-group"><label>الاؤنس (Allowances)</label><input type="number" name="allowances" value="0" oninput="app.calculateNetSalary()"></div>
-                    <div class="tt-form-group"><label>کٹوتی (Deductions)</label><input type="number" name="deductions" value="0" oninput="app.calculateNetSalary()"></div>
-                    
-                    <div style="background:#fffbeb; padding:1rem; border-radius:12px; border:1px solid #fde68a; margin-bottom:1.2rem;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
-                            <span>کل بقایا ایڈوانس:</span>
-                            <span style="font-weight:bold; color:#b45309;">${pendingAdvance} روپے</span>
+                    <input type="hidden" name="employeeCode" value="${code}">
+                    <input type="hidden" name="designation" value="${staff.designation || ''}">
+
+                    <!-- 1. Month and Year Selection with Paid Check -->
+                    <div style="background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:14px;">
+                        <label style="display:block; font-weight:bold; font-size:0.92rem; color:#1e293b; margin-bottom:6px;">
+                            <i class="fas fa-calendar-check" style="color:var(--primary);"></i> برائے مہینہ و سال (کس ماہ کی تنخواہ ادا ہو رہی ہے):
+                        </label>
+                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:10px;">
+                            <div>
+                                <select name="month" id="form_salary_month" onchange="app.checkSalaryMonthConflict(${staff.id})" style="width:100%; padding:8px 10px; border-radius:8px; border:1.5px solid #cbd5e1; font-weight:bold; font-size:0.95rem; background:white;">
+                                    ${monthsUrdu.map(m => {
+                                        const isPaid = Boolean(paidMonthsMap[m]);
+                                        return `<option value="${m}" ${defaultMonth === m ? 'selected' : ''} ${isPaid ? 'style="color:#94a3b8; background:#f1f5f9;"' : ''}>${m} ${isPaid ? '(ادا شدہ ✓)' : ''}</option>`;
+                                    }).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <select name="year" id="form_salary_year" onchange="app.checkSalaryMonthConflict(${staff.id})" style="width:100%; padding:8px 10px; border-radius:8px; border:1.5px solid #cbd5e1; font-weight:bold; font-size:0.95rem; background:white;">
+                                    ${[2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => `<option value="${y}" ${defaultYear === y ? 'selected' : ''}>${y}</option>`).join('')}
+                                </select>
+                            </div>
                         </div>
-                        <div class="form-group-horizontal">
-                            <label style="font-size:0.9rem;">اس ماہ کٹوتی ایڈوانس</label>
-                            <input type="number" name="advanceDeduction" value="0" max="${pendingAdvance}" oninput="app.calculateNetSalary()">
+                        <div id="month_conflict_alert" style="display:${paidMonthsMap[defaultMonth] ? 'block' : 'none'}; margin-top:8px; background:#fff7ed; border:1px solid #fdba74; color:#c2410c; padding:6px 10px; border-radius:6px; font-size:0.85rem; font-weight:600;">
+                            <i class="fas fa-exclamation-triangle"></i> تنبیہ: اس ملازم کی برائے ماہ <b id="conflict_month_label">${defaultMonth}</b> تنخواہ پہلے ہی ادا شدہ ہے! (پرچی #${paidMonthsMap[defaultMonth]?.payslipNo || ''})
                         </div>
                     </div>
 
-                    <div style="background:var(--primary); color:white; padding:1.2rem; border-radius:12px; text-align:center; margin-bottom:1.5rem;">
-                        <div style="font-size:0.9rem; opacity:0.8;">خالص تنخواہ (Net Payable)</div>
-                        <div id="net_salary_display" style="font-size:2rem; font-weight:800;">${staff.salary || 0}</div>
-                        <input type="hidden" name="netSalary" id="net_salary_input" value="${staff.salary || 0}">
+                    <!-- 2. Base Salary and Previous Arrears -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+                        <div>
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; color:#334155; margin-bottom:4px;">بنیادی تنخواہ (روپے)</label>
+                            <input type="number" id="base_salary" name="baseSalary" value="${baseSalary}" oninput="app.calculateNetSalary()" style="width:100%; padding:8px 10px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:1.05rem; font-weight:bold; font-family:monospace; background:#f1f5f9;" required>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; color:#b91c1c; margin-bottom:4px;">سابقہ بقایا تنخواہ (روپے)</label>
+                            <input type="number" id="previous_arrears" name="previousArrears" value="${previousArrears}" oninput="app.calculateNetSalary()" placeholder="0" style="width:100%; padding:8px 10px; border-radius:8px; border:1.5px solid #f87171; background:#fffbfa; font-size:1.05rem; font-weight:bold; font-family:monospace; color:#b91c1c;">
+                        </div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary" style="width:100%;">تنخواہ ادا کریں</button>
+                    <!-- 3. Allowances with Details -->
+                    <div style="display:grid; grid-template-columns:1fr 1.5fr; gap:10px; margin-bottom:12px;">
+                        <div>
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; color:#059669; margin-bottom:4px;">الاؤنسز / بونس (روپے)</label>
+                            <input type="number" id="salary_allowances" name="allowances" value="0" oninput="app.calculateNetSalary()" style="width:100%; padding:8px 10px; border-radius:8px; border:1.5px solid #a7f3d0; font-size:1.05rem; font-weight:bold; font-family:monospace; color:#059669;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.85rem; font-weight:600; color:#64748b; margin-bottom:4px;">الاؤنس کی تفصیل / مد</label>
+                            <input type="text" name="allowanceDetails" placeholder="مثلاً عید بونس، اضافی تدریس" style="width:100%; padding:8px 10px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.9rem;">
+                        </div>
+                    </div>
+
+                    <!-- 4. Deductions with Details -->
+                    <div style="display:grid; grid-template-columns:1fr 1.5fr; gap:10px; margin-bottom:12px;">
+                        <div>
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; color:#dc2626; margin-bottom:4px;">عمومی کٹوتی (روپے)</label>
+                            <input type="number" id="salary_deductions" name="deductions" value="0" oninput="app.calculateNetSalary()" style="width:100%; padding:8px 10px; border-radius:8px; border:1.5px solid #fca5a5; font-size:1.05rem; font-weight:bold; font-family:monospace; color:#dc2626;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.85rem; font-weight:600; color:#64748b; margin-bottom:4px;">کٹوتی کی وجہ</label>
+                            <input type="text" name="deductionDetails" placeholder="مثلاً غیر حاضری، رخصت کٹوتی" style="width:100%; padding:8px 10px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.9rem;">
+                        </div>
+                    </div>
+
+                    <!-- 5. Installments Section (اقساط کا تذکرہ) -->
+                    <div style="background:#faf5ff; border:1.5px solid #e9d5ff; border-radius:12px; padding:10px 12px; margin-bottom:12px;">
+                        <div style="font-size:0.88rem; font-weight:bold; color:#7e22ce; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-layer-group"></i> اقساط / قرض کی قسط کٹوتی (Installment):
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1.5fr; gap:10px;">
+                            <div>
+                                <input type="number" id="salary_installment" name="installment" value="0" oninput="app.calculateNetSalary()" placeholder="قسط کی رقم" style="width:100%; padding:8px 10px; border-radius:8px; border:1.5px solid #d8b4fe; font-size:1.05rem; font-weight:bold; font-family:monospace; color:#7e22ce;">
+                            </div>
+                            <div>
+                                <input type="text" id="salary_installment_details" name="installmentDetails" placeholder="قسط کا تذکرہ (مثلاً قسط ۲ از ۵ - موٹر سائیکل قرض)" style="width:100%; padding:8px 10px; border-radius:8px; border:1.5px solid #d8b4fe; font-size:0.9rem; color:#581c87;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 6. Advance Adjustment (if any pending advance) -->
+                    ${pendingAdvance > 0 ? `
+                        <div style="background:#fffbeb; padding:10px 12px; border-radius:12px; border:1.5px solid #fde68a; margin-bottom:12px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                                <span style="font-size:0.85rem; font-weight:bold; color:#92400e;"><i class="fas fa-receipt"></i> بقایا ایڈوانس ریکارڈ:</span>
+                                <span style="font-weight:bold; color:#b45309; font-family:monospace; font-size:0.95rem;">Rs. ${pendingAdvance.toLocaleString()}</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <label style="font-size:0.85rem; font-weight:bold; color:#78350f; white-space:nowrap;">اس ماہ کٹوتی:</label>
+                                <input type="number" name="advanceDeduction" id="salary_advance_deduction" value="0" min="0" max="${pendingAdvance}" oninput="app.calculateNetSalary()" style="flex-grow:1; padding:7px 10px; border-radius:8px; border:1.5px solid #fcd34d; font-size:1rem; font-weight:bold; font-family:monospace;">
+                            </div>
+                        </div>
+                    ` : '<input type="hidden" name="advanceDeduction" id="salary_advance_deduction" value="0">'}
+
+                    <!-- 7. Live Computation: Total Payable, Paid Now, and Remaining Arrears -->
+                    <div style="background:linear-gradient(135deg, #064e3b 0%, #065f46 100%); color:white; padding:14px; border-radius:14px; margin-bottom:14px; box-shadow:0 4px 12px rgba(6,95,70,0.25);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:6px;">
+                            <span style="font-size:0.92rem; opacity:0.9;">کل واجب الادا تنخواہ (Total Due):</span>
+                            <span id="total_due_display" style="font-size:1.4rem; font-weight:bold; font-family:monospace; color:#fde047;">Rs. ${baseSalary.toLocaleString()}</span>
+                            <input type="hidden" id="total_due_input" name="totalDue" value="${baseSalary}">
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1.2fr; gap:10px; align-items:center;">
+                            <div>
+                                <label style="font-size:0.82rem; display:block; opacity:0.9; margin-bottom:3px;">موقع پر ادا رقم (Paid Now):</label>
+                                <input type="number" name="paidNow" id="salary_paid_now" value="${baseSalary}" oninput="app.calculateNetSalary(true)" style="width:100%; padding:8px 10px; border-radius:8px; border:2px solid #34d399; font-size:1.15rem; font-weight:bold; font-family:monospace; color:#064e3b; background:#ffffff;" required>
+                                <input type="hidden" name="netSalary" id="net_salary_input" value="${baseSalary}">
+                            </div>
+                            <div id="salary_arrears_status_box">
+                                <span style="background:rgba(255,255,255,0.2); color:#ffffff; padding:6px 10px; border-radius:8px; font-size:0.88rem; font-weight:bold; display:block; text-align:center;">
+                                    مکمل بے باق (صاف حساب) ✓
+                                </span>
+                            </div>
+                            <input type="hidden" name="arrears" id="salary_arrears_input" value="0">
+                        </div>
+                    </div>
+
+                    <!-- 8. Payment Method & Notes -->
+                    <div style="display:grid; grid-template-columns:1fr 1.5fr; gap:10px; margin-bottom:15px;">
+                        <div>
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; color:#475569; margin-bottom:4px;">طریقۂ ادائیگی</label>
+                            <select name="paymentMode" style="width:100%; padding:8px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.9rem;">
+                                <option value="نقد (Cash)">نقد (Cash)</option>
+                                <option value="بینک ٹرانسفر (Bank Transfer)">بینک ٹرانسفر (Bank Transfer)</option>
+                                <option value="ایزی پیسہ / جاز کیش (Mobile Wallet)">ایزی پیسہ / جاز کیش</option>
+                                <option value="چیک (Cheque)">چیک (Cheque)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.85rem; font-weight:600; color:#475569; margin-bottom:4px;">نوٹ / ریمارکس</label>
+                            <input type="text" name="notes" placeholder="اختیاری ریمارکس..." style="width:100%; padding:8px 10px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.9rem;">
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div style="display:flex; gap:8px;">
+                        <button type="submit" class="btn btn-primary" style="flex-grow:1; padding:11px; font-size:1.05rem; font-weight:bold; border-radius:10px; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 10px rgba(6,95,70,0.25);">
+                            <i class="fas fa-check-circle"></i> تنخواہ ادا کریں اور پرچی پرنٹ کریں
+                        </button>
+                        <button type="button" class="btn" style="background:#e2e8f0; color:#475569; border-radius:10px; padding:11px 16px; font-weight:bold;" onclick="app.renderSalaryModule(document.getElementById('main-content'))">
+                            منسوخ
+                        </button>
+                    </div>
                 </form>
             </div>
         `;
+
+        this.calculateNetSalary(false);
     }
 
-    calculateNetSalary() {
+    checkSalaryMonthConflict(staffId) {
+        const m = document.getElementById('form_salary_month')?.value;
+        const y = parseInt(document.getElementById('form_salary_year')?.value || 2026);
+        const alertBox = document.getElementById('month_conflict_alert');
+        const conflictLbl = document.getElementById('conflict_month_label');
+        if (!m || !alertBox) return;
+
+        MadrassahDB.getStaffSalaries(staffId).then(salaries => {
+            const match = (salaries || []).find(s => s.month === m && parseInt(s.year) === y);
+            if (match) {
+                alertBox.style.display = 'block';
+                if (conflictLbl) conflictLbl.innerText = `${m} ${y}`;
+            } else {
+                alertBox.style.display = 'none';
+            }
+        });
+    }
+
+    calculateNetSalary(isPaidNowManual = false) {
         const base = parseInt(document.getElementById('base_salary')?.value || 0);
-        const allow = parseInt(document.querySelector('input[name="allowances"]')?.value || 0);
-        const deduct = parseInt(document.querySelector('input[name="deductions"]')?.value || 0);
-        const advDeduct = parseInt(document.querySelector('input[name="advanceDeduction"]')?.value || 0);
+        const prevArrears = parseInt(document.getElementById('previous_arrears')?.value || 0);
+        const allow = parseInt(document.getElementById('salary_allowances')?.value || 0);
+        const deduct = parseInt(document.getElementById('salary_deductions')?.value || 0);
+        const advDeduct = parseInt(document.getElementById('salary_advance_deduction')?.value || 0);
+        const installment = parseInt(document.getElementById('salary_installment')?.value || 0);
         
-        const net = base + allow - deduct - advDeduct;
-        const disp = document.getElementById('net_salary_display');
-        if (disp) disp.innerText = net;
-        const inp = document.getElementById('net_salary_input');
-        if (inp) inp.value = net;
+        // Net Total Due = Base + Arrears + Allowances - Deductions - Advance - Installments
+        const totalDue = Math.max(0, base + prevArrears + allow - deduct - advDeduct - installment);
+        
+        const totalDueDisp = document.getElementById('total_due_display');
+        if (totalDueDisp) totalDueDisp.innerText = 'Rs. ' + totalDue.toLocaleString();
+        
+        const totalDueInput = document.getElementById('total_due_input');
+        if (totalDueInput) totalDueInput.value = totalDue;
+
+        const paidNowInput = document.getElementById('salary_paid_now');
+        if (!isPaidNowManual && paidNowInput) {
+            paidNowInput.value = totalDue;
+        }
+
+        const paidNow = parseInt(paidNowInput?.value || 0);
+        const remainingArrears = Math.max(0, totalDue - paidNow);
+
+        const arrearsInput = document.getElementById('salary_arrears_input');
+        if (arrearsInput) arrearsInput.value = remainingArrears;
+
+        const netSalaryInput = document.getElementById('net_salary_input');
+        if (netSalaryInput) netSalaryInput.value = paidNow;
+
+        const statusBox = document.getElementById('salary_arrears_status_box');
+        if (statusBox) {
+            if (remainingArrears > 0) {
+                statusBox.innerHTML = `
+                    <span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:6px 10px; border-radius:8px; font-size:0.82rem; font-weight:bold; display:block; text-align:center;">
+                        بقایا تنخواہ: Rs. ${remainingArrears.toLocaleString()}
+                    </span>
+                `;
+            } else {
+                statusBox.innerHTML = `
+                    <span style="background:rgba(255,255,255,0.2); color:#ffffff; padding:6px 10px; border-radius:8px; font-size:0.88rem; font-weight:bold; display:block; text-align:center;">
+                        مکمل بے باق (صاف حساب) ✓
+                    </span>
+                `;
+            }
+        }
     }
 
     async handleSalarySubmit(e) {
         e.preventDefault();
-        const data = Object.fromEntries(new FormData(e.target).entries());
-        data.paymentDate = Date.now();
-        data.payslipNo = 'PS-' + Math.floor(100000 + Math.random() * 900000);
-        
-        await MadrassahDB.saveSalary(data);
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
 
-        // Record as expense in Accounts
+        data.staffId = parseInt(data.staffId);
+        data.baseSalary = parseInt(data.baseSalary || 0);
+        data.previousArrears = parseInt(data.previousArrears || 0);
+        data.allowances = parseInt(data.allowances || 0);
+        data.deductions = parseInt(data.deductions || 0);
+        data.advanceDeduction = parseInt(data.advanceDeduction || 0);
+        data.installment = parseInt(data.installment || 0);
+        data.totalDue = parseInt(data.totalDue || 0);
+        data.paidNow = parseInt(data.paidNow || 0);
+        data.netPaid = data.paidNow;
+        data.netSalary = data.paidNow;
+        data.arrears = parseInt(data.arrears || 0);
+        data.year = parseInt(data.year || new Date().getFullYear());
+        data.paymentDate = Date.now();
+        data.payslipNo = 'SAL-' + Math.floor(100000 + Math.random() * 900000);
+        
+        const salaryId = await MadrassahDB.saveSalary(data);
+
+        // Adjust advances if advance deduction was made
+        if (data.advanceDeduction > 0) {
+            try {
+                const advances = await MadrassahDB.getStaffAdvances(data.staffId);
+                const pendingAdv = advances.find(a => a.status === 'Pending');
+                if (pendingAdv) {
+                    if (data.advanceDeduction >= parseInt(pendingAdv.amount || 0)) {
+                        await MadrassahDB.updateAdvanceStatus(pendingAdv.id, 'Paid');
+                    }
+                }
+            } catch(advErr) {
+                console.warn('Advance status update warning:', advErr);
+            }
+        }
+
+        // Record as expense in Bait-ul-Maal Accounts
+        let desc = `تنخواہ برائے ماہ ${data.month} ${data.year} (ملازم: ${data.staffName}، پرچی: #${data.payslipNo})`;
+        if (data.installment > 0) {
+            desc += ` [قسط کٹوتی: Rs. ${data.installment} - ${data.installmentDetails || 'قسط'}]`;
+        }
+        if (data.arrears > 0) {
+            desc += ` [بقایا تنخواہ: Rs. ${data.arrears}]`;
+        }
+        if (data.previousArrears > 0) {
+            desc += ` [سابقہ بقایا شامل: Rs. ${data.previousArrears}]`;
+        }
+
         await MadrassahDB.saveTransaction({
             type: 'Expense',
             category: 'تنخواہ عملہ',
-            amount: data.netSalary,
+            amount: data.paidNow,
             name: data.staffName,
+            receiptNo: data.payslipNo,
             date: Date.now(),
-            description: `تنخواہ برائے ماہ ${data.month} ${data.year} (Payslip: ${data.payslipNo})`
+            description: desc
         });
 
-        alert('تنخواہ کامیابی سے ریکارڈ کر لی گئی ہے اور بیت المال کے اخراجات میں درج کر دی گئی ہے۔');
+        this.showToast('ماشاء اللہ! تنخواہ کامیابی سے ریکارڈ ہو گئی ہے اور بیت المال میں خرچ درج ہو گیا ہے۔', 'success');
+        
+        // Promptly open A4 payslip
+        this.printPayslip(salaryId);
+        
         this.render();
     }
 
     async renderAdvanceModule() {
-        const staff = await MadrassahDB.getAllTeachers();
+        const staff = (await MadrassahDB.getAllTeachers()) || [];
         const container = document.getElementById('salary_side_container');
         if (!container) return;
         
         container.innerHTML = `
-            <div class="card">
-                <h3 style="color:var(--primary); margin-bottom:1.5rem; border-bottom:1px solid #eee; padding-bottom:0.5rem;"><i class="fas fa-hand-holding-hand"></i> ایڈوانس / قرض ریکارڈ</h3>
-                <form onsubmit="app.handleAdvanceSubmit(event)" style="margin-bottom:2rem; background:#f8fafc; padding:1.2rem; border-radius:12px;">
-                    <div class="tt-form-group">
-                        <label>ملازم منتخب کریں</label>
-                        <select name="staffId" required>
+            <div class="card" style="border-radius:16px; border:1px solid #cbd5e1; box-shadow:0 10px 25px rgba(0,0,0,0.06); padding:1.5rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1.5px solid #e2e8f0; padding-bottom:10px; margin-bottom:15px;">
+                    <h3 style="color:var(--primary); margin:0; font-size:1.25rem;">
+                        <i class="fas fa-hand-holding-hand"></i> اندراجِ ایڈوانس و قرض عملہ
+                    </h3>
+                    <button class="btn btn-sm" style="background:#e2e8f0; border-radius:6px;" onclick="app.renderSalaryModule(document.getElementById('main-content'))">بند کریں</button>
+                </div>
+                <form onsubmit="app.handleAdvanceSubmit(event)" style="margin-bottom:1.5rem; background:#f8fafc; padding:1.2rem; border-radius:12px; border:1px solid #e2e8f0;">
+                    <div class="tt-form-group" style="margin-bottom:10px;">
+                        <label style="font-weight:bold; font-size:0.9rem; color:#334155;">ملازم کا انتخاب فرمائیں</label>
+                        <select name="staffId" style="width:100%; padding:8px; border-radius:8px; border:1.5px solid #cbd5e1; font-weight:bold;" required>
                             <option value="">انتخاب کریں...</option>
-                            ${staff.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+                            ${staff.map(s => `<option value="${s.id}">${s.name} (${s.designation || 'مدرس'})</option>`).join('')}
                         </select>
                     </div>
-                    <div class="tt-form-group"><label>رقم (Amount)</label><input type="number" name="amount" required></div>
-                    <div class="tt-form-group"><label>وجہ / تفصیل</label><input type="text" name="reason" placeholder="مثلاً بیماری، گھریلو ضرورت"></div>
-                    <button type="submit" class="btn btn-primary" style="width:100%;">ایڈوانس ریکارڈ کریں</button>
+                    <div class="tt-form-group" style="margin-bottom:10px;">
+                        <label style="font-weight:bold; font-size:0.9rem; color:#334155;">رقم ایڈوانس / قرض (روپے)</label>
+                        <input type="number" name="amount" placeholder="مطلوبہ رقم" style="width:100%; padding:8px 10px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:1.05rem; font-weight:bold; font-family:monospace;" required>
+                    </div>
+                    <div class="tt-form-group" style="margin-bottom:15px;">
+                        <label style="font-weight:bold; font-size:0.9rem; color:#334155;">وجہ / مد / واپسی کی اقساط تفصیل</label>
+                        <input type="text" name="reason" placeholder="مثلاً ایمرجنسی ضرورت، ۲ اقساط میں واپسی" style="width:100%; padding:8px 10px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.9rem;">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:100%; padding:10px; font-weight:bold; border-radius:8px;">
+                        <i class="fas fa-save"></i> ایڈوانس محفوظ فرمائیں
+                    </button>
                 </form>
                 
-                <p style="font-size:0.8rem; color:#666; text-align:center;">ایڈوانس کی کٹوتی تنخواہ دیتے وقت کی جائے گی۔</p>
+                <p style="font-size:0.85rem; color:#64748b; text-align:center; margin:0;">
+                    <i class="fas fa-info-circle"></i> ایڈوانس رقم کی کٹوتی تنخواہ ادا کرتے وقت خودکار ظاہر ہوگی۔
+                </p>
             </div>
         `;
     }
@@ -13637,80 +17380,1178 @@ downloadReceiptImageDirect(options) {
         data.date = Date.now();
         data.status = 'Pending';
         data.staffId = parseInt(data.staffId);
+        data.amount = parseInt(data.amount || 0);
         
         await MadrassahDB.saveAdvance(data);
-        alert('ایڈوانس ریکارڈ کر لیا گیا ہے۔');
+        this.showToast('ایڈوانس ریکارڈ کامیابی سے محفوظ ہو گیا ہے۔', 'info');
         this.render();
     }
 
+    // --- Official Dual A5 Salary Payslips on A4 (سیلری پے سلپ پورے A5 سائز میں - ۲ کاپیاں برائے A4) ---
     async printPayslip(id) {
-        const salaries = await MadrassahDB.getAllSalaries();
+        const salaries = (await MadrassahDB.getAllSalaries()) || [];
         const salary = salaries.find(s => s.id === id);
-        if (!salary) return;
+        if (!salary) {
+            alert('تنخواہ پرچی کا ریکارڈ نہیں ملا!');
+            return;
+        }
         const staff = (await MadrassahDB.getTeacherById(salary.staffId)) || {};
-        
+        const code = staff.uniqueCode || ('EMP-' + (100 + parseInt(staff.id || salary.staffId)));
+
         const printWindow = window.open('', '_blank');
-        printWindow.document.write(`
-            <html lang="ur" dir="rtl">
-            <head>
-                <title>تنخواہ پرچی - ${salary.payslipNo}</title>
-                <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
-                <style>
-                    body { font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif; padding: 40px; background: #f1f5f9; }
-                    .payslip-container { background: white; max-width: 800px; margin: 0 auto; padding: 40px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.1); border-top: 15px solid #065f46; }
-                    .header { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; }
-                    .madrsa-name { font-size: 2.8rem; color: #065f46; margin: 0; }
-                    .payslip-title { font-size: 1.5rem; color: #475569; margin-top: 10px; font-weight: bold; }
-                    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
-                    .info-item { border-bottom: 1px dotted #ccc; padding: 8px 0; display: flex; justify-content: space-between; }
-                    .info-label { color: #065f46; font-weight: bold; }
-                    .salary-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
-                    .salary-table th, .salary-table td { border: 1px solid #e2e8f0; padding: 12px; text-align: right; }
-                    .salary-table th { background: #f8fafc; color: #065f46; }
-                    .total-row { background: #065f46; color: white; font-weight: bold; font-size: 1.3rem; }
-                    .footer { display: flex; justify-content: space-between; margin-top: 60px; }
-                    .signature { border-top: 1px solid #000; width: 150px; text-align: center; padding-top: 10px; font-size: 0.9rem; }
-                    @media print { body { background: white; padding: 0; } .payslip-container { box-shadow: none; border: 1px solid #eee; } .no-print { display: none; } }
-                </style>
-            </head>
-            <body>
-                <div class="payslip-container">
-                    <div class="header">
-                        <img src="${TITLE_DATA_URI}" alt="مدرسہ عبد الرحمن بن عوف غفوریہ" style="max-height:65px; max-width:85%; object-fit:contain; mix-blend-mode:multiply; display:block; margin:0 auto 4px auto;">
-                        <div class="payslip-title">تنخواہ پرچی (Monthly Payslip)</div>
-                    </div>
-                    
-                    <div class="info-grid">
-                        <div class="info-item"><span class="info-label">نامِ ملازم:</span> <span>${salary.staffName}</span></div>
-                        <div class="info-item"><span class="info-label">تاریخِ ادائیگی:</span> <span>${new Date(salary.paymentDate).toLocaleDateString('ur-PK')}</span></div>
-                        <div class="info-item"><span class="info-label">عہدہ:</span> <span>${staff.designation || '---'}</span></div>
-                        <div class="info-item"><span class="info-label">مہینہ / سال:</span> <span>${salary.month} ${salary.year}</span></div>
-                        <div class="info-item"><span class="info-label">پرچی نمبر:</span> <span>${salary.payslipNo}</span></div>
+        if (!printWindow) {
+            alert('براہ کرم پاپ اپ ونڈو کھولنے کی اجازت دیجیے۔');
+            return;
+        }
+
+        const renderSingleA5Slip = (copyTitle, copyColor, copyIcon) => `
+            <div class="payslip-a5">
+                <img src="${LOGO_DATA_URI}" class="watermark" alt="Watermark">
+                
+                <!-- Top Header -->
+                <div>
+                    <div class="header-wrap">
+                        <img src="${LOGO_DATA_URI}" class="header-logo" alt="لوگو">
+                        <div class="header-center">
+                            <img src="${TITLE_DATA_URI}" alt="مدرسہ عبد الرحمن بن عوف" class="header-title-img">
+                            <div class="slip-title-row">
+                                <span class="main-title">تنخواہ پرچی و ادائیگی واؤچر (Salary Payslip)</span>
+                                <span class="copy-badge" style="background:${copyColor};">
+                                    <i class="${copyIcon}"></i> ${copyTitle}
+                                </span>
+                            </div>
+                            <div class="header-address">چک نمبر 10-28 آر بوسال کالونی، ضلع خانیوال — سیشن ${salary.year}ء</div>
+                        </div>
+                        <div class="header-code">
+                            <div class="rcpt-lbl">پرچی نمبر</div>
+                            <div class="rcpt-val">${salary.payslipNo}</div>
+                            <div class="rcpt-date">${new Date(salary.paymentDate).toLocaleDateString('ur-PK')}</div>
+                        </div>
                     </div>
 
-                    <table class="salary-table">
+                    <!-- Staff Details Grid (A5 Proportioned) -->
+                    <div class="info-grid">
+                        <div><span>نام ملازم / استاد:</span> <b>${salary.staffName}</b></div>
+                        <div><span>ملازم کوڈ:</span> <b style="font-family:monospace; color:#1d4ed8;">${code}</b></div>
+                        <div><span>عہدہ / منصب:</span> <b>${salary.designation || staff.designation || 'مدرس'}</b></div>
+                        <div><span>برائے ماہ و سال:</span> <b style="color:#065f46;">${salary.month} ${salary.year}</b></div>
+                        <div><span>طریقۂ ادائیگی:</span> <b>${salary.paymentMode || 'نقد کیش'}</b></div>
+                        <div><span>رابطہ نمبر:</span> <b dir="ltr">${staff.phone || '---'}</b></div>
+                    </div>
+
+                    <!-- Breakdown Table -->
+                    <table>
                         <thead>
-                            <tr><th>تفصیل</th><th>رقم (روپے)</th></tr>
+                            <tr>
+                                <th style="width:25px; text-align:center;">#</th>
+                                <th>تفصیل و مدات (Salary Breakdown)</th>
+                                <th style="width:125px; text-align:center;">رقم (روپے)</th>
+                                <th style="width:210px;">کیفیت و اقساط کا تذکرہ</th>
+                            </tr>
                         </thead>
                         <tbody>
-                            <tr><td>بنیادی تنخواہ (Base Salary)</td><td>${salary.baseSalary}</td></tr>
-                            <tr><td>الاؤنسز (Allowances)</td><td>${salary.allowances || 0}</td></tr>
-                            <tr style="color:#ef4444;"><td>کٹوتی (Deductions)</td><td>-${salary.deductions || 0}</td></tr>
-                            <tr style="color:#ef4444;"><td>ایڈوانس کٹوتی (Advance Adjustment)</td><td>-${salary.advanceDeduction || 0}</td></tr>
-                            <tr class="total-row">
-                                <td>خالص تنخواہ (Net Payable)</td>
-                                <td>${salary.netSalary} /-</td>
+                            <tr>
+                                <td style="text-align:center;">۱</td>
+                                <td><b>بنیادی مشاہرہ (Base Salary)</b></td>
+                                <td style="text-align:center; font-weight:bold; font-family:monospace;">Rs. ${(parseInt(salary.baseSalary || 0)).toLocaleString()}</td>
+                                <td>مقررہ ماہانہ تنخواہ</td>
                             </tr>
+                            ${salary.previousArrears > 0 ? `
+                            <tr>
+                                <td style="text-align:center;">۲</td>
+                                <td style="color:#b91c1c;"><b>سابقہ بقایا تنخواہ (Previous Arrears)</b></td>
+                                <td style="text-align:center; font-weight:bold; font-family:monospace; color:#b91c1c;">+ Rs. ${(parseInt(salary.previousArrears)).toLocaleString()}</td>
+                                <td>گزشتہ ماہ کے واجب الادا بقایا جات</td>
+                            </tr>
+                            ` : ''}
+                            ${salary.allowances > 0 ? `
+                            <tr>
+                                <td style="text-align:center;">۳</td>
+                                <td style="color:#059669;"><b>اضافی الاؤنسز و بونس (Allowances)</b></td>
+                                <td style="text-align:center; font-weight:bold; font-family:monospace; color:#059669;">+ Rs. ${(parseInt(salary.allowances)).toLocaleString()}</td>
+                                <td>${salary.allowanceDetails || 'اضافی الاؤنس'}</td>
+                            </tr>
+                            ` : ''}
+                            ${salary.deductions > 0 ? `
+                            <tr>
+                                <td style="text-align:center;">۴</td>
+                                <td style="color:#dc2626;"><b>عمومی کٹوتی (Deductions)</b></td>
+                                <td style="text-align:center; font-weight:bold; font-family:monospace; color:#dc2626;">- Rs. ${(parseInt(salary.deductions)).toLocaleString()}</td>
+                                <td>${salary.deductionDetails || 'غیر حاضری / رخصت'}</td>
+                            </tr>
+                            ` : ''}
+                            ${salary.advanceDeduction > 0 ? `
+                            <tr>
+                                <td style="text-align:center;">۵</td>
+                                <td style="color:#d97706;"><b>ایڈوانس کٹوتی (Advance Adjustment)</b></td>
+                                <td style="text-align:center; font-weight:bold; font-family:monospace; color:#d97706;">- Rs. ${(parseInt(salary.advanceDeduction)).toLocaleString()}</td>
+                                <td>سابقہ ایڈوانس رقم کی کٹوتی</td>
+                            </tr>
+                            ` : ''}
+                            ${salary.installment > 0 ? `
+                            <tr>
+                                <td style="text-align:center;">۶</td>
+                                <td style="color:#7e22ce;"><b>اقساط کٹوتی (Installment)</b></td>
+                                <td style="text-align:center; font-weight:bold; font-family:monospace; color:#7e22ce;">- Rs. ${(parseInt(salary.installment)).toLocaleString()}</td>
+                                <td style="font-weight:bold; color:#7e22ce;">${salary.installmentDetails || 'قرض / خریداری قسط'}</td>
+                            </tr>
+                            ` : ''}
                         </tbody>
                     </table>
 
-                    <div class="footer">
-                        <div class="signature">دستخط ملازم</div>
-                        <div class="signature">دستخط ناظمِ اعلیٰ / خزانچی</div>
+                    <!-- Total Bar -->
+                    <div class="total-bar">
+                        <div>
+                            <span>کل واجب: Rs. ${(parseInt(salary.totalDue || salary.netSalary || 0)).toLocaleString()}</span>
+                            <span style="margin:0 10px; color:#cbd5e1;">|</span>
+                            <span>خالص ادا شدہ: <b style="font-family:monospace; color:#065f46; font-size:1.25rem;">Rs. ${(parseInt(salary.paidNow || salary.netSalary || 0)).toLocaleString()}/-</b></span>
+                        </div>
+                        <div>
+                            ${salary.arrears > 0 ? 
+                                `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:2px 10px; border-radius:6px; font-size:0.85rem; font-weight:bold;">بقایا تنخواہ: Rs. ${parseInt(salary.arrears).toLocaleString()}</span>` : 
+                                `<span style="background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:2px 10px; border-radius:6px; font-size:0.85rem; font-weight:bold;">حساب بے باق (صاف) ✓</span>`
+                            }
+                        </div>
+                    </div>
+
+                    ${salary.notes ? `
+                        <div class="slip-notes">
+                            <b>نوٹ / ریمارکس:</b> ${salary.notes}
+                        </div>
+                    ` : ''}
+                </div>
+
+                <!-- 3 Official Signatures firmly at bottom -->
+                <div class="signatures">
+                    <div class="sig-line">دستخط وصول کنندہ (مدرس / ملازم)</div>
+                    <div class="sig-line">دستخط خزانچی / کیشیئر</div>
+                    <div class="sig-line">مہر و دستخط مہتمم ادارہ</div>
+                </div>
+            </div>
+        `;
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html lang="ur" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>تنخواہ پرچی A5 - ${salary.staffName} (${salary.month} ${salary.year})</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+                <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+                <style>
+                    @page {
+                        size: A4 portrait;
+                        margin: 4mm 6mm;
+                    }
+                    * {
+                        box-sizing: border-box;
+                        font-family: 'Jameel Noori Nastaleeq', 'Noto Sans Urdu', 'Segoe UI', Tahoma, sans-serif;
+                    }
+                    body {
+                        background: #f1f5f9;
+                        color: #0f172a;
+                        direction: rtl;
+                        margin: 0;
+                        padding: 8px;
+                        font-size: 0.92rem;
+                    }
+                    .page-container {
+                        max-width: 198mm;
+                        margin: 0 auto;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: space-between;
+                    }
+                    /* Exact A5 Proportioned Slip Box (fills 139mm height cleanly) */
+                    .payslip-a5 {
+                        height: 139mm;
+                        max-height: 139mm;
+                        background: white;
+                        border: 2px solid #065f46;
+                        border-radius: 10px;
+                        padding: 10px 16px 8px 16px;
+                        box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+                        position: relative;
+                        overflow: hidden;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: space-between;
+                    }
+                    .watermark {
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 250px;
+                        opacity: 0.05;
+                        pointer-events: none;
+                        z-index: 0;
+                    }
+                    .header-wrap {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-bottom: 2px double #065f46;
+                        padding-bottom: 6px;
+                        margin-bottom: 7px;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .header-logo {
+                        width: 52px;
+                        height: 52px;
+                        border-radius: 50%;
+                        border: 1.5px solid #065f46;
+                        padding: 2px;
+                        object-fit: contain;
+                        background: white;
+                    }
+                    .header-center {
+                        text-align: center;
+                        flex-grow: 1;
+                    }
+                    .header-title-img {
+                        max-height: 32px;
+                        max-width: 82%;
+                        object-fit: contain;
+                        mix-blend-mode: multiply;
+                        display: block;
+                        margin: 0 auto 2px auto;
+                    }
+                    .slip-title-row {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 10px;
+                    }
+                    .main-title {
+                        font-size: 1.05rem;
+                        font-weight: bold;
+                        color: #065f46;
+                    }
+                    .copy-badge {
+                        color: white;
+                        padding: 2px 12px;
+                        border-radius: 14px;
+                        font-size: 0.8rem;
+                        font-weight: bold;
+                        letter-spacing: 0.3px;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 5px;
+                    }
+                    .header-address {
+                        font-size: 0.74rem;
+                        color: #475569;
+                        margin-top: 1px;
+                    }
+                    .header-code {
+                        text-align: center;
+                        border: 1.5px solid #065f46;
+                        border-radius: 8px;
+                        padding: 4px 10px;
+                        background: #f0fdf4;
+                        min-width: 95px;
+                    }
+                    .rcpt-lbl {
+                        font-size: 0.72rem;
+                        color: #065f46;
+                        font-weight: bold;
+                    }
+                    .rcpt-val {
+                        font-family: monospace;
+                        font-weight: bold;
+                        font-size: 1.05rem;
+                        color: #065f46;
+                        line-height: 1.1;
+                    }
+                    .rcpt-date {
+                        font-size: 0.72rem;
+                        color: #64748b;
+                    }
+
+                    .info-grid {
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr);
+                        gap: 4px 12px;
+                        background: #f8fafc;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 6px;
+                        padding: 6px 12px;
+                        margin-bottom: 7px;
+                        font-size: 0.88rem;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .info-grid div span { color: #64748b; }
+                    .info-grid div b { color: #0f172a; }
+
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 7px;
+                        font-size: 0.85rem;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    th, td {
+                        border: 1px solid #cbd5e1;
+                        padding: 4px 8px;
+                        text-align: right;
+                    }
+                    th {
+                        background: #f1f5f9;
+                        color: #1e293b;
+                        font-weight: bold;
+                    }
+
+                    .total-bar {
+                        background: #ecfdf5;
+                        border: 1.5px solid #059669;
+                        border-radius: 6px;
+                        padding: 5px 12px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 6px;
+                        font-size: 0.92rem;
+                        font-weight: bold;
+                        color: #065f46;
+                        position: relative;
+                        z-index: 2;
+                    }
+
+                    .slip-notes {
+                        font-size: 0.78rem;
+                        color: #475569;
+                        background: #f8fafc;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 4px;
+                        padding: 3px 10px;
+                        margin-bottom: 5px;
+                        position: relative;
+                        z-index: 2;
+                    }
+
+                    .signatures {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-top: 10px;
+                        padding: 0 20px;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .sig-line {
+                        border-top: 1.3px dashed #065f46;
+                        width: 145px;
+                        text-align: center;
+                        padding-top: 3px;
+                        font-weight: bold;
+                        font-size: 0.82rem;
+                        color: #334155;
+                    }
+
+                    .cut-line {
+                        border-top: 2px dashed #64748b;
+                        margin: 5px 0;
+                        position: relative;
+                        text-align: center;
+                        height: 12px;
+                    }
+                    .cut-line span {
+                        background: #f1f5f9;
+                        padding: 0 16px;
+                        position: relative;
+                        top: -9px;
+                        font-size: 0.75rem;
+                        color: #334155;
+                        font-weight: bold;
+                        border-radius: 12px;
+                    }
+
+                    @media print {
+                        html, body {
+                            background: white !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            width: 100% !important;
+                            height: 100% !important;
+                        }
+                        .page-container {
+                            border: none !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            height: 289mm !important;
+                            display: flex !important;
+                            flex-direction: column !important;
+                            justify-content: space-between !important;
+                        }
+                        .payslip-a5 {
+                            height: 139mm !important;
+                            max-height: 139mm !important;
+                            border: 2px solid #065f46 !important;
+                            box-shadow: none !important;
+                            width: 100% !important;
+                            padding: 8px 14px 6px 14px !important;
+                            page-break-inside: avoid !important;
+                            display: flex !important;
+                            flex-direction: column !important;
+                            justify-content: space-between !important;
+                        }
+                        .cut-line {
+                            border-top: 2px dashed #475569 !important;
+                            margin: 3px 0 !important;
+                            height: 8px !important;
+                        }
+                        .cut-line span {
+                            background: white !important;
+                            color: #1e293b !important;
+                            top: -9px !important;
+                        }
+                        .no-print {
+                            display: none !important;
+                        }
+                        * {
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                    }
+                </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
+                <script>
+                if (typeof html2canvas === 'undefined') {
+                    document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                }
+                if (typeof window.jspdf === 'undefined') {
+                    document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                }
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) {
+                        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...';
+                        btn.disabled = true;
+                    }
+
+                    const safeName = (filename || 'تنخواہ_پرچی_A5') + '.pdf';
+                    const targetEl = document.querySelector('.page-container') || document.body;
+
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+                                window.print();
+                                return;
+                            }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({
+                                orientation: isLandscape ? 'landscape' : 'portrait',
+                                unit: 'mm',
+                                format: format
+                            });
+
+                            const pWidth = isLandscape ? 297 : 210;
+                            const pHeight = isLandscape ? 210 : 297;
+
+                            const imgProps = pdf.getImageProperties(imgData);
+                            let renderWidth = pWidth;
+                            let renderHeight = renderWidth * (imgProps.height / imgProps.width);
+
+                            if (renderHeight > pHeight) {
+                                renderHeight = pHeight;
+                                renderWidth = renderHeight * (imgProps.width / imgProps.height);
+                            }
+
+                            const x = (pWidth - renderWidth) / 2;
+                            const y = 0;
+
+                            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight, undefined, 'FAST');
+                            pdf.save(safeName);
+                        } catch(err) {
+                            console.error('PDF error:', err);
+                            window.print();
+                        } finally {
+                            if (btn) {
+                                btn.innerHTML = origHtml;
+                                btn.disabled = false;
+                            }
+                        }
+                    };
+
+                    if (typeof html2canvas !== 'undefined' && targetEl) {
+                        html2canvas(targetEl, {
+                            scale: 2,
+                            useCORS: true,
+                            allowTaint: true,
+                            backgroundColor: '#ffffff'
+                        }).then(canvas => {
+                            doExport(canvas);
+                        }).catch(err => {
+                            console.warn('html2canvas failed, falling back to print:', err);
+                            window.print();
+                            if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        });
+                    } else {
+                        window.print();
+                        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                    }
+                }
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') {
+                    downloadPDF(filename, orientation, format);
+                }
+                </script>
+            </head>
+            <body>
+                <div class="page-container">
+                    <!-- کاپی ۱: دفتر / آفس کاپی (پورے A5 سائز میں) -->
+                    ${renderSingleA5Slip('آفس کاپی (Office Copy)', '#1e40af', 'fas fa-building')}
+
+                    <!-- کٹائی لائن مع قینچی آئیکن -->
+                    <div class="cut-line">
+                        <span><i class="fas fa-scissors"></i> کٹائی لائن — یہاں سے کٹ کریں (Cut Along Dotted Line) <i class="fas fa-scissors fa-flip-horizontal"></i></span>
+                    </div>
+
+                    <!-- کاپی ۲: مدرس / ملازم کاپی (پورے A5 سائز میں) -->
+                    ${renderSingleA5Slip('مدرس / ملازم کاپی (Teacher Copy)', '#065f46', 'fas fa-user-tie')}
+                </div>
+
+                <div class="no-print" style="position:fixed; bottom:15px; left:0; right:0; text-align:center; z-index:999; display:flex; justify-content:center; gap:12px;">
+                    <button onclick="window.print()" style="padding:10px 30px; background:#065f46; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; font-weight:bold; box-shadow:0 6px 16px rgba(6,95,70,0.35); font-family:inherit;">
+                        <i class="fas fa-print"></i> پرنٹ کریں (A4 - دو A5 پرچیاں)
+                    </button>
+                    <button onclick="downloadPDF('پرچی_${(salary.staffName || 'Staff').replace(/['\"\\s]+/g, '_')}_${salary.month}', 'portrait', 'a4')" style="padding:10px 22px; background:#dc2626; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; font-weight:bold; box-shadow:0 6px 16px rgba(220,38,38,0.35); font-family:inherit;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)
+                    </button>
+                    <button onclick="window.close()" style="padding:10px 22px; background:#64748b; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.1rem; font-weight:bold; box-shadow:0 6px 16px rgba(100,116,139,0.25); font-family:inherit;">
+                        <i class="fas fa-times"></i> بند کریں
+                    </button>
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    }
+
+    // --- Official A4 Salary Ledger (ملازم باضابطہ تنخواہ کھاتہ و ادائیگیوں کا لیجر) ---
+    async printStaffSalaryLedger(staffId, selectedYear = null) {
+        const staff = await MadrassahDB.getTeacherById(staffId);
+        if (!staff) {
+            alert('عملہ کا ریکارڈ نہیں ملا!');
+            return;
+        }
+
+        const allSalaries = (await MadrassahDB.getStaffSalaries(staffId)) || [];
+        const year = parseInt(selectedYear || this.salaryYear || new Date().getFullYear());
+        const code = staff.uniqueCode || ('EMP-' + (100 + parseInt(staff.id)));
+
+        // Filter and sort for the year
+        const yearSalaries = allSalaries
+            .filter(s => parseInt(s.year) === year)
+            .sort((a, b) => (a.paymentDate || 0) - (b.paymentDate || 0));
+
+        // Totals
+        const totalPaidYear = yearSalaries.reduce((sum, s) => sum + parseInt(s.paidNow || s.netSalary || 0), 0);
+        const totalAllowances = yearSalaries.reduce((sum, s) => sum + parseInt(s.allowances || 0), 0);
+        const totalDeductions = yearSalaries.reduce((sum, s) => sum + parseInt(s.deductions || 0) + parseInt(s.advanceDeduction || 0) + parseInt(s.installment || 0), 0);
+        const latestSalary = yearSalaries[yearSalaries.length - 1];
+        const currentArrears = latestSalary ? parseInt(latestSalary.arrears || 0) : 0;
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert('براہ کرم پاپ اپ ونڈو کھولنے کی اجازت دیجیے۔');
+            return;
+        }
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html lang="ur" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>تنخواہ کھاتہ لیجر - ${staff.name} (${year})</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+                <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+                <style>
+                    @page {
+                        size: A4 landscape;
+                        margin: 8mm 10mm;
+                    }
+                    * {
+                        box-sizing: border-box;
+                        font-family: 'Jameel Noori Nastaleeq', 'Noto Sans Urdu', 'Segoe UI', Tahoma, sans-serif;
+                    }
+                    body {
+                        background: #f8fafc;
+                        color: #0f172a;
+                        direction: rtl;
+                        margin: 0;
+                        padding: 12px;
+                        font-size: 0.95rem;
+                        overflow-x: auto;
+                    }
+                    .ledger-container {
+                        width: 100%;
+                        max-width: 282mm;
+                        margin: 0 auto;
+                        background: white;
+                        border: 2px solid #065f46;
+                        border-radius: 10px;
+                        padding: 14px 18px;
+                        box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+                        position: relative;
+                        box-sizing: border-box;
+                    }
+                    .watermark {
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 440px;
+                        opacity: 0.06;
+                        pointer-events: none;
+                        z-index: 0;
+                    }
+                    .header-box {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-bottom: 2px double #065f46;
+                        padding-bottom: 8px;
+                        margin-bottom: 12px;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .logo-img {
+                        width: 68px;
+                        height: 68px;
+                        border-radius: 50%;
+                        border: 1.5px solid #065f46;
+                        padding: 2px;
+                        object-fit: contain;
+                        background: white;
+                    }
+                    .madrsa-title {
+                        text-align: center;
+                        flex-grow: 1;
+                    }
+                    .madrsa-title h2 {
+                        margin: 3px 0 0 0;
+                        background: #065f46;
+                        color: white;
+                        display: inline-block;
+                        padding: 2px 28px;
+                        border-radius: 18px;
+                        font-size: 1.15rem;
+                    }
+                    .staff-header-info {
+                        display: grid;
+                        grid-template-columns: repeat(6, 1fr);
+                        gap: 6px 12px;
+                        background: #f8fafc;
+                        border: 1.5px solid #065f46;
+                        border-radius: 8px;
+                        padding: 8px 12px;
+                        margin-bottom: 12px;
+                        font-size: 0.92rem;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .staff-header-info div span {
+                        color: #475569;
+                        font-size: 0.82rem;
+                        margin-left: 4px;
+                        display: block;
+                    }
+                    .staff-header-info div b {
+                        color: #0f172a;
+                        font-size: 0.98rem;
+                    }
+                    
+                    table {
+                        width: 100%;
+                        table-layout: fixed;
+                        border-collapse: collapse;
+                        font-size: 0.88rem;
+                        margin-bottom: 16px;
+                        box-sizing: border-box;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    th, td {
+                        border: 1px solid #cbd5e1;
+                        padding: 5px 4px;
+                        text-align: center;
+                        vertical-align: middle;
+                        overflow-wrap: break-word;
+                        word-break: break-word;
+                        box-sizing: border-box;
+                    }
+                    th {
+                        background: #f1f5f9;
+                        color: #1e293b;
+                        font-weight: bold;
+                        line-height: 1.25;
+                        padding: 6px 3px;
+                    }
+                    .txt-right { text-align: right; }
+                    .num { font-family: monospace; font-weight: bold; }
+
+                    .footer-signs {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-top: 25px;
+                        padding: 0 45px;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .sig-line {
+                        border-top: 1.5px dashed #065f46;
+                        width: 165px;
+                        text-align: center;
+                        padding-top: 5px;
+                        font-size: 0.92rem;
+                        font-weight: bold;
+                        color: #334155;
+                    }
+                    @media print {
+                        body { background: white !important; padding: 0 !important; margin: 0 !important; }
+                        .ledger-container { border: 2px solid #065f46 !important; box-shadow: none !important; width: 100% !important; max-width: 100% !important; padding: 8mm 10mm !important; margin: 0 !important; }
+                        table { width: 100% !important; table-layout: fixed !important; }
+                        .no-print { display: none !important; }
+                        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    }
+                </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
+                <script>
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'landscape', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'لیجر_تنخواہ') + '.pdf';
+                    const targetEl = document.querySelector('.ledger-container') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            const margin = 5;
+                            const maxW = pWidth - (margin * 2);
+                            const maxH = pHeight - (margin * 2);
+                            let finalW = maxW;
+                            let finalH = (imgProps.height * maxW) / imgProps.width;
+                            if (finalH > maxH) {
+                                finalH = maxH;
+                                finalW = (imgProps.width * maxH) / imgProps.height;
+                            }
+                            const x = (pWidth - finalW) / 2;
+                            const y = (pHeight - finalH) / 2;
+                            pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
+                            pdf.save(safeName);
+                        } catch (err) {
+                            console.error('PDF export error:', err);
+                            window.print();
+                        } finally {
+                            if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        }
+                    };
+                    if (typeof html2canvas !== 'undefined') {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' })
+                            .then(doExport)
+                            .catch(err => {
+                                console.error('html2canvas error:', err);
+                                if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                                window.print();
+                            });
+                    } else {
+                        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        window.print();
+                    }
+                }
+                function downloadDoc(filename, orientation = 'landscape', format = 'a4') { downloadPDF(filename, orientation, format); }
+                </script>
+            </head>
+            <body>
+                <div class="ledger-container">
+                    <img src="${LOGO_DATA_URI}" class="watermark" alt="Watermark">
+                    <div class="header-box">
+                        <img src="${LOGO_DATA_URI}" class="logo-img" alt="لوگو">
+                        <div class="madrsa-title">
+                            <img src="${TITLE_DATA_URI}" alt="مدرسہ عبد الرحمن بن عوف" style="max-height:52px; max-width:85%; object-fit:contain; mix-blend-mode:multiply; display:block; margin:0 auto 2px auto;">
+                            <h2>ملازم باضابطہ تنخواہ کھاتہ لیجر (Salary Ledger)</h2>
+                            <div style="font-size:0.88rem; color:#065f46; font-weight:bold; margin-top:2px;">چک نمبر 10-28 آر بوسال کالونی، ضلع خانیوال — سیشن ${year}ء</div>
+                        </div>
+                        <div style="text-align:center; border:1.5px solid #065f46; border-radius:8px; padding:6px 14px; background:#f0fdf4;">
+                            <div style="font-size:0.75rem; color:#065f46; font-weight:bold;">مالیاتی سال</div>
+                            <div style="font-family:monospace; font-weight:bold; font-size:1.2rem; color:#065f46;">${year}ء</div>
+                            <div style="font-size:0.75rem; color:#64748b;">پرنٹ: ${new Date().toLocaleDateString('ur-PK')}</div>
+                        </div>
+                    </div>
+
+                    <!-- Staff Basic Info Bar (اوپر فقط نام و ضروری کوائف - لینڈ اسکیپ) -->
+                    <div class="staff-header-info">
+                        <div><span>نامِ ملازم / استاد:</span> <b>${staff.name}</b></div>
+                        <div><span>ولدیت / زوجیت:</span> <b>${staff.fatherName || '---'}</b></div>
+                        <div><span>ملازم کوڈ:</span> <b style="font-family:monospace; color:#1d4ed8;">${code}</b></div>
+                        <div><span>عہدہ / منصب:</span> <b>${staff.designation || 'مدرس'}</b></div>
+                        <div><span>مقررہ ماہانہ مشاہرہ:</span> <b class="num" dir="ltr" style="color:#059669;">Rs. ${(parseInt(staff.salary || 0)).toLocaleString()}</b></div>
+                        <div><span>رابطہ نمبر:</span> <b dir="ltr">${staff.phone || '---'}</b></div>
+                    </div>
+
+                    <!-- Comprehensive Ledger History Table (صرف ادائیگیوں کا لیجر - A4 Landscape) -->
+                    <div style="width:100%; overflow-x:auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:3.5%;">#</th>
+                                    <th style="width:9%;">تاریخ</th>
+                                    <th style="width:7.5%;">برائے ماہ</th>
+                                    <th style="width:9%;">پرچی نمبر</th>
+                                    <th style="width:9%;">بنیادی</th>
+                                    <th style="width:7.5%;">الاؤنس</th>
+                                    <th style="width:8.5%;">کٹوتی/قسط</th>
+                                    <th style="width:9%;">کل واجب</th>
+                                    <th style="width:9.5%;">ادا شدہ</th>
+                                    <th style="width:8.5%;">بقایا</th>
+                                    <th style="width:19%;" class="txt-right">اقساط کا تذکرہ و ریمارکس</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${yearSalaries.map((s, idx) => {
+                                    const d = new Date(s.paymentDate || Date.now());
+                                    const dStr = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+                                    const totalCut = parseInt(s.deductions || 0) + parseInt(s.advanceDeduction || 0) + parseInt(s.installment || 0);
+                                    
+                                    let noteStr = '';
+                                    if (s.installment > 0) {
+                                        noteStr += `[قسط: Rs. ${s.installment} (${s.installmentDetails || 'قسط'})] `;
+                                    }
+                                    if (s.allowanceDetails) {
+                                        noteStr += `[الاؤنس: ${s.allowanceDetails}] `;
+                                    }
+                                    if (s.deductionDetails) {
+                                        noteStr += `[کٹوتی: ${s.deductionDetails}] `;
+                                    }
+                                    if (s.notes) {
+                                        noteStr += s.notes;
+                                    }
+                                    if (!noteStr) noteStr = 'ماہانہ باضابطہ تنخواہ';
+
+                                    return `
+                                        <tr>
+                                            <td>${idx + 1}</td>
+                                            <td class="num" style="font-size:0.82rem;">${dStr}</td>
+                                            <td style="font-weight:bold; color:#065f46;">${s.month}</td>
+                                            <td class="num" style="color:#0284c7; font-size:0.82rem;">${s.payslipNo || '---'}</td>
+                                            <td class="num" style="font-size:0.84rem;">Rs. ${(parseInt(s.baseSalary || 0)).toLocaleString()}</td>
+                                            <td class="num" style="color:#059669; font-size:0.84rem;">${s.allowances > 0 ? ('Rs. ' + s.allowances.toLocaleString()) : '—'}</td>
+                                            <td class="num" style="color:#dc2626; font-size:0.84rem;">${totalCut > 0 ? ('Rs. ' + totalCut.toLocaleString()) : '—'}</td>
+                                            <td class="num" style="color:#1e293b; font-size:0.84rem;">Rs. ${(parseInt(s.totalDue || s.netSalary || 0)).toLocaleString()}</td>
+                                            <td class="num" style="color:#059669; font-size:0.9rem;">Rs. ${(parseInt(s.paidNow || s.netSalary || 0)).toLocaleString()}</td>
+                                            <td class="num" style="color:${s.arrears > 0 ? '#dc2626' : '#16a34a'}; font-size:0.84rem;">${s.arrears > 0 ? ('Rs. ' + s.arrears.toLocaleString()) : 'بے باق ✓'}</td>
+                                            <td class="txt-right" style="font-size:0.82rem; line-height:1.25;">${noteStr}</td>
+                                        </tr>
+                                    `;
+                                }).join('') || `<tr><td colspan="11" style="text-align:center; padding:2.5rem; color:#94a3b8; font-size:1.1rem;">سال ${year} میں تاحال کوئی تنخواہ ادائیگی کا ریکارڈ موجود نہیں ہے</td></tr>`}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background:#f8fafc; font-weight:bold; border-top:2px solid #cbd5e1;">
+                                    <td colspan="4" class="txt-right" style="padding:6px 8px;">
+                                        <i class="fas fa-calculator" style="color:#065f46;"></i> مجموعی میزان:
+                                    </td>
+                                    <td>—</td>
+                                    <td class="num" style="color:#059669; font-size:0.84rem;">Rs. ${totalAllowances.toLocaleString()}</td>
+                                    <td class="num" style="color:#7e22ce; font-size:0.84rem;">Rs. ${totalDeductions.toLocaleString()}</td>
+                                    <td>—</td>
+                                    <td class="num" style="color:#059669; font-size:0.95rem;">Rs. ${totalPaidYear.toLocaleString()}</td>
+                                    <td class="num" style="color:${currentArrears > 0 ? '#dc2626' : '#16a34a'}; font-size:0.84rem;">${currentArrears > 0 ? ('Rs. ' + currentArrears.toLocaleString()) : 'بے باق ✓'}</td>
+                                    <td class="txt-right" style="font-size:0.8rem; color:#64748b; padding:4px 6px;">کل ادا شدہ اقساط و تنخواہ کھاتہ</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <div class="footer-signs">
+                        <div class="sig-line">دستخط ملازم / استاد</div>
+                        <div class="sig-line">دستخط ناظمِ مالیات / خزانچی</div>
+                        <div class="sig-line">مہر و دستخط مہتمم ادارہ</div>
                     </div>
                 </div>
-                <div class="no-print" style="text-align:center; margin-top:30px;">
-                    <button onclick="window.print()" style="padding:10px 40px; background:#065f46; color:white; border:none; border-radius:5px; cursor:pointer; font-size:1.1rem;">پرنٹ کریں</button>
+
+                <div class="no-print" style="position:fixed; bottom:20px; left:0; right:0; text-align:center; z-index:999; display:flex; justify-content:center; gap:12px;">
+                    <button onclick="window.print()" style="padding:11px 35px; background:#065f46; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.15rem; font-weight:bold; box-shadow:0 6px 16px rgba(6,95,70,0.35); font-family:inherit;">
+                        <i class="fas fa-print"></i> پرنٹ کریں (A4 Landscape)
+                    </button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('تنخواہ_لیجر_${(staff.name || 'Staff').replace(/['\"\\s]+/g, '_')}_${year}', 'landscape', 'a4')" style="padding:11px 25px; background:#dc2626; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.15rem; font-weight:bold; box-shadow:0 6px 16px rgba(220,38,38,0.35); font-family:inherit; display:inline-flex; align-items:center; gap:8px;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)
+                    </button>
+                    <button onclick="window.close()" style="padding:11px 25px; background:#64748b; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.15rem; font-weight:bold; box-shadow:0 6px 16px rgba(100,116,139,0.25); font-family:inherit;">
+                        <i class="fas fa-times"></i> بند کریں
+                    </button>
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    }
+
+    // --- Master Monthly Payroll Sheet (A4 Landscape برائے تمام عملہ) ---
+    async printMonthlyPayrollSheet(month = null, year = null) {
+        const staff = (await MadrassahDB.getAllTeachers()) || [];
+        const selectedMonth = month || this.salaryMonth || 'جنوری';
+        const selectedYear = parseInt(year || this.salaryYear || new Date().getFullYear());
+        const salaries = (await MadrassahDB.getSalariesByMonth(selectedMonth, selectedYear)) || [];
+
+        const totalBase = staff.reduce((sum, s) => sum + parseInt(s.salary || 0), 0);
+        const totalPaid = salaries.reduce((sum, s) => sum + parseInt(s.paidNow || s.netSalary || 0), 0);
+        const totalArrears = salaries.reduce((sum, s) => sum + parseInt(s.arrears || 0), 0);
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert('براہ کرم پاپ اپ ونڈو کھولنے کی اجازت دیجیے۔');
+            return;
+        }
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html lang="ur" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>ماہانہ پے رول شیٹ - ${selectedMonth} ${selectedYear}</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+                <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+                <style>
+                    @page {
+                        size: A4 landscape;
+                        margin: 8mm;
+                    }
+                    * {
+                        box-sizing: border-box;
+                        font-family: 'Jameel Noori Nastaleeq', 'Noto Sans Urdu', 'Segoe UI', Tahoma, sans-serif;
+                    }
+                    body {
+                        background: white;
+                        color: #0f172a;
+                        direction: rtl;
+                        margin: 0;
+                        padding: 10px;
+                        font-size: 0.92rem;
+                    }
+                    .sheet-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-bottom: 2px solid #065f46;
+                        padding-bottom: 6px;
+                        margin-bottom: 10px;
+                    }
+                    .sheet-header h1 {
+                        margin: 0;
+                        color: #065f46;
+                        font-size: 1.8rem;
+                        line-height: 1.1;
+                    }
+                    .sheet-header h2 {
+                        margin: 2px 0 0 0;
+                        color: #1e293b;
+                        font-size: 1.05rem;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 0.85rem;
+                        margin-bottom: 15px;
+                    }
+                    th, td {
+                        border: 1px solid #94a3b8;
+                        padding: 5px 6px;
+                        text-align: center;
+                        vertical-align: middle;
+                    }
+                    th {
+                        background: #f1f5f9;
+                        color: #0f172a;
+                        font-weight: bold;
+                        white-space: nowrap;
+                    }
+                    .txt-right { text-align: right; }
+                    .num { font-family: monospace; font-weight: bold; }
+                    .footer-signs {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-top: 25px;
+                        padding: 0 40px;
+                    }
+                    .sig-line {
+                        border-top: 1.5px dashed #065f46;
+                        width: 150px;
+                        text-align: center;
+                        padding-top: 4px;
+                        font-weight: bold;
+                        font-size: 0.9rem;
+                        color: #334155;
+                    }
+                    @media print {
+                        body { padding: 0; }
+                        .no-print { display: none !important; }
+                        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    }
+                </style>
+                <script src="assets/js/html2canvas.min.js"></script>
+                <script src="assets/js/jspdf.umd.min.js"></script>
+                <script>
+                if (typeof html2canvas === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>');
+                if (typeof window.jspdf === 'undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\\/script>');
+                </script>
+                <script>
+                function downloadPDF(filename, orientation = 'landscape', format = 'a4') {
+                    const btn = (window.event && window.event.currentTarget) ? window.event.currentTarget : document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'پے_رول_شیٹ') + '.pdf';
+                    const targetEl = document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const isLandscape = orientation === 'landscape';
+                            const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: format });
+                            const pWidth = isLandscape ? (format === 'a5' ? 210 : 297) : (format === 'a5' ? 148 : 210);
+                            const pHeight = isLandscape ? (format === 'a5' ? 148 : 210) : (format === 'a5' ? 210 : 297);
+                            const imgProps = pdf.getImageProperties(imgData);
+                            const margin = 5;
+                            const maxW = pWidth - (margin * 2);
+                            const maxH = pHeight - (margin * 2);
+                            let finalW = maxW;
+                            let finalH = (imgProps.height * maxW) / imgProps.width;
+                            if (finalH > maxH) {
+                                finalH = maxH;
+                                finalW = (imgProps.width * maxH) / imgProps.height;
+                            }
+                            const x = (pWidth - finalW) / 2;
+                            const y = (pHeight - finalH) / 2;
+                            pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
+                            pdf.save(safeName);
+                        } catch (err) {
+                            console.error('PDF export error:', err);
+                            window.print();
+                        } finally {
+                            if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        }
+                    };
+                    if (typeof html2canvas !== 'undefined') {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' })
+                            .then(doExport)
+                            .catch(err => {
+                                console.error('html2canvas error:', err);
+                                if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                                window.print();
+                            });
+                    } else {
+                        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
+                        window.print();
+                    }
+                }
+                function downloadDoc(filename, orientation = 'landscape', format = 'a4') { downloadPDF(filename, orientation, format); }
+                </script>
+            </head>
+            <body>
+                <div class="sheet-header">
+                    <div>
+                        <h1>مدرسہ عبد الرحمن بن عوف غفوریہ (خانیوال)</h1>
+                        <h2>ماہانہ پے رول و تقسیمِ تنخواہ گوشوارہ — برائے ماہ: <b style="color:#065f46;">${selectedMonth} ${selectedYear}ء</b></h2>
+                    </div>
+                    <div style="text-align:left; font-size:0.85rem; color:#475569;">
+                        <div><b>کل عملہ:</b> ${staff.length} ملازمین | <b>ادا شدہ:</b> ${salaries.length}</div>
+                        <div><b>تاریخِ پرنٹ:</b> ${new Date().toLocaleDateString('ur-PK')}</div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:25px;">#</th>
+                            <th style="width:70px;">ملازم کوڈ</th>
+                            <th style="width:130px;" class="txt-right">نامِ ملازم / استاد</th>
+                            <th style="width:90px;">عہدہ</th>
+                            <th style="width:75px;">بنیادی تنخواہ</th>
+                            <th style="width:65px;">الاؤنس</th>
+                            <th style="width:65px;">کٹوتی</th>
+                            <th style="width:75px;">اقساط کٹوتی</th>
+                            <th style="width:80px;">کل واجب</th>
+                            <th style="width:80px;">ادا شدہ رقم</th>
+                            <th style="width:70px;">بقایا تنخواہ</th>
+                            <th style="width:80px;">رسید نمبر</th>
+                            <th style="width:110px;">دستخطِ وصولی ملازم</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${staff.map((s, idx) => {
+                            const code = s.uniqueCode || ('EMP-' + (100 + parseInt(s.id)));
+                            const sal = salaries.find(item => item.staffId === s.id);
+                            return `
+                                <tr>
+                                    <td>${idx + 1}</td>
+                                    <td class="num" style="color:#1d4ed8;">${code}</td>
+                                    <td class="txt-right" style="font-weight:bold;">${s.name}</td>
+                                    <td>${s.designation || (s.staffType === 'teaching' || !s.staffType ? 'مدرس' : 'ملازم')}</td>
+                                    <td class="num">Rs. ${(parseInt(s.salary || 0)).toLocaleString()}</td>
+                                    <td class="num" style="color:#059669;">${sal && sal.allowances > 0 ? ('Rs. ' + sal.allowances.toLocaleString()) : '—'}</td>
+                                    <td class="num" style="color:#dc2626;">${sal && sal.deductions > 0 ? ('Rs. ' + sal.deductions.toLocaleString()) : '—'}</td>
+                                    <td class="num" style="color:#7e22ce;">${sal && sal.installment > 0 ? ('Rs. ' + sal.installment.toLocaleString()) : '—'}</td>
+                                    <td class="num">${sal ? ('Rs. ' + (parseInt(sal.totalDue || sal.netSalary || 0)).toLocaleString()) : ('Rs. ' + (parseInt(s.salary || 0)).toLocaleString())}</td>
+                                    <td class="num" style="color:${sal ? '#059669' : '#dc2626'}; font-weight:bold;">${sal ? ('Rs. ' + (parseInt(sal.paidNow || sal.netSalary || 0)).toLocaleString()) : 'باقی'}</td>
+                                    <td class="num" style="color:${sal && sal.arrears > 0 ? '#dc2626' : '#16a34a'};">${sal ? (sal.arrears > 0 ? ('Rs. ' + sal.arrears.toLocaleString()) : 'بے باق ✓') : '—'}</td>
+                                    <td class="num" style="color:#0284c7;">${sal ? sal.payslipNo : '—'}</td>
+                                    <td style="font-size:0.75rem; color:#94a3b8;">${sal ? 'بذریعہ پرچی ✓' : '________________'}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background:#f8fafc; font-weight:bold;">
+                            <td colspan="4" class="txt-right">میزان (Grand Total):</td>
+                            <td class="num">Rs. ${totalBase.toLocaleString()}</td>
+                            <td colspan="3">—</td>
+                            <td>—</td>
+                            <td class="num" style="color:#059669; font-size:1rem;">Rs. ${totalPaid.toLocaleString()}</td>
+                            <td class="num" style="color:${totalArrears > 0 ? '#dc2626' : '#16a34a'};">${totalArrears > 0 ? ('Rs. ' + totalArrears.toLocaleString()) : 'بے باق'}</td>
+                            <td colspan="2">مجموعی پے رول کیفیت</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="footer-signs">
+                    <div class="sig-line">تیار کنندہ (اکاؤنٹنٹ)</div>
+                    <div class="sig-line">تصدیق کنندہ (ناظم تعلیمات)</div>
+                    <div class="sig-line">منظور کنندہ (مہر و دستخط مہتمم)</div>
+                </div>
+
+                <div class="no-print" style="text-align:center; margin-top:20px; display:flex; justify-content:center; gap:12px;">
+                    <button onclick="window.print()" style="padding:8px 30px; background:#065f46; color:white; border:none; border-radius:20px; font-weight:bold; font-size:1rem; cursor:pointer;">
+                        <i class="fas fa-print"></i> پرنٹ کریں (A4 Landscape)
+                    </button>
+                    <button class="btn-pdf-download" onclick="downloadPDF('ماہانہ_پے_رول_${selectedMonth}_${selectedYear}', 'landscape', 'a4')" style="padding:8px 25px; background:#dc2626; color:white; border:none; border-radius:20px; font-weight:bold; font-size:1rem; cursor:pointer; box-shadow:0 4px 10px rgba(220,38,38,0.35); display:inline-flex; align-items:center; gap:6px;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)
+                    </button>
+                    <button onclick="window.close()" style="padding:8px 20px; background:#64748b; color:white; border:none; border-radius:20px; font-weight:bold; font-size:1rem; cursor:pointer;">
+                        <i class="fas fa-times"></i> بند کریں
+                    </button>
                 </div>
             </body>
             </html>
@@ -13743,15 +18584,22 @@ downloadReceiptImageDirect(options) {
     }
 
     filterStudents(query) {
-        const rows = document.querySelectorAll('#studentTable tbody tr');
-        rows.forEach(row => {
-            const text = row.innerText.toLowerCase();
-            row.style.display = text.includes(query.toLowerCase()) ? '' : 'none';
-        });
+        const sInput = document.getElementById('studentSearch');
+        if (sInput) sInput.value = query || '';
+        if (typeof this.filterStudentsTable === 'function') {
+            this.filterStudentsTable();
+        } else {
+            const rows = document.querySelectorAll('#studentTable tbody tr');
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes((query || '').toLowerCase()) ? '' : 'none';
+            });
+        }
     }
 }
 
 window.app = new MadrassahApp();
+window.mmsApp = window.app;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (window.app && window.app.render) {
