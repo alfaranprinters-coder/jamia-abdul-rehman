@@ -94,6 +94,11 @@ const DonorsModule = {
         if (!container) container = document.getElementById('main-content');
         if (!container) return;
 
+        if (window.app && typeof window.app.isFinanceAccessGranted === 'function' && !window.app.isFinanceAccessGranted()) {
+            window.app.renderFinanceLockScreen(container, 'donors');
+            return;
+        }
+
         container.innerHTML = '<div style="text-align:center; padding: 4rem;"><div class="mms-spinner"></div></div>';
 
         let donors = [];
@@ -163,6 +168,12 @@ const DonorsModule = {
                             </button>
                             <button onclick="DonorsModule.showDonationModal()" class="btn" style="background:#ffffff; color:#065f46; font-weight:bold; font-size:1.05rem; padding:10px 20px; border-radius:10px; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
                                 <i class="fas fa-hand-holding-dollar"></i> رقم وصول کریں (فوری رسید)
+                            </button>
+                            <button class="btn" onclick="app.showChangeFinancePasscodeModal()" style="background:#4338ca; color:white; border:none; border-radius:10px; font-weight:bold; padding:10px 15px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(67,56,202,0.25); cursor:pointer;" title="مالیات و عطیات کا سیکیورٹی پاس کوڈ تبدیل کریں">
+                                <i class="fas fa-key"></i> کوڈ تبدیل کریں
+                            </button>
+                            <button class="btn" onclick="app.lockFinanceSection()" style="background:#475569; color:white; border:none; border-radius:10px; font-weight:bold; padding:10px 15px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(71,85,105,0.2); cursor:pointer;" title="سیکشن کو دوبارہ لاک کریں">
+                                <i class="fas fa-lock"></i> لاک کریں
                             </button>
                         </div>
                     </div>

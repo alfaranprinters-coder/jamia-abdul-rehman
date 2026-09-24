@@ -155,78 +155,40 @@
 </head>
 <body class="mms-dashboard-body">
     <!-- =========================================================================
-         --- WELCOME & LOGIN SCREEN (FULL PAGE HERO) ---
+         --- WELCOME & LOGIN SCREEN (MINIMALIST & ELEGANT) ---
          ========================================================================= -->
     <div id="welcome-login-screen">
-        <div class="welcome-inner-wrap">
-            <!-- Right Hero Section -->
-            <div class="welcome-hero">
-                <div class="welcome-bismillah-badge">
-                    <i class="fas fa-star-and-crescent" style="color:#f59e0b; margin-left:6px;"></i> بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+        <div class="welcome-screen-content">
+            
+            <!-- 1 & 2: OUTSIDE TOP - Bismillah, Madrassah Logo, and Name -->
+            <div class="welcome-outside-header">
+                <!-- Bismillah in Beautiful Calligraphy -->
+                <div class="welcome-bismillah">
+                    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
                 </div>
 
-                <div class="welcome-title-card">
-                    <img src="madrsa-title.png" alt="مدرسہ عبد الرحمن بن عوف غفوریہ" class="welcome-title-img">
-                </div>
-
-                <div class="welcome-headings">
-                    <h1>جامعہ و مدرسہ عبد الرحمن بن عوف غفوریہ</h1>
-                    <p>جامع نظامِ انتظام و انصرام برائے بنین و بنات (Madrassah Pro Management System)</p>
-                </div>
-
-                <div class="welcome-hadith-box">
-                    <i class="fas fa-quran" style="font-size:1.4rem; color:#f59e0b;"></i>
-                    <div>
-                        <b>«خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ»</b>
-                        <span style="font-size:0.92rem; opacity:0.85; display:block; margin-top:2px;">(تم میں سے بہترین وہ ہے جو قرآن سیکھے اور سکھائے — صحیح بخاری)</span>
+                <!-- Madrassah Logo & Calligraphy Name -->
+                <div class="welcome-madrassah-brand">
+                    <div class="welcome-logo-circle">
+                        <img src="logo.png" alt="مدرسہ لوگو" class="welcome-logo-img" onerror="this.src='logo.jpg'">
                     </div>
-                </div>
-
-                <!-- 4 Highlights Grid -->
-                <div class="welcome-features-grid">
-                    <div class="welcome-feature-item">
-                        <div class="feat-icon"><i class="fas fa-venus-mars"></i></div>
-                        <div class="feat-title">شعبہ بنین و بنات</div>
-                        <div class="feat-desc">طلباء و طالبات کا مکمل الگ، منظم اور خودکار ریکارڈ</div>
-                    </div>
-                    <div class="welcome-feature-item">
-                        <div class="feat-icon"><i class="fas fa-book-quran"></i></div>
-                        <div class="feat-title">حفظ و درس نظامی</div>
-                        <div class="feat-desc">وفاق المدارس کا نصاب، روزانہ حاضری اور تفصیلی جائزے</div>
-                    </div>
-                    <div class="welcome-feature-item">
-                        <div class="feat-icon"><i class="fas fa-vault"></i></div>
-                        <div class="feat-title">بیت المال و فیس نظام</div>
-                        <div class="feat-desc">مصدقہ رسیدیں (پرنٹ، پی ڈی ایف، پی این جی) اور لیجر</div>
-                    </div>
-                    <div class="welcome-feature-item">
-                        <div class="feat-icon"><i class="fas fa-cloud-arrow-up"></i></div>
-                        <div class="feat-title">بیک اپ و ڈیٹا تحفظ</div>
-                        <div class="feat-desc">100٪ تیز رفتار آف لائن اور گوگل ڈرائیو پر خودکار سنک</div>
+                    <div class="welcome-madrassah-calligraphy-wrap">
+                        <img src="madrsa-title.png" alt="مدرسہ عبد الرحمن بن عوف غفوریہ" class="welcome-madrassah-calligraphy">
                     </div>
                 </div>
             </div>
 
-            <!-- Left Login Card -->
-            <div class="welcome-login-card" style="position: relative;">
-                <button type="button" onclick="window.enterSoftwareDirectly()" style="position:absolute; top:14px; left:14px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:50%; width:34px; height:34px; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.08); z-index:10;" title="سافٹ ویئر کھولیں">
-                    <i class="fas fa-xmark"></i>
-                </button>
-                <div class="welcome-login-header">
-                    <img src="logo.jpg" alt="مدرسہ عبد الرحمن بن عوف" class="welcome-login-logo">
-                    <h2>خوش آمدید! لاگ ان فرمائیں</h2>
-                    <p>سافٹ ویئر تک باحفاظت رسائی کے لیے پاسورڈ درج فرمائیں</p>
-                </div>
-
-                <div id="login-error-alert" class="login-alert-error">
+            <!-- 3: THE WHITE LOGIN CARD (خانہ) -->
+            <div class="welcome-login-card">
+                <div id="login-error-alert" class="login-alert-error" style="display:none;">
                     <i class="fas fa-circle-exclamation"></i>
                     <span id="login-error-text">پاسورڈ درست نہیں ہے۔ دوبارہ کوشش کریں۔</span>
                 </div>
 
                 <form onsubmit="var pass = document.getElementById('login-password-input')?.value; if (window.app && typeof window.app.handleLogin === 'function') { window.app.handleLogin(event); } else { if(event) event.preventDefault(); window.enterSoftwareDirectly(pass); } return false;">
-                    <div class="login-form-group">
-                        <label class="login-form-label" for="login-password-input">
-                            <i class="fas fa-lock" style="color:#059669;"></i> سیکیورٹی پاسورڈ (Password)
+                    <div class="login-field-group">
+                        <label class="login-field-label" for="login-password-input">
+                            <i class="fas fa-shield-halved" style="color:var(--primary, #065f46);"></i> سیکیورٹی پاسورڈ (Password)
                         </label>
                         <div class="login-input-wrap">
                             <i class="fas fa-key login-icon-right"></i>
@@ -237,45 +199,35 @@
                         </div>
                     </div>
 
-                    <div class="login-options-row">
+                    <div class="login-options-bar">
                         <label class="login-remember-label">
                             <input type="checkbox" id="login-remember-checkbox" checked>
-                            <span>لاگ ان یاد رکھیں (Remember Me)</span>
+                            <span>لاگ ان یاد رکھیں</span>
                         </label>
+                        <!-- Hidden element for app.js compatibility without showing in UI -->
+                        <span id="login-current-pass-hint" style="display:none;">123</span>
                     </div>
 
                     <button type="submit" class="btn-login-submit" id="btn-login-submit" onclick="var pass = document.getElementById('login-password-input')?.value; if (window.app && typeof window.app.handleLogin === 'function') { window.app.handleLogin(event); } else { if(event) event.preventDefault(); window.enterSoftwareDirectly(pass); }">
-                        <i class="fas fa-right-to-bracket"></i> داخل ہوں (Sign In)
+                        <i class="fas fa-arrow-right-to-bracket"></i> لاگ ان (Sign In)
                     </button>
-
-                    <button type="button" onclick="window.enterSoftwareDirectly()" class="btn-login-submit" style="background:#16a34a; margin-top:10px; width:100%; border:none; cursor:pointer;">
-                        <i class="fas fa-door-open"></i> براہِ راست سافٹ ویئر کھولیں (بغیر پاسورڈ)
-                    </button>
-
-                    <div class="login-hint-badge" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                        <div>
-                            <i class="fas fa-circle-info" style="color:#d97706;"></i>
-                            <span>فعال پاسورڈ: <strong id="login-current-pass-hint" style="font-family:monospace; font-size:1.1rem; color:#0f766e; background:#fef3c7; padding:2px 8px; border-radius:4px; margin-right:4px;">123</strong></span>
-                        </div>
-                        <button type="button" onclick="if(window.app && typeof window.app.autoFillPassword === 'function') { window.app.autoFillPassword(); } else { const el=document.getElementById('login-password-input'); if(el) el.value='123'; }" style="background:transparent; border:none; color:#2563eb; font-size:0.85rem; font-weight:bold; cursor:pointer; text-decoration:underline;">
-                            خودکار درج کریں
-                        </button>
-                    </div>
-
-                    <div style="text-align:center; margin-top:10px;">
-                        <button type="button" onclick="if (window.app && typeof window.app.quickLoginWithDefault === 'function') { window.app.quickLoginWithDefault(); } else { window.enterSoftwareDirectly(); }" style="background:#f0fdf4; border:1.5px solid #86efac; color:#166534; padding:8px 16px; border-radius:8px; font-weight:bold; font-size:0.88rem; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 4px rgba(0,0,0,0.05); width:100%; justify-content:center;">
-                            <i class="fas fa-unlock-keyhole" style="color:#16a34a;"></i> پاسورڈ 123 پر ری سیٹ کریں اور داخل ہوں
-                        </button>
-                    </div>
                 </form>
+            </div>
 
-                <div class="welcome-card-footer">
-                    <span>ڈیزائن و ڈویلپمنٹ: <b>محمد ادریس شاہین</b></span>
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <span>Powered by</span>
-                        <img src="novatix-logo.jpg" alt="NOVATIX">
-                    </div>
-                </div>
+        </div>
+
+        <!-- 4: OUTSIDE BOTTOM CORNERS - Developer Name (Right) and Novatix Logo (Left) -->
+        <div class="welcome-bottom-corners-bar">
+            <!-- Right Corner: Developer Name -->
+            <div class="corner-developer-info">
+                <span class="corner-dev-by">Designed & Developed by</span>
+                <span class="corner-dev-name">Muhammad Idrees Shaheen</span>
+            </div>
+
+            <!-- Left Corner: Novatix Logo & Branding -->
+            <div class="corner-novatix-info">
+                <img src="novatix-logo.jpg" alt="NOVATIX" class="corner-novatix-logo">
+                <span class="corner-novatix-text">NOVATIX</span>
             </div>
         </div>
     </div>

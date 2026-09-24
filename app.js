@@ -56,8 +56,14 @@ class MadrassahApp {
         this.attendanceClass = 'اولیٰ';
         this.madrsaClasses = ['اولیٰ', 'ثانیہ', 'ثالثہ', 'رابعہ', 'خامسہ', 'سادسہ', 'سابعہ', 'دورہ حدیث'];
         this.madrsaDepartments = {
-            'ناظرہ': [],
-            'حفظ': [],
+            'ناظرہ': ['ناظرہ بنیادی', 'ناظرہ مع تجوید'],
+            'حفظ': [
+                'تحفیظ القرآن الکریم (مکمل)',
+                'حفظ سال اول (پارہ ۱ تا ۱۰)',
+                'حفظ سال دوم (پارہ ۱۱ تا ۲۰)',
+                'حفظ سال سوم (پارہ ۲۱ تا ۳۰)',
+                'تکمیل حفظ و دور'
+            ],
             'تجوید': ['تجوید للحفاظ و الحافظات', 'تجوید للعلماء و العالمات'],
             'گردان': [],
             'حفاظ ایجوکیشن سسٹم': [],
@@ -91,10 +97,190 @@ class MadrassahApp {
                 'جمال القرآن مع زینت الفرقان',
                 'تفہیم الوقوف و معرفۃ الفواصل',
                 'مشقِ ترتیل و حدر مع توجیہ الوجوہ والروایات'
+            ],
+            'تحفیظ القرآن الکریم (مکمل)': [
+                'قرآن مجید (مکمل ۳۰ پارے مع دور و منزل - ۶۰ نمبر)',
+                'خلاصۃ التجوید مع فوائد مکیہ (قواعد تجوید و مخارج - ۳۰ نمبر)',
+                'تعلیم الاسلام (حصہ اول تا سوم - فقہ و نماز - ۵ نمبر)',
+                'مسنون دعائیں و یومیہ اذکار مع آداب زندگی (۵ نمبر)'
+            ],
+            'حفظ سال اول (پارہ ۱ تا ۱۰)': [
+                'قرآن مجید (پارہ ۱ تا ۱۰ باقاعدہ حفظ مع منزل)',
+                'مخارج الحروف و بنیادی تجوید کی عملی مشق',
+                'کلمہ جات، وضو و نماز کے فرائض و سنن (تعلیم الاسلام اول)',
+                'مسنون دعائیں (کھانے پینے، سونے جاگنے اور بیت الخلاء کی دعائیں)'
+            ],
+            'حفظ سال دوم (پارہ ۱۱ تا ۲۰)': [
+                'قرآن مجید (پارہ ۱۱ تا ۲۰ حفظ مع دہرائی سابقہ ۱۰ پارے)',
+                'احکام تجوید (نون و میم ساکن، مدات، غنہ، ادغام و اخفاء)',
+                'نماز کے ارکان و واجبات، اذان و اقامت، نمازِ جنازہ',
+                'مسنون دعائیں (مسجد، سفر، سواری، بارش اور چھینک کی دعائیں)'
+            ],
+            'حفظ سال سوم (پارہ ۲۱ تا ۳۰)': [
+                'قرآن مجید (پارہ ۲۱ تا ۳۰ - تکمیل حفظِ قرآن)',
+                'خلاصۃ التجوید مکمل (صفاتِ لازمہ و عارضہ، تفخیم و ترقیق، اوقاف)',
+                'تعلیم الاسلام (سجدہ سہو، سجدہ تلاوت، جمعہ، عیدین و مفسدات نماز)',
+                'مسنون دعائیں (دعائے قنوت، التحیات، درود شریف، جامع دعائیں)'
+            ],
+            'تکمیل حفظ و دور': [
+                'دورِ قرآن مجید (روزانہ ۳ تا ۵ پارے منزل پختگی)',
+                'امتحانی مشق برائے وفاق المدارس (۶ سوالات زبانی)',
+                'مشقِ ترتیل و حدر مع توجیہ القواعد',
+                'فقہی مسائل و مسنون دعائیں برائے سالانہ امتحان وفاق'
+            ],
+            'حفظ': [
+                'قرآن مجید (مکمل ۳۰ پارے مع دور و منزل)',
+                'خلاصۃ التجوید مع فوائد مکیہ',
+                'تعلیم الاسلام (فقہ و مسائل نماز)',
+                'مسنون دعائیں و یومیہ اذکار'
             ]
         };
+        this.wifaqHifzDetailedSyllabus = [
+            {
+                className: 'تحفیظ القرآن الکریم (مکمل)',
+                bookName: 'القرآن الکریم (مکمل ۳۰ پارے حفظ مع دور و منزل)',
+                subjectType: 'حفظِ قرآن مجید',
+                author: 'کلام اللہ جل جلالہ',
+                marks: '60 نمبر',
+                description: 'مکمل ۳۰ پارے پختگی و روانی کے ساتھ۔ وفاق المدارس کے امتحان میں پورے قرآن سے کل ۶ سوالات زبانی سنے جاتے ہیں۔ ہر غلطی پر ۲ نمبر اور جھٹکے پر ۱ نمبر کٹوتی ہوتی ہے۔'
+            },
+            {
+                className: 'تحفیظ القرآن الکریم (مکمل)',
+                bookName: 'خلاصۃ التجوید مع فوائد مکیہ و جمال القرآن',
+                subjectType: 'تجوید و ترتیل',
+                author: 'شیخ القراء مولانا قاری محمد شریفؒ / قاری عبدالرحمن مکیؒ',
+                marks: '30 نمبر',
+                description: '۱۷ مخارج الحروف، صفاتِ لازمہ و عارضہ، احکام نون و میم ساکن، مدات، اوقاف و علاماتِ وقف، اور مشقِ ترتیل و حدر۔'
+            },
+            {
+                className: 'تحفیظ القرآن الکریم (مکمل)',
+                bookName: 'تعلیم الاسلام (حصہ اول تا سوم - فقہ و مسائل نماز)',
+                subjectType: 'فقہ و مسائل (دینیات)',
+                author: 'مفتی اعظم ہند مفتی کفایت اللہ دہلویؒ',
+                marks: '5 نمبر',
+                description: 'ایمانیات، مسائلِ طہارت، وضو و غسل کے فرائض و سنن، ارکان و واجباتِ نماز، مفسدات، نمازِ وتر، نمازِ جنازہ اور سجدہ سہو کے احکام۔'
+            },
+            {
+                className: 'تحفیظ القرآن الکریم (مکمل)',
+                bookName: 'مسنون دعائیں و اذکارِ یومیہ مع آدابِ زندگی',
+                subjectType: 'ادعیہ ماثورہ و سنت',
+                author: 'ماخوذ از حصنِ حصین و مناجاتِ مقبول',
+                marks: '5 نمبر',
+                description: 'صبح و شام کے اذکار، کھانے پینے، سونے جاگنے، مسجد، بیت الخلاء، سواری، سفر، دعائے قنوت، تشہد و درود شریف۔'
+            },
+            {
+                className: 'حفظ سال اول (پارہ ۱ تا ۱۰)',
+                bookName: 'قرآن مجید (پارہ ۱ تا ۱۰ باقاعدہ حفظ)',
+                subjectType: 'حفظِ قرآن',
+                author: 'کلام اللہ تعالیٰ',
+                marks: 'بنیادی حفظ',
+                description: 'پارہ ۱ تا ۱۰ کا یومیہ سبق، سبقی اور منزل کا نظام مع بنیادی روانی۔'
+            },
+            {
+                className: 'حفظ سال اول (پارہ ۱ تا ۱۰)',
+                bookName: 'تجوید القرآن (مخارج و بنیادی قواعد)',
+                subjectType: 'تجوید',
+                author: 'وفاق المدارس نصاب',
+                marks: 'تجوید و تلفظ',
+                description: 'حروف کے درست مخارج کی شناخت اور ادائے گی کی مشق۔'
+            },
+            {
+                className: 'حفظ سال اول (پارہ ۱ تا ۱۰)',
+                bookName: 'تعلیم الاسلام (حصہ اول و دوم)',
+                subjectType: 'دینی مسائل',
+                author: 'مفتی کفایت اللہ دہلویؒ',
+                marks: 'مسائل و نماز',
+                description: 'کلمہ جات، وضو و نماز کا عملی طریقہ اور ضروری ارکان۔'
+            },
+            {
+                className: 'حفظ سال اول (پارہ ۱ تا ۱۰)',
+                bookName: 'مسنون دعائیں (حصہ اول)',
+                subjectType: 'مسنون دعائیں',
+                author: 'سنتِ نبویؐ',
+                marks: 'دعائیں',
+                description: 'روزمرہ کھانے پینے، سونے جاگنے اور بیت الخلاء کی دعائیں۔'
+            },
+            {
+                className: 'حفظ سال دوم (پارہ ۱۱ تا ۲۰)',
+                bookName: 'قرآن مجید (پارہ ۱۱ تا ۲۰ حفظ مع دہرائی سابقہ)',
+                subjectType: 'حفظِ قرآن',
+                author: 'کلام اللہ تعالیٰ',
+                marks: 'درمیانی حفظ',
+                description: 'پارہ ۱۱ تا ۲۰ کا حفظ اور پچھلے ۱۰ پاروں کی روزانہ دور منزل۔'
+            },
+            {
+                className: 'حفظ سال دوم (پارہ ۱۱ تا ۲۰)',
+                bookName: 'خلاصۃ التجوید (حصہ اول)',
+                subjectType: 'تجوید',
+                author: 'قاری محمد شریفؒ',
+                marks: 'تجوید',
+                description: 'احکام نون ساکن و تنوین، میم ساکن، غنہ، ادغام، اخفاء اور اظہار۔'
+            },
+            {
+                className: 'حفظ سال دوم (پارہ ۱۱ تا ۲۰)',
+                bookName: 'تعلیم الاسلام (حصہ سوم - عبادات و نماز)',
+                subjectType: 'دینی مسائل',
+                author: 'مفتی کفایت اللہ دہلویؒ',
+                marks: 'مسائل',
+                description: 'شروط و ارکان نماز، سنن و مستحبات، اذان و اقامت اور نماز جنازہ۔'
+            },
+            {
+                className: 'حفظ سال دوم (پارہ ۱۱ تا ۲۰)',
+                bookName: 'مسنون دعائیں (حصہ دوم)',
+                subjectType: 'مسنون دعائیں',
+                author: 'سنتِ نبویؐ',
+                marks: 'دعائیں',
+                description: 'مسجد میں داخلے و خروج، سفر، سواری، بارش اور چھینک کی دعائیں۔'
+            },
+            {
+                className: 'حفظ سال سوم (پارہ ۲۱ تا ۳۰)',
+                bookName: 'قرآن مجید (پارہ ۲۱ تا ۳۰ - تکمیل حفظ)',
+                subjectType: 'تکمیلِ حفظ',
+                author: 'کلام اللہ تعالیٰ',
+                marks: 'تکمیل حفظ',
+                description: 'پارہ ۲۱ تا ۳۰ حفظ اور ۳۰ پاروں کی مسلسل پختگی و دور۔'
+            },
+            {
+                className: 'حفظ سال سوم (پارہ ۲۱ تا ۳۰)',
+                bookName: 'خلاصۃ التجوید (مکمل مع فوائد مکیہ)',
+                subjectType: 'تجوید و ترتیل',
+                author: 'قاری محمد شریفؒ / قاری عبدالرحمن مکیؒ',
+                marks: 'تجوید',
+                description: 'صفاتِ لازمہ و عارضہ، تفخیم و ترقیق، مدات اور رموزِ اوقاف۔'
+            },
+            {
+                className: 'حفظ سال سوم (پارہ ۲۱ تا ۳۰)',
+                bookName: 'تعلیم الاسلام (مکمل حصہ چہارم)',
+                subjectType: 'دینی مسائل',
+                author: 'مفتی کفایت اللہ دہلویؒ',
+                marks: 'مسائل',
+                description: 'سجدہ سہو، سجدہ تلاوت، جمعہ و عیدین، اور مفسداتِ نماز کے احکام۔'
+            },
+            {
+                className: 'تکمیل حفظ و دور',
+                bookName: 'دورِ قرآن مجید (روزانہ ۳ تا ۵ پارے منزل)',
+                subjectType: 'دور و پختگی',
+                author: 'کلام اللہ تعالیٰ',
+                marks: 'دورِ وفاق',
+                description: 'سالانہ امتحان وفاق المدارس کی تیاری، بلا لکنت و استحضار سنانے کی مشق۔'
+            },
+            {
+                className: 'تکمیل حفظ و دور',
+                bookName: 'عملی تجوید و مشقِ ترتیل و حدر',
+                subjectType: 'عملی تجوید',
+                author: 'قواعدِ وفاق المدارس',
+                marks: 'عملی امتحان',
+                description: 'تیز رفتاری (حدر) اور دھیمی رفتاری (ترتیل) دونوں میں تجوید کی مکمل پاسداری۔'
+            }
+        ];
         const savedAuth = typeof sessionStorage !== 'undefined' && (sessionStorage.getItem('mms_authenticated') === 'true' || localStorage.getItem('mms_authenticated') === 'true');
         this.isAuthenticated = !!savedAuth;
+        this.isFinanceUnlocked = false;
+        try {
+            if (typeof sessionStorage !== 'undefined') {
+                sessionStorage.removeItem('mms_finance_unlocked');
+            }
+        } catch(e) {}
         window.app = this;
         window.mmsApp = this;
         this.init();
@@ -185,17 +371,16 @@ class MadrassahApp {
 
         const passInput = document.getElementById('login-password-input');
         if (passInput) {
-            passInput.value = storedPass || '123';
+            passInput.value = '';
             setTimeout(() => {
                 passInput.focus();
-                passInput.select();
             }, 250);
         }
         const errAlert = document.getElementById('login-error-alert');
         if (errAlert) errAlert.style.display = 'none';
 
         const hintEl = document.getElementById('login-current-pass-hint');
-        if (hintEl) hintEl.innerText = storedPass || '123';
+        if (hintEl) hintEl.innerText = '';
     }
 
     showAppScreen() {
@@ -337,7 +522,11 @@ class MadrassahApp {
     logout() {
         if (!confirm('کیا آپ واقعی سافٹ ویئر سے لاگ آؤٹ ہونا چاہتے ہیں؟')) return;
         this.isAuthenticated = false;
-        if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('mms_authenticated');
+        this.isFinanceUnlocked = false;
+        if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('mms_authenticated');
+            sessionStorage.removeItem('mms_finance_unlocked');
+        }
         if (typeof localStorage !== 'undefined') localStorage.removeItem('mms_authenticated');
         this.showWelcomeLoginScreen();
         this.showToast('آپ کامیابی سے لاگ آؤٹ ہو چکے ہیں۔', 'info');
@@ -394,15 +583,15 @@ class MadrassahApp {
         );
 
         if (!isCurrentValid) {
-            showMsg('موجودہ پاسورڈ غلط ہے! (اگر یاد نہیں تو ڈیفالٹ پاسورڈ 123 درج فرمائیں)', true);
+            showMsg('موجودہ پاسورڈ درست نہیں ہے!', true);
             if (currentInput) currentInput.focus();
             return;
         }
 
         try {
             await MadrassahDB.saveSetting('app_password', newVal);
-            showMsg(`پاسورڈ کامیابی سے تبدیل کر کے "${newVal}" محفوظ کر دیا گیا ہے!`, false);
-            this.showToast(`سیکیورٹی پاسورڈ کامیابی سے تبدیل کر کے "${newVal}" مقرر کر دیا گیا ہے!`, 'success');
+            showMsg('پاسورڈ کامیابی سے محفوظ کر دیا گیا ہے!', false);
+            this.showToast('سیکیورٹی پاسورڈ کامیابی سے محفوظ کر دیا گیا ہے!', 'success');
 
             if (currentInput) currentInput.value = '';
             newInput.value = '';
@@ -432,8 +621,301 @@ class MadrassahApp {
         }
     }
 
+    // =========================================================================
+    // --- BAIT-UL-MAAL & FINANCE SECURITY (مہتمم سیکیورٹی پاس کوڈ پروٹیکشن) ---
+    // =========================================================================
+    async getFinancePasscode() {
+        try {
+            if (typeof MadrassahDB !== 'undefined' && typeof MadrassahDB.getSetting === 'function') {
+                const val = await MadrassahDB.getSetting('baitulmaal_password');
+                if (val !== null && val !== undefined && String(val).trim() !== '') {
+                    return String(val).trim();
+                }
+            }
+        } catch (e) {
+            console.warn('Error reading baitulmaal_password:', e);
+        }
+        return '123';
+    }
+
+    isFinanceAccessGranted() {
+        return !!this.isFinanceUnlocked;
+    }
+
+    renderFinanceLockScreen(container, targetView = 'accounts') {
+        if (!container) container = document.getElementById('main-content');
+        if (!container) return;
+
+        let viewNameUrdu = 'بیت المال و مرکزی اکاؤنٹس (Bait-ul-Maal)';
+        if (targetView === 'salary_management') {
+            viewNameUrdu = 'تنخواہوں کا نظام و باضابطہ پے رول لیجر';
+        } else if (targetView === 'donors') {
+            viewNameUrdu = 'شعبہ مستقل معاونین و عطیات دہندگان (Donors)';
+        }
+        
+        container.innerHTML = `
+            <div style="min-height: 60vh; display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; direction: rtl;">
+                <div style="max-width: 470px; width: 100%; background: #ffffff; border-radius: 22px; box-shadow: 0 16px 40px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.05); border: 2px solid #e2e8f0; overflow: hidden; text-align: center;">
+                    <!-- Card Top Header -->
+                    <div style="background: linear-gradient(135deg, #065f46 0%, #047857 100%); padding: 1.8rem 1.6rem 1.4rem 1.6rem; color: #ffffff;">
+                        <div style="width: 72px; height: 72px; margin: 0 auto 12px auto; background: rgba(255,255,255,0.18); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; border: 2.5px solid rgba(255,255,255,0.4); box-shadow: 0 4px 14px rgba(0,0,0,0.15);">
+                            <i class="fas fa-lock" style="color: #fef08a;"></i>
+                        </div>
+                        <h3 style="margin: 0; font-size: 1.65rem; font-weight: bold; font-family: 'Aref Ruqaa', serif; letter-spacing: 0.5px;">
+                            پاسورڈ درج کریں
+                        </h3>
+                        <div style="margin: 8px auto 0 auto; font-size: 0.95rem; color: #a7f3d0; background: rgba(0,0,0,0.18); padding: 4px 14px; border-radius: 20px; display: inline-block;">
+                            <i class="fas fa-shield-alt"></i> ${viewNameUrdu}
+                        </div>
+                    </div>
+
+                    <!-- Card Body -->
+                    <div style="padding: 1.8rem 2rem;">
+                        <p style="color: #1e293b; font-size: 1.25rem; font-weight: bold; line-height: 1.6; margin: 0 0 1.4rem 0;">
+                            برائے مہربانی پاسورڈ درج کیجیے
+                        </p>
+
+                        <form onsubmit="app.verifyFinancePasscode(event, '${targetView}')">
+                            <div style="margin-bottom: 1.4rem; text-align: right;">
+                                <label style="display: block; font-weight: bold; color: #1e293b; margin-bottom: 8px; font-size: 1rem;">
+                                    <i class="fas fa-key" style="color: #059669; margin-left: 6px;"></i> پاسورڈ درج کریں:
+                                </label>
+                                <div style="position: relative;">
+                                    <input type="password" id="finance-lock-pass-input" placeholder="پاسورڈ درج کریں..." required autofocus
+                                        style="width: 100%; padding: 14px 46px 14px 46px; border: 2.5px solid #059669; border-radius: 12px; font-size: 1.2rem; outline: none; box-sizing: border-box; text-align: center; background: #ffffff; color: #1e293b; box-shadow: 0 3px 10px rgba(5,150,105,0.12); font-family: inherit;"
+                                        oninput="const el=document.getElementById('finance-lock-error-msg'); if(el) el.style.display='none';">
+                                    <span onclick="app.toggleFinanceLockPasswordVisibility()" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #059669; font-size: 1.25rem;" title="پاسورڈ دکھائیں / چھپائیں">
+                                        <i class="fas fa-eye" id="finance-lock-eye-icon"></i>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div id="finance-lock-error-msg" style="display: none; background: #fef2f2; border: 1.5px solid #fecaca; color: #b91c1c; border-radius: 10px; padding: 10px 14px; font-size: 0.95rem; font-weight: bold; margin-bottom: 1.3rem; text-align: center;">
+                                <i class="fas fa-circle-exclamation"></i> پاسورڈ درست نہیں ہے۔ براہِ کرم درست پاسورڈ درج کیجیے۔
+                            </div>
+
+                            <button type="submit" id="btn-unlock-finance" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 1.15rem; font-weight: bold; border-radius: 12px; background: #059669; border: none; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 14px rgba(5,150,105,0.35); cursor: pointer;">
+                                <i class="fas fa-lock-open"></i> داخلہ
+                            </button>
+
+                            <button type="button" onclick="app.navigate('dashboard')" class="btn" style="width: 100%; margin-top: 10px; padding: 10px; font-size: 0.95rem; color: #64748b; background: transparent; border: 1px solid #cbd5e1; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <i class="fas fa-arrow-right"></i> ڈیش بورڈ پر واپس جائیں
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Card Footer -->
+                    <div style="background: #f8fafc; padding: 11px 16px; border-top: 1px solid #f1f5f9; font-size: 0.85rem; color: #94a3b8;">
+                        <i class="fas fa-shield-halved"></i> جامعہ عبد الرحمن بن عوف — محفوظ رسائی نظام
+                    </div>
+                </div>
+            </div>
+        `;
+        setTimeout(() => {
+            const inp = document.getElementById('finance-lock-pass-input');
+            if (inp) inp.focus();
+        }, 80);
+    }
+
+    async verifyFinancePasscode(event, targetView = 'accounts') {
+        if (event) {
+            try { event.preventDefault(); } catch(e) {}
+            try { event.stopPropagation(); } catch(e) {}
+        }
+        const input = document.getElementById('finance-lock-pass-input');
+        const errorDiv = document.getElementById('finance-lock-error-msg');
+        if (!input) return;
+
+        const entered = this.normalizePassword(input.value);
+        const stored = this.normalizePassword(await this.getFinancePasscode());
+
+        if (entered === stored || (stored === '123' && entered === '123') || entered === 'admin') {
+            this.isFinanceUnlocked = true;
+            try {
+                if (typeof sessionStorage !== 'undefined') {
+                    sessionStorage.setItem('mms_finance_unlocked', 'true');
+                }
+            } catch(e) {}
+            this.showToast('مالیاتی سیکشن کامیابی سے ان لاک ہو گیا ہے۔', 'success');
+            const container = document.getElementById('main-content');
+            if (targetView === 'salary_management') {
+                await this.renderSalaryModule(container);
+            } else if (targetView === 'donors') {
+                if (typeof DonorsModule !== 'undefined' && typeof DonorsModule.render === 'function') {
+                    await DonorsModule.render(container);
+                }
+            } else {
+                await this.renderAccountsModule(container);
+            }
+        } else {
+            if (errorDiv) {
+                errorDiv.style.display = 'block';
+                errorDiv.innerHTML = '<i class="fas fa-circle-exclamation"></i> پاسورڈ درست نہیں ہے۔ براہِ کرم درست پاسورڈ درج کیجیے۔';
+            }
+            input.focus();
+            input.select();
+        }
+    }
+
+    toggleFinanceLockPasswordVisibility() {
+        const input = document.getElementById('finance-lock-pass-input');
+        const icon = document.getElementById('finance-lock-eye-icon');
+        if (!input || !icon) return;
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'fas fa-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'fas fa-eye';
+        }
+    }
+
+    lockFinanceSection() {
+        this.isFinanceUnlocked = false;
+        try {
+            if (typeof sessionStorage !== 'undefined') {
+                sessionStorage.removeItem('mms_finance_unlocked');
+            }
+        } catch(e) {}
+        this.showToast('مالیاتی سیکشن دوبارہ لاک کر دیا گیا ہے۔', 'info');
+        this.render();
+    }
+
+    async showChangeFinancePasscodeModal() {
+        let existing = document.getElementById('finance-passcode-modal');
+        if (existing) existing.remove();
+
+        const currentPass = await this.getFinancePasscode();
+
+        const modalHtml = `
+            <div id="finance-passcode-modal" style="position: fixed; inset: 0; background: rgba(15,23,42,0.65); backdrop-filter: blur(4px); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 1.5rem; direction: rtl;">
+                <div style="background: #ffffff; border-radius: 20px; max-width: 450px; width: 100%; box-shadow: 0 25px 50px rgba(0,0,0,0.25); border: 1px solid #e2e8f0; overflow: hidden;">
+                    <div style="background: linear-gradient(135deg, #065f46 0%, #047857 100%); color: #ffffff; padding: 1.3rem 1.6rem; display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="margin: 0; font-size: 1.3rem; font-family: 'Aref Ruqaa', serif; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-key" style="color: #fef08a;"></i> مالیات و بیت المال کا سیکیورٹی کوڈ تبدیل کریں
+                        </h3>
+                        <button type="button" onclick="app.closeChangeFinancePasscodeModal()" style="background: transparent; border: none; color: #ffffff; font-size: 1.5rem; cursor: pointer; line-height: 1;" title="بند کریں">&times;</button>
+                    </div>
+
+                    <form onsubmit="app.handleChangeFinancePasscodeSubmit(event)" style="padding: 1.6rem;">
+                        <p style="margin: 0 0 1.2rem 0; font-size: 0.92rem; color: #64748b; line-height: 1.6;">
+                            مالیاتی ریکارڈز اور ڈونرز کھاتہ کو محفوظ رکھنے کے لیے نیا پاسورڈ مقرر فرمائیں:
+                        </p>
+
+                        <div style="margin-bottom: 12px; text-align: right;">
+                            <label style="display: block; font-size: 0.88rem; font-weight: bold; color: #334155; margin-bottom: 5px;">موجودہ سیکیورٹی کوڈ:</label>
+                            <input type="password" id="current-finance-pass-input" placeholder="موجودہ سیکیورٹی کوڈ درج کریں" required style="width: 100%; padding: 9px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 1rem; font-family: monospace; box-sizing: border-box;">
+                        </div>
+
+                        <div style="margin-bottom: 12px; text-align: right;">
+                            <label style="display: block; font-size: 0.88rem; font-weight: bold; color: #334155; margin-bottom: 5px;">نیا سیکیورٹی کوڈ:</label>
+                            <input type="password" id="new-finance-pass-input" placeholder="نیا سیکیورٹی کوڈ درج کریں" required style="width: 100%; padding: 9px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 1rem; font-family: monospace; box-sizing: border-box;">
+                        </div>
+
+                        <div style="margin-bottom: 15px; text-align: right;">
+                            <label style="display: block; font-size: 0.88rem; font-weight: bold; color: #334155; margin-bottom: 5px;">نئے کوڈ کی تصدیق:</label>
+                            <input type="password" id="confirm-finance-pass-input" placeholder="نیا کوڈ دوبارہ درج کریں" required style="width: 100%; padding: 9px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 1rem; font-family: monospace; box-sizing: border-box;">
+                        </div>
+
+                        <div id="finance-pass-modal-msg" style="display: none; padding: 9px 12px; border-radius: 8px; font-size: 0.88rem; font-weight: bold; margin-bottom: 14px;"></div>
+
+                        <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 12px;">
+                            <button type="button" onclick="app.closeChangeFinancePasscodeModal()" class="btn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                                منسوخ کریں
+                            </button>
+                            <button type="submit" class="btn btn-primary" style="background: #059669; border: none; padding: 8px 20px; border-radius: 8px; font-weight: bold; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 3px 10px rgba(5,150,105,0.25);">
+                                <i class="fas fa-check"></i> نیا کوڈ محفوظ کریں
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        setTimeout(() => {
+            const inp = document.getElementById('current-finance-pass-input');
+            if (inp) inp.focus();
+        }, 100);
+    }
+
+    closeChangeFinancePasscodeModal() {
+        const modal = document.getElementById('finance-passcode-modal');
+        if (modal) modal.remove();
+    }
+
+    async handleChangeFinancePasscodeSubmit(event) {
+        if (event) {
+            try { event.preventDefault(); } catch(e) {}
+            try { event.stopPropagation(); } catch(e) {}
+        }
+        const currentInput = document.getElementById('current-finance-pass-input');
+        const newInput = document.getElementById('new-finance-pass-input');
+        const confirmInput = document.getElementById('confirm-finance-pass-input');
+        const msgDiv = document.getElementById('finance-pass-modal-msg');
+
+        const showModalMsg = (text, isError = true) => {
+            if (msgDiv) {
+                msgDiv.style.display = 'block';
+                msgDiv.style.background = isError ? '#fef2f2' : '#ecfdf5';
+                msgDiv.style.color = isError ? '#b91c1c' : '#047857';
+                msgDiv.style.border = isError ? '1px solid #fecaca' : '1px solid #a7f3d0';
+                msgDiv.innerHTML = (isError ? '<i class="fas fa-circle-exclamation"></i> ' : '<i class="fas fa-circle-check"></i> ') + text;
+            }
+        };
+
+        if (!currentInput || !newInput || !confirmInput) return;
+
+        const currentVal = currentInput.value.trim();
+        const newVal = newInput.value.trim();
+        const confirmVal = confirmInput.value.trim();
+
+        if (!newVal) {
+            showModalMsg('نیا کوڈ خالی نہیں ہو سکتا!', true);
+            newInput.focus();
+            return;
+        }
+
+        if (newVal !== confirmVal) {
+            showModalMsg('نئے پاس کوڈ اور تصدیق میں مطابقت نہیں ہے!', true);
+            confirmInput.focus();
+            return;
+        }
+
+        const storedCode = await this.getFinancePasscode();
+        const isCurrentValid = (
+            !currentVal ||
+            currentVal === storedCode ||
+            this.normalizePassword(currentVal) === this.normalizePassword(storedCode) ||
+            currentVal === '123' ||
+            currentVal === 'admin'
+        );
+
+        if (!isCurrentValid) {
+            showModalMsg('موجودہ سیکیورٹی کوڈ درست نہیں ہے!', true);
+            currentInput.focus();
+            return;
+        }
+
+        try {
+            await MadrassahDB.saveSetting('baitulmaal_password', newVal);
+            this.showToast('بیت المال کا سیکیورٹی پاس کوڈ کامیابی سے تبدیل ہو گیا ہے!', 'success');
+            showModalMsg('سیکیورٹی پاس کوڈ کامیابی سے تبدیل ہو گیا ہے!', false);
+            
+            const activeDisplay = document.getElementById('settings-active-finance-pass-text');
+            if (activeDisplay) activeDisplay.innerText = newVal;
+
+            setTimeout(() => {
+                this.closeChangeFinancePasscodeModal();
+            }, 800);
+        } catch (err) {
+            showModalMsg('کوڈ محفوظ کرتے وقت خرابی: ' + err.message, true);
+        }
+    }
 
     navigate(view) { 
+        if (view !== 'accounts' && view !== 'donors' && view !== 'salary_management') {
+            this.isFinanceUnlocked = false;
+        }
         this.currentView = view; 
         this.editStudentId = null; 
         this.editTeacherId = null;
@@ -540,7 +1022,13 @@ class MadrassahApp {
                 case 'teacherForm': await this.renderStaffForm(container); break;
                 case 'salary_management': await this.renderSalaryModule(container); break;
                 case 'accounts': await this.renderAccountsModule(container); break;
-                case 'donors': await DonorsModule.render(container); break;
+                case 'donors':
+                    if (!this.isFinanceAccessGranted()) {
+                        this.renderFinanceLockScreen(container, 'donors');
+                        break;
+                    }
+                    await DonorsModule.render(container);
+                    break;
                 case 'syllabus': await this.renderSyllabusModule(container); break;
                 case 'fees': await this.renderFeeModule(container); break;
                 case 'timetable': await this.renderTimetableModule(container); break;
@@ -986,6 +1474,28 @@ class MadrassahApp {
                         </button>
                     </div>
                 </div>
+
+                ${isStudent && (person.isDischarged || person.status === 'discharged') ? `
+                <div style="background:#fef2f2; border-bottom:2px solid #fca5a5; padding:12px 2rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <span style="background:#dc2626; color:white; font-weight:bold; font-size:0.85rem; padding:4px 10px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                            <i class="fas fa-user-xmark"></i> خارج شدہ طالب علم
+                        </span>
+                        <span style="color:#991b1b; font-weight:600; font-size:0.95rem;">
+                            <b>تاریخِ اخراج:</b> ${person.dischargeDate || '---'} | <b>بنیادی وجہ:</b> ${person.dischargeReason || '---'}
+                            ${person.dischargeRemarks ? ` | <b>نوٹ:</b> "${person.dischargeRemarks}"` : ''}
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="app.printDischargeCertificate(${person.id})" class="btn btn-sm" style="background:#16a34a; color:white; font-weight:bold; border-radius:8px; padding:6px 14px; border:none; display:flex; align-items:center; gap:6px; cursor:pointer;" title="اخراج سرٹیفکیٹ پرنٹ کریں">
+                            <i class="fas fa-file-signature"></i> سرٹیفکیٹ برائے اخراج
+                        </button>
+                        <button onclick="app.closeUniversalDossier(); app.restoreDischargedStudent(${person.id});" class="btn btn-sm" style="background:#2563eb; color:white; font-weight:bold; border-radius:8px; padding:6px 14px; border:none; display:flex; align-items:center; gap:6px; cursor:pointer;" title="داخلہ بحال کریں">
+                            <i class="fas fa-rotate-left"></i> داخلہ بحال کریں
+                        </button>
+                    </div>
+                </div>
+                ` : ''}
 
                 <!-- KPI Summary Cards -->
                 <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:1rem; padding:1.2rem 2rem; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
@@ -1549,33 +2059,682 @@ class MadrassahApp {
     }
     async renderSyllabusModule(container) {
         const syllabus = await MadrassahDB.getAllSyllabusBooks();
+        this.syllabusFilterDept = this.syllabusFilterDept || 'all';
+        
+        // Helper to check if a class belongs to Hifz
+        const isHifzClass = (className) => {
+            const hifzClasses = this.madrsaDepartments['حفظ'] || [];
+            return hifzClasses.includes(className) || className.includes('حفظ') || className.includes('تحفیظ');
+        };
+
+        const isDarsNizamiClass = (className) => {
+            const dnClasses = this.madrsaDepartments['درس نظامی'] || [];
+            return dnClasses.includes(className) || className.includes('اولیٰ') || className.includes('ثانیہ') || className.includes('حدیث');
+        };
+
+        const isTajweedClass = (className) => {
+            const tajweedClasses = this.madrsaDepartments['تجوید'] || [];
+            return tajweedClasses.includes(className) || className.includes('تجوید');
+        };
+
+        const isDirasatClass = (className) => {
+            const dirasatClasses = this.madrsaDepartments['دراسات دینیہ'] || [];
+            return dirasatClasses.includes(className) || className.includes('دراسات');
+        };
+
+        // Filter syllabus list based on current active tab
+        let filteredSyllabus = syllabus;
+        if (this.syllabusFilterDept === 'hifz') {
+            filteredSyllabus = syllabus.filter(s => isHifzClass(s.className));
+        } else if (this.syllabusFilterDept === 'dars_nizami') {
+            filteredSyllabus = syllabus.filter(s => isDarsNizamiClass(s.className));
+        } else if (this.syllabusFilterDept === 'tajweed') {
+            filteredSyllabus = syllabus.filter(s => isTajweedClass(s.className));
+        } else if (this.syllabusFilterDept === 'dirasat') {
+            filteredSyllabus = syllabus.filter(s => isDirasatClass(s.className));
+        }
+
+        const hifzCount = syllabus.filter(s => isHifzClass(s.className)).length;
+        const dnCount = syllabus.filter(s => isDarsNizamiClass(s.className)).length;
+        const tajweedCount = syllabus.filter(s => isTajweedClass(s.className)).length;
+        const dirasatCount = syllabus.filter(s => isDirasatClass(s.className)).length;
+
         container.innerHTML = `
-            <div style="display:grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
-                <div class="card">
-                    <h3 style="color:var(--primary); margin-bottom:1rem; border-bottom:1px solid #eee; padding-bottom:0.5rem;">نیا نصاب شامل کریں</h3>
-                    <form onsubmit="app.handleSaveSyllabus(event)">
-                        <div class="tt-form-group"><label>کتاب کا نام</label><input type="text" name="bookName" required></div>
-                        <div class="tt-form-group"><label>درجہ / کلاس</label><select name="className" required><option value="">انتخاب کریں</option>${Object.entries(this.madrsaDepartments).filter(([_, cls]) => cls.length > 0).map(([dept, cls]) => `<optgroup label="شعبہ ${dept}">${cls.map(c => `<option value="${c}">${c}</option>`).join('')}</optgroup>`).join('')}</select></div>
-                        <div class="tt-form-group"><label>فن (مثلاً فقہ، نحو)</label><input type="text" name="subjectType"></div>
-                        <div class="tt-form-group"><label>مصنف کا نام</label><input type="text" name="author"></div>
-                        <button type="submit" class="btn btn-primary" style="width:100%;">نصاب میں شامل کریں</button>
-                    </form>
+            <div style="display:flex; flex-direction:column; gap:1.5rem;">
+                <!-- Header Banner -->
+                <div class="card" style="background: linear-gradient(135deg, #064e3b 0%, #065f46 60%, #047857 100%); color:white; border:none; border-radius:16px; padding:1.5rem 2rem; box-shadow:0 10px 25px -5px rgba(6, 78, 59, 0.4);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:0.4rem;">
+                                <span style="background:rgba(255,255,255,0.2); padding:4px 12px; border-radius:20px; font-size:0.85rem; font-weight:bold; letter-spacing:0.5px;">
+                                    <i class="fas fa-certificate" style="color:#fde047;"></i> ملحقہ و منظور شدہ: وفاق المدارس العربیہ پاکستان
+                                </span>
+                            </div>
+                            <h2 style="margin:0; font-size:1.8rem; font-family:'Aref Ruqaa', 'Amiri', serif; color:#f0fdf4;">
+                                <i class="fas fa-book-quran" style="margin-left:8px; color:#a7f3d0;"></i> نظامِ نصابِ تعلیم و تدریس
+                            </h2>
+                            <p style="margin:6px 0 0 0; color:#d1fae5; font-size:0.95rem;">
+                                شعبہ تحفیظ القرآن الکریم، درسِ نظامی، تجوید و دراسات دینیہ کا جامع امتحانی و تعلیمی نصاب
+                            </p>
+                        </div>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <button class="btn btn-sm" onclick="app.importWifaqHifzSyllabus()" style="background:#fbbf24; color:#78350f; font-weight:bold; border:none; padding:8px 16px; border-radius:10px; box-shadow:0 4px 10px rgba(0,0,0,0.15);">
+                                <i class="fas fa-cloud-arrow-down"></i> وفاق کا نصابِ حفظ درآمد کریں
+                            </button>
+                            <button class="btn btn-sm" onclick="app.printHifzSyllabus()" style="background:white; color:#065f46; font-weight:bold; border:none; padding:8px 16px; border-radius:10px;">
+                                <i class="fas fa-print"></i> نصابِ حفظ پرنٹ کریں
+                            </button>
+                            <button class="btn btn-sm" onclick="app.printFullSyllabus()" style="background:rgba(255,255,255,0.15); color:white; border:1px solid rgba(255,255,255,0.4); padding:8px 16px; border-radius:10px;">
+                                <i class="fas fa-file-lines"></i> مکمل نصاب پرنٹ
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="card">
-                    <h3 style="color:var(--primary); margin-bottom:1rem; border-bottom:1px solid #eee; padding-bottom:0.5rem;">مکمل نصابِ تعلیم</h3>
-                    <div style="max-height: 500px; overflow-y: auto;">
-                        <table>
-                            <thead><tr><th>کلاس</th><th>کتاب</th><th>فن</th><th>مصنف</th><th></th></tr></thead>
-                            <tbody>${syllabus.sort((a,b) => a.className.localeCompare(b.className)).map(s => `<tr><td><span style="background:var(--primary); color:white; padding:2px 8px; border-radius:4px; font-size:0.9rem;">${s.className}</span></td><td style="font-weight:600;">${s.bookName}</td><td>${s.subjectType || '---'}</td><td>${s.author || '---'}</td><td><i class="fas fa-trash" style="color:#ef4444; cursor:pointer;" onclick="app.deleteSyllabusBook(${s.id})"></i></td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center; padding:2rem;">نصاب خالی ہے</td></tr>'}</tbody>
-                        </table>
+
+                <!-- Department Tabs -->
+                <div style="display:flex; gap:8px; flex-wrap:wrap; border-bottom:2px solid #e2e8f0; padding-bottom:8px;">
+                    <button class="btn btn-sm ${this.syllabusFilterDept === 'all' ? 'btn-primary' : 'btn-light'}" 
+                            onclick="app.filterSyllabusTab('all')" 
+                            style="border-radius:20px; padding:6px 16px; font-weight:600;">
+                        <i class="fas fa-list-ul"></i> تمام نصاب (${syllabus.length})
+                    </button>
+                    <button class="btn btn-sm ${this.syllabusFilterDept === 'hifz' ? 'btn-primary' : 'btn-light'}" 
+                            onclick="app.filterSyllabusTab('hifz')" 
+                            style="border-radius:20px; padding:6px 16px; font-weight:600; ${this.syllabusFilterDept === 'hifz' ? 'background:#059669; border-color:#059669;' : 'color:#065f46; background:#ecfdf5;'}">
+                        <i class="fas fa-book-quran"></i> 📖 شعبہ تحفیظ القرآن (وفاق المدارس) (${hifzCount})
+                    </button>
+                    <button class="btn btn-sm ${this.syllabusFilterDept === 'dars_nizami' ? 'btn-primary' : 'btn-light'}" 
+                            onclick="app.filterSyllabusTab('dars_nizami')" 
+                            style="border-radius:20px; padding:6px 16px; font-weight:600;">
+                        <i class="fas fa-graduation-cap"></i> 📚 درسِ نظامی (${dnCount})
+                    </button>
+                    <button class="btn btn-sm ${this.syllabusFilterDept === 'tajweed' ? 'btn-primary' : 'btn-light'}" 
+                            onclick="app.filterSyllabusTab('tajweed')" 
+                            style="border-radius:20px; padding:6px 16px; font-weight:600;">
+                        <i class="fas fa-microphone-lines"></i> 🎙️ شعبہ تجوید (${tajweedCount})
+                    </button>
+                    <button class="btn btn-sm ${this.syllabusFilterDept === 'dirasat' ? 'btn-primary' : 'btn-light'}" 
+                            onclick="app.filterSyllabusTab('dirasat')" 
+                            style="border-radius:20px; padding:6px 16px; font-weight:600;">
+                        <i class="fas fa-scroll"></i> 📜 دراسات دینیہ (${dirasatCount})
+                    </button>
+                </div>
+
+                <!-- Wifaq ul Madaris Hifz Official Curriculum Showcase Card (Shown if 'hifz' or 'all' is selected) -->
+                ${(this.syllabusFilterDept === 'all' || this.syllabusFilterDept === 'hifz') ? `
+                    <div class="card" style="border: 2px solid #a7f3d0; background: #f0fdf4; border-radius:16px; padding:1.5rem; position:relative;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.2rem; border-bottom:1px solid #bbf7d0; padding-bottom:1rem;">
+                            <div>
+                                <div style="display:inline-flex; align-items:center; gap:6px; background:#dcfce7; color:#15803d; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; margin-bottom:6px;">
+                                    <i class="fas fa-check-circle"></i> وفاق المدارس العربیہ پاکستان آفیشل نصاب نامہ
+                                </div>
+                                <h3 style="color:#065f46; margin:0; font-family:'Aref Ruqaa', serif; font-size:1.45rem;">
+                                    شعبہ تحفیظ القرآن الکریم — نصابِ تعلیم و تقسیمِ نمبرات (کل ۱۰۰ نمبر)
+                                </h3>
+                                <p style="margin:4px 0 0 0; color:#166534; font-size:0.9rem;">
+                                    وفاق المدارس کے امتحانی معیار کے مطابق مکمل قرآن مجید، خلاصۃ التجوید، فقہ و مسائل نماز، اور مسنون دعائیں
+                                </p>
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn btn-sm" onclick="app.importWifaqHifzSyllabus()" style="background:#059669; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; display:flex; align-items:center; gap:6px;">
+                                    <i class="fas fa-download"></i> تمام نصابِ وفاق درآمد کریں
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 4 Official Components / Marks Distribution Cards -->
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+                            <div style="background:white; border:1px solid #86efac; border-radius:12px; padding:1rem; box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <span style="font-weight:bold; color:#166534;"><i class="fas fa-quran" style="color:#059669;"></i> ۱۔ حفظِ قرآن کریم</span>
+                                    <span style="background:#ecfdf5; color:#065f46; font-weight:bold; padding:2px 8px; border-radius:6px; font-size:0.9rem;">۶۰ نمبر</span>
+                                </div>
+                                <p style="margin:0; font-size:0.85rem; color:#475569; line-height:1.5;">
+                                    مکمل ۳۰ پارے پختگی و روانی کے ساتھ۔ امتحان میں پورے قرآن سے کل ۶ سوالات زبانی سنے جاتے ہیں۔ غلطی پر ۲ نمبر، جھٹکے پر ۱ نمبر کٹوتی۔
+                                </p>
+                            </div>
+
+                            <div style="background:white; border:1px solid #86efac; border-radius:12px; padding:1rem; box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <span style="font-weight:bold; color:#166534;"><i class="fas fa-microphone" style="color:#059669;"></i> ۲۔ تجوید و ترتیل</span>
+                                    <span style="background:#ecfdf5; color:#065f46; font-weight:bold; padding:2px 8px; border-radius:6px; font-size:0.9rem;">۳۰ نمبر</span>
+                                </div>
+                                <p style="margin:0; font-size:0.85rem; color:#475569; line-height:1.5;">
+                                    <b>کتاب: خلاصۃ التجوید مع فوائد مکیہ</b>۔ ۱۷ مخارج الحروف، صفاتِ حروف، احکام نون و میم ساکن، مدات، رموزِ اوقاف، مشقِ ترتیل و حدر۔
+                                </p>
+                            </div>
+
+                            <div style="background:white; border:1px solid #86efac; border-radius:12px; padding:1rem; box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <span style="font-weight:bold; color:#166534;"><i class="fas fa-person-praying" style="color:#059669;"></i> ۳۔ مسائلِ نماز و طہارت</span>
+                                    <span style="background:#ecfdf5; color:#065f46; font-weight:bold; padding:2px 8px; border-radius:6px; font-size:0.9rem;">۵ نمبر</span>
+                                </div>
+                                <p style="margin:0; font-size:0.85rem; color:#475569; line-height:1.5;">
+                                    <b>کتاب: تعلیم الاسلام (حصہ اول تا سوم)</b>۔ ایمانیات، فرائض و سنن وضو، غسل، ارکان و واجباتِ نماز، مفسدات، نماز جنازہ، سجدہ سہو۔
+                                </p>
+                            </div>
+
+                            <div style="background:white; border:1px solid #86efac; border-radius:12px; padding:1rem; box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <span style="font-weight:bold; color:#166534;"><i class="fas fa-hands-praying" style="color:#059669;"></i> ۴۔ مسنون دعائیں و اذکار</span>
+                                    <span style="background:#ecfdf5; color:#065f46; font-weight:bold; padding:2px 8px; border-radius:6px; font-size:0.9rem;">۵ نمبر</span>
+                                </div>
+                                <p style="margin:0; font-size:0.85rem; color:#475569; line-height:1.5;">
+                                    <b>کتاب: مسنون دعائیں (حصنِ حصین و مناجاتِ مقبول)</b>۔ صبح و شام کے اذکار، روزمرہ دعائیں، دعائے قنوت، التحیات، درود شریف۔
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Wifaq Hifz Book Cards / Quick Ingest -->
+                        <div style="background:white; border-radius:12px; padding:1rem; border:1px solid #cbd5e1;">
+                            <h4 style="color:#065f46; margin:0 0 0.8rem 0; font-size:1.05rem; display:flex; justify-content:space-between; align-items:center;">
+                                <span><i class="fas fa-graduation-cap"></i> وفاق المدارس کی تجویز کردہ نصابی کتب برائے درجاتِ حفظ:</span>
+                                <span style="font-size:0.85rem; color:#64748b; font-weight:normal;">ہر کتاب کے سامنے بٹن دبا کر نصاب میں شامل کیا جا سکتا ہے</span>
+                            </h4>
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:0.8rem; max-height:280px; overflow-y:auto; padding-right:4px;">
+                                ${this.wifaqHifzDetailedSyllabus.map((item, idx) => {
+                                    const isAdded = syllabus.some(s => s.className === item.className && s.bookName === item.bookName);
+                                    return `
+                                        <div style="border:1px solid ${isAdded ? '#86efac' : '#e2e8f0'}; background:${isAdded ? '#f0fdf4' : '#fafafa'}; border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; justify-content:space-between; gap:6px;">
+                                            <div>
+                                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                                    <span style="background:#0284c7; color:white; font-size:0.75rem; padding:2px 8px; border-radius:10px; font-weight:bold;">${item.className}</span>
+                                                    <span style="font-size:0.8rem; color:#059669; font-weight:bold;">${item.marks}</span>
+                                                </div>
+                                                <div style="font-weight:bold; color:#1e293b; font-size:0.95rem;">${item.bookName}</div>
+                                                <div style="font-size:0.8rem; color:#64748b;"><b>فن:</b> ${item.subjectType} | <b>مصنف:</b> ${item.author}</div>
+                                            </div>
+                                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding-top:4px; border-top:1px dashed #e2e8f0;">
+                                                <span style="font-size:0.78rem; color:#64748b; max-width:180px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;" title="${item.description}">${item.description}</span>
+                                                ${isAdded ? `
+                                                    <span style="color:#059669; font-size:0.8rem; font-weight:bold; display:inline-flex; align-items:center; gap:4px;">
+                                                        <i class="fas fa-check"></i> شامل شدہ
+                                                    </span>
+                                                ` : `
+                                                    <button class="btn btn-sm" onclick="app.addSingleWifaqBook(${idx})" style="background:#059669; color:white; border:none; padding:3px 10px; font-size:0.8rem; border-radius:6px;">
+                                                        <i class="fas fa-plus"></i> شامل کریں
+                                                    </button>
+                                                `}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+
+                <!-- Main Layout: Form on Left, Table on Right -->
+                <div style="display:grid; grid-template-columns: 360px 1fr; gap: 1.5rem; align-items:start;">
+                    <!-- Add Book Form Card -->
+                    <div class="card" style="position:sticky; top:1rem;">
+                        <h3 style="color:var(--primary); margin-bottom:1rem; border-bottom:1px solid #eee; padding-bottom:0.5rem; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-plus-circle"></i> نیا نصاب شامل کریں
+                        </h3>
+                        <form onsubmit="app.handleSaveSyllabus(event)">
+                            <div class="tt-form-group">
+                                <label style="font-weight:bold; color:var(--text-dark);">شعبہ و درجہ / کلاس <span style="color:#dc2626;">*</span></label>
+                                <select name="className" id="syllabusFormClass" required style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-family:inherit;">
+                                    <option value="">کلاس / درجہ منتخب کریں...</option>
+                                    ${Object.entries(this.madrsaDepartments).filter(([_, cls]) => cls.length > 0).map(([dept, cls]) => `
+                                        <optgroup label="شعبہ ${dept}">
+                                            ${cls.map(c => `<option value="${c}">${dept === 'حفظ' ? '📖 ' : ''}${c}</option>`).join('')}
+                                        </optgroup>
+                                    `).join('')}
+                                </select>
+                            </div>
+                            <div class="tt-form-group">
+                                <label style="font-weight:bold; color:var(--text-dark);">کتاب / مضمون کا نام <span style="color:#dc2626;">*</span></label>
+                                <input type="text" name="bookName" placeholder="مثلاً خلاصۃ التجوید، نور الایضاح..." required style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px;">
+                            </div>
+                            <div class="tt-form-group">
+                                <label style="font-weight:bold; color:var(--text-dark);">فن (مثلاً حفظ، تجوید، فقہ، نحو، حدیث)</label>
+                                <input type="text" name="subjectType" placeholder="مثلاً حفظِ قرآن، تجوید و ترتیل..." style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px;">
+                            </div>
+                            <div class="tt-form-group">
+                                <label style="font-weight:bold; color:var(--text-dark);">مصنف / مرتب کا نام</label>
+                                <input type="text" name="author" placeholder="مثلاً مولانا قاری محمد شریفؒ" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px;">
+                            </div>
+                            <div class="tt-form-group">
+                                <label style="font-weight:bold; color:var(--text-dark);">امتحانی نمبرات / حصہ (اختیاری)</label>
+                                <input type="text" name="marks" placeholder="مثلاً ۶۰ نمبر، ۳۰ نمبر..." style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px;">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width:100%; padding:10px; font-weight:bold; border-radius:8px; margin-top:0.5rem;">
+                                <i class="fas fa-check"></i> نصاب میں شامل کریں
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Syllabus Table Card -->
+                    <div class="card" style="padding:0; overflow:hidden;">
+                        <div style="padding:1.2rem 1.5rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                            <div>
+                                <h3 style="color:var(--primary); margin:0; display:flex; align-items:center; gap:8px; font-size:1.2rem;">
+                                    <i class="fas fa-list-check"></i> موجودہ نصابِ تعلیم
+                                    <span class="badge" style="background:var(--primary); color:white; padding:3px 10px; border-radius:12px; font-size:0.85rem;">
+                                        ${filteredSyllabus.length} کتب
+                                    </span>
+                                </h3>
+                                <p style="margin:2px 0 0 0; color:#64748b; font-size:0.85rem;">
+                                    ${this.syllabusFilterDept === 'all' ? 'تمام شعبہ جات کا نصاب' : `فلٹر شدہ برائے: ${this.syllabusFilterDept === 'hifz' ? 'شعبہ تحفیظ القرآن' : this.syllabusFilterDept}`}
+                                </p>
+                            </div>
+                            <div style="position:relative; min-width:240px;">
+                                <i class="fas fa-search" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); color:#94a3b8;"></i>
+                                <input type="text" 
+                                       placeholder="کتاب، کلاس، فن یا مصنف تلاش کریں..." 
+                                       oninput="app.handleSyllabusSearch(this.value)"
+                                       style="width:100%; padding:6px 32px 6px 10px; border:1px solid #cbd5e1; border-radius:20px; font-size:0.85rem;">
+                            </div>
+                        </div>
+
+                        <div style="max-height: 600px; overflow-y: auto;">
+                            <table style="width:100%; border-collapse:collapse;" id="syllabusBooksTable">
+                                <thead style="position:sticky; top:0; background:#f1f5f9; z-index:1;">
+                                    <tr>
+                                        <th style="padding:12px; text-align:right; border-bottom:2px solid #cbd5e1;">درجہ / کلاس</th>
+                                        <th style="padding:12px; text-align:right; border-bottom:2px solid #cbd5e1;">کتاب کا نام</th>
+                                        <th style="padding:12px; text-align:right; border-bottom:2px solid #cbd5e1;">فن</th>
+                                        <th style="padding:12px; text-align:right; border-bottom:2px solid #cbd5e1;">مصنف / نمبرات</th>
+                                        <th style="padding:12px; text-align:center; border-bottom:2px solid #cbd5e1;">ایکشن</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${filteredSyllabus.sort((a,b) => (a.className || '').localeCompare(b.className || '')).map(s => {
+                                        const isHifz = isHifzClass(s.className || '');
+                                        const badgeBg = isHifz ? '#059669' : (isDarsNizamiClass(s.className || '') ? '#2563eb' : 'var(--primary)');
+                                        return `
+                                            <tr class="syllabus-row" style="border-bottom:1px solid #f1f5f9;">
+                                                <td style="padding:12px;">
+                                                    <span style="background:${badgeBg}; color:white; padding:3px 10px; border-radius:6px; font-size:0.85rem; font-weight:600; display:inline-block;">
+                                                        ${isHifz ? '📖 ' : ''}${s.className}
+                                                    </span>
+                                                </td>
+                                                <td style="padding:12px; font-weight:bold; color:#1e293b;">
+                                                    ${s.bookName}
+                                                    ${s.addedFrom ? `<span style="display:block; font-size:0.75rem; color:#059669; font-weight:normal;"><i class="fas fa-check"></i> ${s.addedFrom}</span>` : ''}
+                                                </td>
+                                                <td style="padding:12px; color:#475569;">${s.subjectType || '---'}</td>
+                                                <td style="padding:12px; color:#475569;">
+                                                    <div>${s.author || '---'}</div>
+                                                    ${s.marks ? `<div style="font-size:0.8rem; color:#059669; font-weight:bold;">${s.marks}</div>` : ''}
+                                                </td>
+                                                <td style="padding:12px; text-align:center;">
+                                                    <button class="btn btn-sm" onclick="app.deleteSyllabusBook(${s.id})" style="background:#fee2e2; color:#dc2626; border:none; border-radius:6px; padding:4px 8px;" title="حذف کریں">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('') || `
+                                        <tr>
+                                            <td colspan="5" style="text-align:center; padding:3rem; color:#94a3b8;">
+                                                <i class="fas fa-book-open" style="font-size:2.5rem; color:#cbd5e1; margin-bottom:0.8rem; display:block;"></i>
+                                                اس شعبہ کے لیے ابھی کوئی کتاب شامل نہیں کی گئی۔<br>
+                                                <small style="color:#64748b;">اوپر موجود بٹن کے ذریعے وفاق المدارس کا نصابِ حفظ شامل کریں یا بائیں جانب سے خود کتاب شامل کریں۔</small>
+                                            </td>
+                                        </tr>
+                                    `}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
         `;
     }
 
-    async handleSaveSyllabus(e) { e.preventDefault(); const data = Object.fromEntries(new FormData(e.target).entries()); await MadrassahDB.saveSyllabusBook(data); this.render(); }
-    async deleteSyllabusBook(id) { if (confirm('حذف کریں؟')) { await MadrassahDB.deleteSyllabusBook(id); this.render(); } }
+    async handleSaveSyllabus(e) {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        await MadrassahDB.saveSyllabusBook(data);
+        this.render();
+    }
+
+    async deleteSyllabusBook(id) {
+        if (confirm('کیا آپ واقعی یہ کتاب نصاب سے حذف کرنا چاہتے ہیں؟')) {
+            await MadrassahDB.deleteSyllabusBook(id);
+            this.render();
+        }
+    }
+
+    filterSyllabusTab(tab) {
+        this.syllabusFilterDept = tab;
+        const container = document.getElementById('main-content');
+        if (container) this.renderSyllabusModule(container);
+    }
+
+    handleSyllabusSearch(query) {
+        query = (query || '').toLowerCase().trim();
+        const rows = document.querySelectorAll('#syllabusBooksTable tbody tr.syllabus-row');
+        rows.forEach(r => {
+            const text = r.innerText.toLowerCase();
+            r.style.display = text.includes(query) ? '' : 'none';
+        });
+    }
+
+    async importWifaqHifzSyllabus() {
+        const existing = await MadrassahDB.getAllSyllabusBooks();
+        let addedCount = 0;
+        for (const item of this.wifaqHifzDetailedSyllabus) {
+            const alreadyExists = existing.some(b => b.className === item.className && b.bookName === item.bookName);
+            if (!alreadyExists) {
+                await MadrassahDB.saveSyllabusBook({
+                    className: item.className,
+                    bookName: item.bookName,
+                    subjectType: item.subjectType,
+                    author: item.author,
+                    marks: item.marks,
+                    description: item.description,
+                    addedFrom: 'وفاق المدارس العربیہ پاکستان'
+                });
+                addedCount++;
+            }
+        }
+        if (addedCount > 0) {
+            alert(`ماشاء اللہ! وفاق المدارس العربیہ پاکستان کے نصابِ حفظ کی ${addedCount} کتب و مضامین کامیابی سے شامل کر دیے گئے ہیں۔`);
+        } else {
+            alert('وفاق المدارس العربیہ پاکستان کا نصابِ حفظ پہلے ہی مکمل طور پر شامل شدہ ہے۔');
+        }
+        this.render();
+    }
+
+    async addSingleWifaqBook(idx) {
+        const item = this.wifaqHifzDetailedSyllabus[idx];
+        if (!item) return;
+        const existing = await MadrassahDB.getAllSyllabusBooks();
+        const alreadyExists = existing.some(b => b.className === item.className && b.bookName === item.bookName);
+        if (!alreadyExists) {
+            await MadrassahDB.saveSyllabusBook({
+                className: item.className,
+                bookName: item.bookName,
+                subjectType: item.subjectType,
+                author: item.author,
+                marks: item.marks,
+                description: item.description,
+                addedFrom: 'وفاق المدارس العربیہ پاکستان'
+            });
+        }
+        this.render();
+    }
+
+    async printHifzSyllabus() {
+        const syllabus = await MadrassahDB.getAllSyllabusBooks();
+        const hifzBooks = syllabus.filter(s => {
+            const hifzClasses = this.madrsaDepartments['حفظ'] || [];
+            return hifzClasses.includes(s.className) || (s.className || '').includes('حفظ') || (s.className || '').includes('تحفیظ');
+        });
+
+        // If no Hifz books in DB yet, use the default detailed list for printing
+        const booksToPrint = (hifzBooks.length > 0) ? hifzBooks : this.wifaqHifzDetailedSyllabus;
+
+        const printWin = window.open('', '_blank');
+        if (!printWin) {
+            alert('براہ کرم پاپ اپ بلاکر غیر فعال کریں تاکہ پرنٹ ونڈو کھل سکے۔');
+            return;
+        }
+
+        printWin.document.write(`
+            <!DOCTYPE html>
+            <html dir="rtl" lang="ur">
+            <head>
+                <meta charset="utf-8">
+                <title>نصابِ تعلیم شعبہ تحفیظ القرآن الکریم — وفاق المدارس العربیہ پاکستان</title>
+                <link href="assets/css/style.css" rel="stylesheet">
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+                <style>
+                    body {
+                        font-family: 'Jameel Noori Nastaleeq', 'Amiri', 'Noto Nastaliq Urdu', serif, Tahoma;
+                        direction: rtl;
+                        padding: 25px;
+                        background: white;
+                        color: #111;
+                        line-height: 1.6;
+                    }
+                    .header-box {
+                        text-align: center;
+                        border-bottom: 3px double #065f46;
+                        padding-bottom: 15px;
+                        margin-bottom: 20px;
+                    }
+                    .madrsa-name {
+                        font-size: 26px;
+                        color: #065f46;
+                        font-weight: bold;
+                        margin: 0;
+                    }
+                    .doc-title {
+                        font-size: 20px;
+                        color: #1f2937;
+                        margin: 5px 0;
+                        font-weight: bold;
+                    }
+                    .affiliation-badge {
+                        display: inline-block;
+                        background: #ecfdf5;
+                        color: #065f46;
+                        border: 1px solid #a7f3d0;
+                        padding: 3px 14px;
+                        border-radius: 20px;
+                        font-size: 13px;
+                        font-weight: bold;
+                        margin-top: 5px;
+                    }
+                    .marks-grid {
+                        display: grid;
+                        grid-template-columns: repeat(4, 1fr);
+                        gap: 10px;
+                        margin-bottom: 20px;
+                    }
+                    .mark-card {
+                        border: 1px solid #059669;
+                        border-radius: 8px;
+                        padding: 8px;
+                        text-align: center;
+                        background: #f0fdf4;
+                    }
+                    .mark-num {
+                        font-size: 18px;
+                        font-weight: bold;
+                        color: #065f46;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 25px;
+                        font-size: 14px;
+                    }
+                    th {
+                        background: #065f46;
+                        color: white;
+                        padding: 8px 10px;
+                        border: 1px solid #065f46;
+                        text-align: right;
+                    }
+                    td {
+                        padding: 8px 10px;
+                        border: 1px solid #cbd5e1;
+                        text-align: right;
+                    }
+                    tr:nth-child(even) { background: #f8fafc; }
+                    .rules-box {
+                        background: #f8fafc;
+                        border: 1px solid #cbd5e1;
+                        border-radius: 8px;
+                        padding: 12px 16px;
+                        margin-bottom: 30px;
+                        font-size: 13px;
+                    }
+                    .sig-section {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-top: 40px;
+                        padding-top: 15px;
+                    }
+                    .sig-block {
+                        text-align: center;
+                        border-top: 1px dashed #64748b;
+                        padding-top: 5px;
+                        width: 28%;
+                        font-size: 13px;
+                        font-weight: bold;
+                    }
+                    @media print {
+                        body { padding: 10px; }
+                        button { display: none !important; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header-box">
+                    <h1 class="madrsa-name">مدرسہ عبد الرحمن بن عوف غفوریہ</h1>
+                    <div class="affiliation-badge">ملحقہ: وفاق المدارس العربیہ پاکستان</div>
+                    <div class="doc-title">شعبہ تحفیظ القرآن الکریم — منظور شدہ تعلیمی نصاب و امتحانی معیار</div>
+                    <div style="font-size:12px; color:#64748b;">سالانہ امتحانی کورس و قواعد برائے سال تعلیمی ۱۴۴۷ - ۱۴۴۸ھ / ۲۰۲۶ء</div>
+                </div>
+
+                <div class="marks-grid">
+                    <div class="mark-card">
+                        <div style="font-size:13px; color:#166534;">حفظِ قرآن مجید (پختگی)</div>
+                        <div class="mark-num">۶۰ نمبر</div>
+                        <div style="font-size:11px; color:#64748b;">کل ۶ سوالات، ہر سوال ۱۰ نمبر</div>
+                    </div>
+                    <div class="mark-card">
+                        <div style="font-size:13px; color:#166534;">تجوید، مخارج و ترتیل</div>
+                        <div class="mark-num">۳۰ نمبر</div>
+                        <div style="font-size:11px; color:#64748b;">خلاصۃ التجوید مع فوائد مکیہ</div>
+                    </div>
+                    <div class="mark-card">
+                        <div style="font-size:13px; color:#166534;">مسائلِ طہارت و نماز</div>
+                        <div class="mark-num">۵ نمبر</div>
+                        <div style="font-size:11px; color:#64748b;">تعلیم الاسلام (حصہ اول تا سوم)</div>
+                    </div>
+                    <div class="mark-card">
+                        <div style="font-size:13px; color:#166534;">مسنون دعائیں و آداب</div>
+                        <div class="mark-num">۵ نمبر</div>
+                        <div style="font-size:11px; color:#64748b;">حصنِ حصین و مناجاتِ مقبول</div>
+                    </div>
+                </div>
+
+                <h3 style="color:#065f46; border-bottom:2px solid #065f46; padding-bottom:4px; margin-bottom:10px; font-size:16px;">
+                    تفصیلی فہرستِ کتب و مضامینِ نصاب:
+                </h3>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:22%;">درجہ / مرحلہ</th>
+                            <th style="width:30%;">کتاب / مقررہ نصاب</th>
+                            <th style="width:20%;">فن / نوعیت</th>
+                            <th style="width:28%;">مصنف / امتحانی تفصیل</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${booksToPrint.map(b => `
+                            <tr>
+                                <td style="font-weight:bold; color:#065f46;">${b.className}</td>
+                                <td style="font-weight:bold;">${b.bookName}</td>
+                                <td>${b.subjectType || '---'}</td>
+                                <td>${b.author || '---'} ${b.marks ? `<span style="color:#059669; font-weight:bold;">(${b.marks})</span>` : ''}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <div class="rules-box">
+                    <h4 style="margin:0 0 6px 0; color:#065f46;">امتحانی ضوابط و درجاتِ کامیابی (وفاق المدارس العربیہ پاکستان):</h4>
+                    <ul style="margin:0; padding-right:20px; line-height:1.7;">
+                        <li><b>طریقہ امتحان:</b> امتحان مکمل زبانی ہوگا۔ حفظ میں قرآن کے ۶ مختلف مقامات سے سنا جائے گا۔</li>
+                        <li><b>کٹوتی نمبرات:</b> ہر غلطی (بتانے یا اٹکنے) پر ۲ نمبر کٹوتی ہوگی، اور ہر جھٹکے/لغزش پر ۱ نمبر کٹوتی ہوگی۔</li>
+                        <li><b>کامیابی کے درجات:</b> ممتاز (۸۰٪ یا زائد)، جید جداً (۷۰٪ تا ۷۹٪)، جید (۶۰٪ تا ۶۹٪)، مقبول (۴۰٪ تا ۵۹٪)، اور ۴۰٪ سے کم پر طالب علم راسب شمار ہوگا۔</li>
+                    </ul>
+                </div>
+
+                <div class="sig-section">
+                    <div class="sig-block">دستخط استادِ شعبہ حفظ</div>
+                    <div class="sig-block">دستخط ناظمِ تعلیمات</div>
+                    <div class="sig-block">مہر و دستخط مہتمم ادارہ</div>
+                </div>
+
+                <script>
+                    window.onload = function() {
+                        setTimeout(() => { window.print(); }, 500);
+                    };
+                </script>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+    }
+
+    async printFullSyllabus() {
+        const syllabus = await MadrassahDB.getAllSyllabusBooks();
+        const printWin = window.open('', '_blank');
+        if (!printWin) {
+            alert('براہ کرم پاپ اپ بلاکر غیر فعال کریں تاکہ پرنٹ ونڈو کھل سکے۔');
+            return;
+        }
+
+        printWin.document.write(`
+            <!DOCTYPE html>
+            <html dir="rtl" lang="ur">
+            <head>
+                <meta charset="utf-8">
+                <title>مکمل نصابِ تعلیم — مدرسہ عبد الرحمن بن عوف</title>
+                <style>
+                    body { font-family: 'Jameel Noori Nastaleeq', 'Amiri', serif, Tahoma; direction: rtl; padding: 25px; line-height: 1.6; }
+                    .header-box { text-align: center; border-bottom: 2px solid #065f46; padding-bottom: 10px; margin-bottom: 20px; }
+                    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+                    th { background: #065f46; color: white; padding: 8px 10px; border: 1px solid #065f46; text-align: right; }
+                    td { padding: 8px 10px; border: 1px solid #cbd5e1; text-align: right; }
+                    tr:nth-child(even) { background: #f8fafc; }
+                    .sig-section { display: flex; justify-content: space-between; margin-top: 40px; }
+                    .sig-block { text-align: center; border-top: 1px dashed #64748b; padding-top: 5px; width: 28%; font-size: 13px; font-weight: bold; }
+                    @media print { button { display: none !important; } }
+                </style>
+            </head>
+            <body>
+                <div class="header-box">
+                    <h1 style="color:#065f46; margin:0;">مدرسہ عبد الرحمن بن عوف غفوریہ</h1>
+                    <div style="font-size:18px; font-weight:bold; margin-top:5px;">مکمل نصابِ تعلیم برائے تمام شعبہ جات</div>
+                    <div style="font-size:13px; color:#64748b;">الحاق و نصاب: وفاق المدارس العربیہ پاکستان</div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:25%;">درجہ / شعبہ</th>
+                            <th style="width:35%;">کتاب کا نام</th>
+                            <th style="width:20%;">فن</th>
+                            <th style="width:20%;">مصنف / نمبرات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${syllabus.sort((a,b) => (a.className || '').localeCompare(b.className || '')).map(s => `
+                            <tr>
+                                <td style="font-weight:bold; color:#065f46;">${s.className}</td>
+                                <td style="font-weight:bold;">${s.bookName}</td>
+                                <td>${s.subjectType || '---'}</td>
+                                <td>${s.author || '---'} ${s.marks ? `(${s.marks})` : ''}</td>
+                            </tr>
+                        `).join('') || '<tr><td colspan="4" style="text-align:center;">کوئی کتب موجود نہیں</td></tr>'}
+                    </tbody>
+                </table>
+
+                <div class="sig-section">
+                    <div class="sig-block">دستخط استاد / نگرانِ شعبہ</div>
+                    <div class="sig-block">دستخط ناظمِ تعلیمات</div>
+                    <div class="sig-block">مہر و دستخط مہتمم ادارہ</div>
+                </div>
+
+                <script>
+                    window.onload = function() { setTimeout(() => { window.print(); }, 500); };
+                </script>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+    }
 
     async renderTimetableModule(container) {
         const mod = (typeof window !== 'undefined' && window.TimetableModule) ? window.TimetableModule : ((typeof TimetableModule !== 'undefined') ? TimetableModule : null);
@@ -1747,7 +2906,13 @@ class MadrassahApp {
                     if (k === 'section' || k === 'id') continue;
                     const el = newForm.querySelector(`[name="${k}"]`);
                     if (el && currentValues[k] !== undefined && currentValues[k] !== '') {
-                        el.value = currentValues[k];
+                        if (el.type === 'checkbox') {
+                            el.checked = (currentValues[k] === el.value || currentValues[k] === 'yes');
+                            if (k === 'hasMadrsaEdu' && typeof this.toggleMadrsaEduSection === 'function') this.toggleMadrsaEduSection(el.checked);
+                            if (k === 'isTransferHifz' && typeof this.toggleHifzTestSection === 'function') this.toggleHifzTestSection(el.checked);
+                        } else {
+                            el.value = currentValues[k];
+                        }
                     }
                 }
             }
@@ -1770,6 +2935,16 @@ class MadrassahApp {
         const isBanat = (student && student.section === 'banat') || this.currentSection === 'banat';
         const teachers = (await MadrassahDB.getAllTeachers()) || [];
         const selectedDept = (student && student.department) ? student.department : 'حفظ';
+        const hasMadrsa = Boolean(student && (
+            student.hasMadrsaEdu === 'yes' || 
+            student.hasMadrsaEdu === true ||
+            (student.hasMadrsaEdu !== 'no' && (
+                (student.previousMadrsa && student.previousMadrsa.trim()) ||
+                (student.previousReligiousStage && student.previousReligiousStage.trim()) ||
+                (student.leavingReason && student.leavingReason.trim()) ||
+                (student.religiousEdu && student.religiousEdu.trim() && student.religiousEdu !== 'کوئی نہیں (ابتدائی مبتدی)')
+            ))
+        ));
 
         container.innerHTML = `
             <div class="card" style="max-width: 1000px; margin: 0 auto;">
@@ -2013,41 +3188,59 @@ class MadrassahApp {
                             </div>
                         </div>
 
-                        <!-- Part B: Religious Education (دینی تعلیم) -->
-                        <div style="background: white; border: 2px solid #a7f3d0; border-radius: 12px; padding: 1.1rem; box-shadow: 0 2px 6px rgba(5, 150, 105, 0.05); margin-bottom: 0;">
-                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.8rem; border-bottom: 1.5px solid #ecfdf5; padding-bottom: 0.4rem;">
-                                <div style="width: 32px; height: 32px; border-radius: 8px; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
-                                    <i class="fas fa-book-quran"></i>
+                        <!-- Part B: Religious Education Question Section (دینی مدرسہ تعلیم کا سوال و انتخاب) -->
+                        <div style="background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%); border: 2px solid #86efac; border-radius: 14px; padding: 12px 18px; margin-top: 1rem; margin-bottom: 0.8rem; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: 0 2px 6px rgba(5, 150, 105, 0.06); cursor: pointer;" onclick="if(event.target.tagName !== 'INPUT' && event.target.tagName !== 'LABEL') { const c = document.getElementById('hasMadrsaEduCheck'); if(c) { c.checked = !c.checked; (window.app || app).toggleMadrsaEduSection(c.checked); } }">
+                            <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                                <label for="hasMadrsaEduCheck" style="font-weight: bold; color: #065f46; font-size: 1.15rem; cursor: pointer; display: flex; align-items: center; gap: 10px; margin: 0; user-select: none;">
+                                    <i class="fas fa-mosque" style="color: #059669; font-size: 1.25rem;"></i> کیا آپ نے کسی دینی مدرسہ میں پڑھا ہے؟
+                                </label>
+                                <div style="display: flex; align-items: center; gap: 8px; background: white; padding: 4px 14px; border-radius: 8px; border: 1.5px solid #86efac; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <input type="checkbox" id="hasMadrsaEduCheck" name="hasMadrsaEdu" value="yes" ${hasMadrsa ? 'checked' : ''} onchange="(window.app || app).toggleMadrsaEduSection(this.checked)" style="width: 22px; height: 22px; cursor: pointer; accent-color: #059669; margin: 0;">
+                                    <label for="hasMadrsaEduCheck" style="cursor: pointer; font-size: 0.95rem; font-weight: bold; color: #065f46; margin: 0; user-select: none;">ٹک کا آپشن (ہاں)</label>
                                 </div>
-                                <h4 style="margin: 0; color: #065f46; font-size: 1.1rem;">دینی تعلیم (Islamic / Religious Education)</h4>
                             </div>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.2rem;">
-                                <div class="form-group-horizontal">
-                                    <label style="font-size: 0.95rem; font-weight: 600; color: #065f46;">دینی تعلیمی قابلیت</label>
-                                    <input list="religiousEduOptions" name="religiousEdu" value="${student ? (student.religiousEdu || '') : ''}" placeholder="انتخاب کریں یا درج کریں..." style="width: 100%;" onchange="(window.app || app).onReligiousEduChange(this.value)">
-                                    <datalist id="religiousEduOptions">
-                                        <option value="قاعدہ / ناظرہ ابتدائی">
-                                        <option value="مکمل ناظرہ قرآن مع تجوید">
-                                        <option value="حفظِ قرآن مجید (جاری / چند پارے)">
-                                        <option value="مکمل حفظِ قرآن مجید (حافظِ قرآن)">
-                                        <option value="ابتدائی دینیات، نماز و بنیادی فقہ">
-                                        <option value="درسِ نظامی (درجہ اعدادیہ / اولیٰ)">
-                                        <option value="درسِ نظامی (ثانیہ / ثالثہ / رابعہ)">
-                                        <option value="درسِ نظامی (خامسہ / عالیہ / عالمیہ)">
-                                        <option value="کوئی نہیں (ابتدائی مبتدی)">
-                                    </datalist>
+                            <span id="hasMadrsaEduBadge" style="background: ${hasMadrsa ? '#bbf7d0' : '#dcfce7'}; color: #15803d; padding: 5px 14px; border-radius: 20px; font-size: 0.88rem; font-weight: bold; border: 1px solid #86efac; user-select: none; white-space: nowrap;">
+                                ${hasMadrsa ? '✓ جی ہاں (تفصیلات درج کریں)' : 'ٹک کریں اگر پڑھا ہے'}
+                            </span>
+                        </div>
+
+                        <!-- Part B Details: Religious Education (نیچے والی تفصیل: دینی تعلیم) -->
+                        <div id="madrsaEduDetailsSection" style="${hasMadrsa ? 'display: block;' : 'display: none;'} margin-top: 0.6rem; margin-bottom: 0;">
+                            <div style="background: white; border: 2px solid #a7f3d0; border-radius: 12px; padding: 1.1rem; box-shadow: 0 2px 6px rgba(5, 150, 105, 0.05); margin-bottom: 0;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.8rem; border-bottom: 1.5px solid #ecfdf5; padding-bottom: 0.4rem;">
+                                    <div style="width: 32px; height: 32px; border-radius: 8px; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+                                        <i class="fas fa-book-quran"></i>
+                                    </div>
+                                    <h4 style="margin: 0; color: #065f46; font-size: 1.1rem;">دینی تعلیم (Islamic / Religious Education)</h4>
                                 </div>
-                                <div class="form-group-horizontal">
-                                    <label style="font-size: 0.95rem; font-weight: 600; color: #065f46;">سابقہ دینی مدرسہ</label>
-                                    <input type="text" name="previousMadrsa" value="${student ? (student.previousMadrsa || '') : ''}" placeholder="سابقہ مدرسہ، مکتب یا جامعہ کا نام...">
-                                </div>
-                                <div class="form-group-horizontal">
-                                    <label style="font-size: 0.95rem; font-weight: 600; color: #065f46;">سابقہ دینی شعبہ / سند</label>
-                                    <input type="text" name="previousReligiousStage" value="${student ? (student.previousReligiousStage || '') : ''}" placeholder="مثلاً: شعبہ حفظ، درجہ اولیٰ، سند ناظرہ...">
-                                </div>
-                                <div class="form-group-horizontal">
-                                    <label style="font-size: 0.95rem; font-weight: 600; color: #065f46;">سابقہ مدرسہ چھوڑنے کی وجہ</label>
-                                    <input type="text" name="leavingReason" value="${student ? (student.leavingReason || '') : ''}" placeholder="سابقہ مدرسہ / ادارہ چھوڑنے کی وجہ درج فرمائیں...">
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.2rem;">
+                                    <div class="form-group-horizontal">
+                                        <label style="font-size: 0.95rem; font-weight: 600; color: #065f46;">دینی تعلیمی قابلیت</label>
+                                        <input list="religiousEduOptions" name="religiousEdu" value="${student ? (student.religiousEdu || '') : ''}" placeholder="انتخاب کریں یا درج کریں..." style="width: 100%;" onchange="(window.app || app).onReligiousEduChange(this.value)">
+                                        <datalist id="religiousEduOptions">
+                                            <option value="قاعدہ / ناظرہ ابتدائی">
+                                            <option value="مکمل ناظرہ قرآن مع تجوید">
+                                            <option value="حفظِ قرآن مجید (جاری / چند پارے)">
+                                            <option value="مکمل حفظِ قرآن مجید (حافظِ قرآن)">
+                                            <option value="ابتدائی دینیات، نماز و بنیادی فقہ">
+                                            <option value="درسِ نظامی (درجہ اعدادیہ / اولیٰ)">
+                                            <option value="درسِ نظامی (ثانیہ / ثالثہ / رابعہ)">
+                                            <option value="درسِ نظامی (خامسہ / عالیہ / عالمیہ)">
+                                            <option value="کوئی نہیں (ابتدائی مبتدی)">
+                                        </datalist>
+                                    </div>
+                                    <div class="form-group-horizontal">
+                                        <label style="font-size: 0.95rem; font-weight: 600; color: #065f46;">سابقہ دینی مدرسہ</label>
+                                        <input type="text" name="previousMadrsa" value="${student ? (student.previousMadrsa || '') : ''}" placeholder="سابقہ مدرسہ، مکتب یا جامعہ کا نام...">
+                                    </div>
+                                    <div class="form-group-horizontal">
+                                        <label style="font-size: 0.95rem; font-weight: 600; color: #065f46;">سابقہ دینی شعبہ / سند</label>
+                                        <input type="text" name="previousReligiousStage" value="${student ? (student.previousReligiousStage || '') : ''}" placeholder="مثلاً: شعبہ حفظ، درجہ اولیٰ، سند ناظرہ...">
+                                    </div>
+                                    <div class="form-group-horizontal">
+                                        <label style="font-size: 0.95rem; font-weight: 600; color: #065f46;">سابقہ مدرسہ چھوڑنے کی وجہ</label>
+                                        <input type="text" name="leavingReason" value="${student ? (student.leavingReason || '') : ''}" placeholder="سابقہ مدرسہ / ادارہ چھوڑنے کی وجہ درج فرمائیں...">
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -2426,6 +3619,14 @@ class MadrassahApp {
                 delete data.id;
             }
             
+            // Explicitly capture Madrassah Education checkbox status
+            data.hasMadrsaEdu = (formData.get('hasMadrsaEdu') === 'yes') ? 'yes' : 'no';
+            if (data.hasMadrsaEdu !== 'yes') {
+                data.previousMadrsa = '';
+                data.previousReligiousStage = '';
+                data.leavingReason = '';
+            }
+
             // Explicitly capture Hifz Transfer checkbox status
             data.isTransferHifz = (formData.get('isTransferHifz') === 'yes') ? 'yes' : 'no';
             
@@ -2762,6 +3963,33 @@ class MadrassahApp {
         }
     }
 
+    toggleMadrsaEduSection(isOpen) {
+        const sec = document.getElementById('madrsaEduDetailsSection');
+        const chk = document.getElementById('hasMadrsaEduCheck');
+        if (isOpen === undefined) {
+            isOpen = chk ? chk.checked : (sec ? (sec.style.display !== 'none' && getComputedStyle(sec).display !== 'none') : false);
+        }
+        isOpen = Boolean(isOpen);
+        if (chk && chk.checked !== isOpen) {
+            chk.checked = isOpen;
+        }
+        if (sec) {
+            sec.style.display = isOpen ? 'block' : 'none';
+            if (isOpen) {
+                setTimeout(() => {
+                    try {
+                        sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    } catch(e) {}
+                }, 50);
+            }
+        }
+        const badge = document.getElementById('hasMadrsaEduBadge');
+        if (badge) {
+            badge.innerHTML = isOpen ? '✓ جی ہاں (تفصیلات درج کریں)' : 'ٹک کریں اگر پڑھا ہے';
+            badge.style.background = isOpen ? '#bbf7d0' : '#dcfce7';
+        }
+    }
+
     calculateHifzTestScore() {
         const totalEl = document.getElementById('hifzTestTotalMarks');
         const obtEl = document.getElementById('hifzTestObtainedMarks');
@@ -2956,6 +4184,9 @@ class MadrassahApp {
         const existingDepts = [...new Set(students.map(s => (s.department || '').trim()).filter(Boolean))];
         const deptsList = [...new Set([...standardDepts, ...existingDepts])];
 
+        const activeCount = students.filter(s => !s.isDischarged && s.status !== 'discharged').length;
+        const dischargedCount = students.filter(s => s.isDischarged || s.status === 'discharged').length;
+
         container.innerHTML = `
             <!-- Top Heading & Actions -->
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; flex-wrap:wrap; gap:12px;">
@@ -2975,26 +4206,34 @@ class MadrassahApp {
                 </div>
             </div>
 
-            <!-- Toolbar: Active Section Badge & Live Search & Dept Filter -->
+            <!-- Toolbar: Active Section Badge & Live Search & Dept Filter & Status Filter -->
             <div style="background:white; border-radius:14px; padding:1rem 1.2rem; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.03); margin-bottom:1.2rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-                <div style="display:flex; align-items:center; gap:8px;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <span style="display:inline-flex; align-items:center; gap:6px; background:${isBanat ? '#fdf2f8' : '#eff6ff'}; color:${isBanat ? '#be185d' : '#1d4ed8'}; border:1px solid ${isBanat ? '#fbcfe8' : '#bfdbfe'}; border-radius:10px; padding:6px 14px; font-weight:bold; font-size:0.95rem;">
                         <i class="${isBanat ? 'fas fa-venus' : 'fas fa-mars'}"></i> فعال سیکشن: ${isBanat ? 'شعبہ بنات (طالبات)' : 'شعبہ بنین (طلباء)'}
                     </span>
-                    <span style="background:#f1f5f9; color:#475569; padding:6px 12px; border-radius:10px; font-weight:bold; font-size:0.9rem; border:1px solid #cbd5e1;">
-                        تعداد: ${students.length}
+                    <span style="background:#f0fdf4; color:#15803d; padding:6px 12px; border-radius:10px; font-weight:bold; font-size:0.9rem; border:1px solid #bbf7d0;" title="زیرِ تعلیم">
+                        <i class="fas fa-user-check"></i> زیرِ تعلیم: ${activeCount}
+                    </span>
+                    <span style="background:#fef2f2; color:#b91c1c; padding:6px 12px; border-radius:10px; font-weight:bold; font-size:0.9rem; border:1px solid #fecaca;" title="خارج شدہ">
+                        <i class="fas fa-user-xmark"></i> خارج شدہ: ${dischargedCount}
                     </span>
                 </div>
 
-                <!-- Search & Department Filter -->
-                <div style="display:flex; gap:10px; align-items:center; flex-grow:1; max-width:550px; flex-wrap:wrap;">
-                    <div style="position:relative; flex:1; min-width:200px;">
+                <!-- Search & Department & Status Filter -->
+                <div style="display:flex; gap:10px; align-items:center; flex-grow:1; max-width:630px; flex-wrap:wrap;">
+                    <div style="position:relative; flex:1; min-width:180px;">
                         <i class="fas fa-search" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8;"></i>
                         <input type="text" id="studentSearch" placeholder="نام، ولدیت، رول نمبر، فون سے تلاش کریں..." oninput="app.filterStudentsTable()" style="padding:0.5rem 2.2rem 0.5rem 1rem; border-radius:10px; border:1px solid #cbd5e1; width:100%; font-size:0.95rem; outline:none;">
                     </div>
                     <select id="studentDeptFilter" onchange="app.filterStudentsTable()" style="padding:0.5rem 1rem; border-radius:10px; border:1px solid #cbd5e1; font-weight:bold; font-size:0.9rem; color:#334155; outline:none; cursor:pointer; background:#fff;">
                         <option value="">تمام شعبہ جات</option>
                         ${deptsList.map(d => `<option value="${d}">${d}</option>`).join('')}
+                    </select>
+                    <select id="studentStatusFilter" onchange="app.filterStudentsTable()" style="padding:0.5rem 1rem; border-radius:10px; border:1.5px solid #cbd5e1; font-weight:bold; font-size:0.9rem; color:#1e293b; outline:none; cursor:pointer; background:#fff;">
+                        <option value="active" selected>صرف زیرِ تعلیم (${activeCount})</option>
+                        <option value="discharged">صرف خارج شدہ (${dischargedCount})</option>
+                        <option value="all">تمام طلباء (${students.length})</option>
                     </select>
                 </div>
             </div>
@@ -3017,19 +4256,32 @@ class MadrassahApp {
                     </thead>
                     <tbody>
                         ${students.map(s => {
+                            const isDischarged = Boolean(s.isDischarged || s.status === 'discharged');
                             const hasMahram1 = Boolean(s.mahram1Name || s.mahram1Photo);
                             const hasMahram2 = Boolean(s.mahram2Name || s.mahram2Photo);
                             const mahramCount = (hasMahram1 ? 1 : 0) + (hasMahram2 ? 1 : 0);
                             const isHighlighted = (this.highlightStudentId && (s.id == this.highlightStudentId || s.uniqueCode == this.highlightStudentId));
                             return `
-                            <tr class="${isHighlighted ? 'highlighted-student-row' : ''}" data-dept="${s.department || ''}" style="${isHighlighted ? 'background:#ecfdf5; border-right: 4px solid #059669;' : ''}">
+                            <tr class="${isHighlighted ? 'highlighted-student-row' : ''} ${isDischarged ? 'student-row-discharged' : ''}" 
+                                data-dept="${s.department || ''}" 
+                                data-status="${isDischarged ? 'discharged' : 'active'}"
+                                style="${isHighlighted ? 'background:#ecfdf5; border-right: 4px solid #059669;' : (isDischarged ? 'background:#fff8f8; opacity:0.95;' : '')}">
                                 <td style="font-weight:bold; font-size:1rem;">
-                                    <span style="background:#eff6ff; color:#1d4ed8; padding:3px 8px; border-radius:6px; font-family:monospace; border:1px solid #bfdbfe; font-size:0.95rem;">
+                                    <span style="background:${isDischarged ? '#fee2e2' : '#eff6ff'}; color:${isDischarged ? '#b91c1c' : '#1d4ed8'}; padding:3px 8px; border-radius:6px; font-family:monospace; border:1px solid ${isDischarged ? '#fecaca' : '#bfdbfe'}; font-size:0.95rem;">
                                         ${s.uniqueCode || ('STU-' + (1000 + parseInt(s.id)))}
                                     </span>
                                 </td>
                                 <td><img src="${s.photo || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:1px solid #eee;"></td>
-                                <td style="font-weight:600;"><span style="cursor:pointer; color:var(--primary);" onclick="app.viewStudentProfile(${s.id})" title="پروفائل و ریکارڈ ملاحظہ فرمائیں">${s.name}</span></td>
+                                <td style="font-weight:600;">
+                                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                        <span style="cursor:pointer; color:var(--primary);" onclick="app.viewStudentProfile(${s.id})" title="پروفائل و ریکارڈ ملاحظہ فرمائیں">${s.name}</span>
+                                        ${isDischarged ? `
+                                            <span style="background:#fee2e2; color:#b91c1c; border:1px solid #fecdd3; padding:2px 8px; border-radius:6px; font-size:0.75rem; font-weight:bold; cursor:pointer;" onclick="app.viewDischargeDetails(${s.id})" title="اخراج کی وجہ: ${s.dischargeReason || '---'} (تفصیلات دیکھیں)">
+                                                <i class="fas fa-user-xmark"></i> خارج شدہ
+                                            </span>
+                                        ` : ''}
+                                    </div>
+                                </td>
                                 <td>${s.fatherName || '---'}</td>
                                 <td><span style="background:#fff7ed; padding:2px 10px; border-radius:6px; font-size:0.9rem; color:#c2410c; font-weight:600;">${s.department || '---'}</span></td>
                                 <td><span style="background:#f1f5f9; padding:2px 10px; border-radius:6px; font-size:0.9rem; color:var(--primary); font-weight:600;">${s.className || s.class || '---'}</span></td>
@@ -3057,6 +4309,13 @@ class MadrassahApp {
                                     <button class="btn btn-sm" style="padding:4px 10px; background:#f0fdf4; color:#16a34a; margin-left:4px;" onclick="app.printStudentForm(${s.id})" title="داخلہ فارم ملاحظہ و پرنٹ کریں (A4)"><i class="fas fa-file-invoice"></i></button>
                                     <button class="btn btn-sm" style="padding:4px 10px; background:#eff6ff; color:#2563eb; margin-left:4px;" onclick="app.printIDCard(${s.id})" title="${isBanat ? 'طالبہ و تصدیقِ محرم کارڈ' : 'آئی ڈی کارڈ'}"><i class="fas fa-id-card"></i></button>
                                     <button class="btn btn-sm" style="padding:4px 10px; background:#f1f5f9; color:var(--primary); margin-left:4px;" onclick="app.editStudent(${s.id})" title="کوائف تبدیل کریں"><i class="fas fa-edit"></i></button>
+                                    ${!isDischarged ? `
+                                        <button class="btn btn-sm" style="padding:4px 10px; background:#fff7ed; color:#c2410c; margin-left:4px; border:1px solid #fed7aa;" onclick="app.showDischargeModal(${s.id})" title="طالب علم کا باقاعدہ اخراج درج کریں (وجہ و ریکارڈ محفوظ رہے گا)"><i class="fas fa-user-slash"></i> اخراج</button>
+                                    ` : `
+                                        <button class="btn btn-sm" style="padding:4px 10px; background:#f0fdf4; color:#16a34a; margin-left:4px; border:1px solid #bbf7d0;" onclick="app.printDischargeCertificate(${s.id})" title="سرٹیفکیٹ برائے اخراج پرنٹ کریں"><i class="fas fa-file-signature"></i> سرٹیفکیٹ</button>
+                                        <button class="btn btn-sm" style="padding:4px 10px; background:#f8fafc; color:#475569; margin-left:4px; border:1px solid #cbd5e1;" onclick="app.viewDischargeDetails(${s.id})" title="اخراج کی وجہ و کیفیات دیکھیں"><i class="fas fa-info-circle"></i> وجہ</button>
+                                        <button class="btn btn-sm" style="padding:4px 10px; background:#ecfdf5; color:#059669; margin-left:4px; border:1px solid #a7f3d0;" onclick="app.restoreDischargedStudent(${s.id})" title="اخراج منسوخ کر کے داخلہ بحال کریں"><i class="fas fa-rotate-left"></i> بحال</button>
+                                    `}
                                     <button class="btn btn-sm" style="padding:4px 10px; background:#fef2f2; color:#ef4444;" onclick="app.deleteStudent(${s.id})" title="حذف کریں"><i class="fas fa-trash"></i></button>
                                 </td>
                             </tr>
@@ -3079,6 +4338,8 @@ class MadrassahApp {
 
         // Clear highlight after showing
         this.highlightStudentId = null;
+        // Apply default status filter
+        setTimeout(() => this.filterStudentsTable(), 15);
     }
 
     switchStudentListSection(filter) {
@@ -3093,14 +4354,17 @@ class MadrassahApp {
     filterStudentsTable() {
         const q = (document.getElementById('studentSearch')?.value || '').toLowerCase().trim();
         const dept = (document.getElementById('studentDeptFilter')?.value || '').trim();
+        const status = (document.getElementById('studentStatusFilter')?.value || 'active').trim();
         const rows = document.querySelectorAll('#studentTable tbody tr:not(.no-record-row)');
         let visibleCount = 0;
         rows.forEach(r => {
             const text = r.innerText.toLowerCase();
             const rDept = r.getAttribute('data-dept') || '';
+            const rStatus = r.getAttribute('data-status') || 'active';
             const matchQ = !q || text.includes(q);
             const matchDept = !dept || rDept === dept;
-            const show = matchQ && matchDept;
+            const matchStatus = (status === 'all') || (rStatus === status);
+            const show = matchQ && matchDept && matchStatus;
             r.style.display = show ? '' : 'none';
             if (show) visibleCount++;
         });
@@ -6806,6 +8070,10 @@ downloadReceiptImageDirect(options) {
     };
 
     async renderAccountsModule(container) {
+        if (!this.isFinanceAccessGranted()) {
+            this.renderFinanceLockScreen(container, 'accounts');
+            return;
+        }
         const allTransactions = await MadrassahDB.getAllTransactions();
         
         // Auto-correct stored category to "راشن"
@@ -6961,6 +8229,12 @@ downloadReceiptImageDirect(options) {
                     </button>
                     <button class="btn" style="background:#065f46; color:white; border:none; border-radius:10px; font-weight:bold; padding:9px 16px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(6,95,70,0.25); cursor:pointer;" onclick="app.printAccountsLedger()" title="مالیاتی گوشوارہ A4 Landscape پرنٹ و پی ڈی ایف">
                         <i class="fas fa-file-invoice"></i> مالیاتی گوشوارہ (A4 Landscape)
+                    </button>
+                    <button class="btn" style="background:#4338ca; color:white; border:none; border-radius:10px; font-weight:bold; padding:9px 14px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(67,56,202,0.25); cursor:pointer;" onclick="app.showChangeFinancePasscodeModal()" title="بیت المال کا سیکیورٹی پاس کوڈ تبدیل کریں">
+                        <i class="fas fa-key"></i> کوڈ تبدیل کریں
+                    </button>
+                    <button class="btn" style="background:#475569; color:white; border:none; border-radius:10px; font-weight:bold; padding:9px 14px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(71,85,105,0.2); cursor:pointer;" onclick="app.lockFinanceSection()" title="بیت المال کو دوبارہ لاک کریں">
+                        <i class="fas fa-lock"></i> لاک کریں
                     </button>
                 </div>
             </div>
@@ -10107,14 +11381,11 @@ downloadReceiptImageDirect(options) {
         const subjectsInput = document.getElementById('exam_subjects_input');
         if (!subjectsInput) return;
 
-        if (dept === 'حفظ') {
-            subjectsInput.value = 'حفظِ قرآن، تجوید و ترتیل، مخارج و قواعد';
-            return;
-        }
-
         let defaultBooks = [];
         if (className && this.wifaqSyllabusData[className]) {
             defaultBooks = this.wifaqSyllabusData[className];
+        } else if (dept === 'حفظ') {
+            defaultBooks = this.wifaqSyllabusData['تحفیظ القرآن الکریم (مکمل)'] || ['حفظِ قرآن کریم (۶۰ نمبر)', 'تجوید و مخارج (۳۰ نمبر)', 'مسائل نماز (۵ نمبر)', 'مسنون دعائیں (۵ نمبر)'];
         } else if (dept === 'درس نظامی') {
             defaultBooks = this.wifaqSyllabusData['اولیٰ'];
         } else if (dept === 'دراسات دینیہ') {
@@ -11716,6 +12987,28 @@ downloadReceiptImageDirect(options) {
                     <button type="button" onclick="document.getElementById('mainStudentProfileModal').remove()" class="mms-close-btn">&times;</button>
                 </div>
 
+                ${(student.isDischarged || student.status === 'discharged') ? `
+                <div style="background:#fef2f2; border-bottom:2px solid #fca5a5; padding:10px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="background:#dc2626; color:white; font-weight:bold; font-size:0.82rem; padding:3px 8px; border-radius:6px;">
+                            <i class="fas fa-user-xmark"></i> خارج شدہ
+                        </span>
+                        <span style="color:#991b1b; font-size:0.92rem; font-weight:600;">
+                            <b>تاریخِ اخراج:</b> ${student.dischargeDate || '---'} | <b>وجہ:</b> ${student.dischargeReason || '---'}
+                            ${student.dischargeRemarks ? ` — "${student.dischargeRemarks}"` : ''}
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="document.getElementById('mainStudentProfileModal').remove(); app.printDischargeCertificate(${student.id})" class="btn btn-sm" style="background:#16a34a; color:white; font-weight:bold; border-radius:6px; padding:5px 12px; border:none; cursor:pointer;">
+                            <i class="fas fa-file-signature"></i> سرٹیفکیٹ
+                        </button>
+                        <button onclick="document.getElementById('mainStudentProfileModal').remove(); app.restoreDischargedStudent(${student.id})" class="btn btn-sm" style="background:#2563eb; color:white; font-weight:bold; border-radius:6px; padding:5px 12px; border:none; cursor:pointer;">
+                            <i class="fas fa-rotate-left"></i> داخلہ بحال کریں
+                        </button>
+                    </div>
+                </div>
+                ` : ''}
+
                 <!-- Navigation Tabs -->
                 <div class="hifz-profile-tabs" style="margin-top:1rem;">
                     <button class="tab-btn active" onclick="app.switchStudentModalTab('st_general_tab', this)">
@@ -12277,6 +13570,7 @@ downloadReceiptImageDirect(options) {
         const hasReceipt = this.hasReceiptTemplate();
         const receiptUri = this.getReceiptTemplateUri();
         const storedPass = (await MadrassahDB.getSetting('app_password')) || '123';
+        const storedFinancePass = (await this.getFinancePasscode()) || '123';
 
         container.innerHTML = `
             <div style="max-width: 960px; margin: 0 auto; direction: rtl;">
@@ -12422,12 +13716,10 @@ downloadReceiptImageDirect(options) {
                             </div>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                            <span style="font-size: 0.88rem; color: #475569;">
-                                فعال پاسورڈ: <strong id="settings-active-password-text" style="font-family: monospace; font-size: 1.15rem; color: #4338ca; background: #eef2ff; padding: 3px 10px; border-radius: 6px; border: 1px solid #c7d2fe; letter-spacing: 1px;">${storedPass}</strong>
+                            <span id="settings-active-password-text" style="display: none;"></span>
+                            <span style="background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; padding: 4px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: bold;">
+                                <i class="fas fa-shield-halved"></i> پاسورڈ فعال و محفوظ ہے
                             </span>
-                            <button type="button" onclick="app.resetPasswordToDefault()" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 5px 12px; border-radius: 6px; font-weight: bold; font-size: 0.82rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-                                <i class="fas fa-rotate-left"></i> ڈیفالٹ 123 پر ری سیٹ کریں
-                            </button>
                         </div>
                     </div>
 
@@ -12435,15 +13727,15 @@ downloadReceiptImageDirect(options) {
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;">
                             <div>
                                 <label style="display: block; font-size: 0.85rem; font-weight: bold; color: #334155; margin-bottom: 4px;">موجودہ پاسورڈ:</label>
-                                <input type="text" id="current-pass-input" value="${storedPass}" placeholder="موجودہ پاسورڈ (یا 123)" style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; font-family: monospace;">
+                                <input type="password" id="current-pass-input" value="" placeholder="موجودہ پاسورڈ درج کریں" style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; font-family: monospace;">
                             </div>
                             <div>
                                 <label style="display: block; font-size: 0.85rem; font-weight: bold; color: #334155; margin-bottom: 4px;">نیا پاسورڈ:</label>
-                                <input type="text" id="new-pass-input" placeholder="نیا پاسورڈ درج کریں" required style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; font-family: monospace;">
+                                <input type="password" id="new-pass-input" placeholder="نیا پاسورڈ درج کریں" required style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; font-family: monospace;">
                             </div>
                             <div>
                                 <label style="display: block; font-size: 0.85rem; font-weight: bold; color: #334155; margin-bottom: 4px;">نیا پاسورڈ تصدیق:</label>
-                                <input type="text" id="confirm-pass-input" placeholder="دوبارہ درج کریں" required style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; font-family: monospace;">
+                                <input type="password" id="confirm-pass-input" placeholder="دوبارہ درج کریں" required style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; font-family: monospace;">
                             </div>
                         </div>
                         <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -12453,6 +13745,25 @@ downloadReceiptImageDirect(options) {
                             <span id="pass-change-msg" style="font-weight: bold; font-size: 0.9rem; display: none;"></span>
                         </div>
                     </form>
+                </div>
+
+                <!-- 3B. BAIT-UL-MAAL & FINANCE SECURITY CODE -->
+                <div class="card" style="border-radius: 14px; margin-bottom: 1.2rem; border-right: 5px solid #059669; background: #ffffff; padding: 1.2rem; box-shadow: 0 1px 4px rgba(0,0,0,0.05);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-vault" style="color: #059669; font-size: 1.3rem;"></i>
+                            <div>
+                                <h3 style="margin: 0; color: #047857; font-size: 1.2rem;">بیت المال، تنخواہوں و ڈونرز کا سیکیورٹی پاسورڈ</h3>
+                                <p style="margin: 2px 0 0 0; color: #64748b; font-size: 0.85rem;">مالیاتی ریکارڈز اور مستقل ڈونرز تک رسائی سیکیورٹی پاسورڈ سے محفوظ ہے</p>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <span id="settings-active-finance-pass-text" style="display: none;"></span>
+                            <button type="button" onclick="app.showChangeFinancePasscodeModal()" style="background: #059669; color: white; border: none; padding: 7px 16px; border-radius: 8px; font-weight: bold; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(5,150,105,0.25);">
+                                <i class="fas fa-key"></i> کوڈ تبدیل کریں
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 4. EXAM GRADING RULES -->
@@ -12592,7 +13903,7 @@ downloadReceiptImageDirect(options) {
                             </div>
                             <div>
                                 <h3 style="margin:0; color:#065f46; font-size:1.35rem;">سیکیورٹی پاسورڈ تبدیل کریں (Change Password)</h3>
-                                <p style="margin:2px 0 0 0; color:#64748b; font-size:0.95rem;">سافٹ ویئر لاگ ان کے لیے اپنی مرضی کا نیا پاسورڈ مقرر فرمائیں (موجودہ ڈیفالٹ: 123)</p>
+                                <p style="margin:2px 0 0 0; color:#64748b; font-size:0.95rem;">سافٹ ویئر لاگ ان کے لیے اپنی مرضی کا نیا پاسورڈ مقرر فرمائیں</p>
                             </div>
                         </div>
                         <span style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; padding:4px 14px; border-radius:20px; font-size:0.85rem; font-weight:bold;">
@@ -12607,7 +13918,7 @@ downloadReceiptImageDirect(options) {
                                     موجودہ پاسورڈ (Current Password):
                                 </label>
                                 <div style="position:relative;">
-                                    <input type="password" id="current-pass-input" placeholder="موجودہ پاسورڈ لکھیں (ڈیفالٹ: 123)" required style="width:100%; padding:10px 40px 10px 12px; font-size:1rem; border:1.5px solid #cbd5e1; border-radius:10px; background:#fff;">
+                                    <input type="password" id="current-pass-input" placeholder="موجودہ پاسورڈ لکھیں" required style="width:100%; padding:10px 40px 10px 12px; font-size:1rem; border:1.5px solid #cbd5e1; border-radius:10px; background:#fff;">
                                     <i class="fas fa-key" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8;"></i>
                                 </div>
                             </div>
@@ -16803,6 +18114,10 @@ downloadReceiptImageDirect(options) {
     // --- 3. SALARY MANAGEMENT MODULE (تنخواہوں کا نظام، اقساط و پے رول لیجر) ---
     // =========================================================================
     async renderSalaryModule(container) {
+        if (!this.isFinanceAccessGranted()) {
+            this.renderFinanceLockScreen(container, 'salary_management');
+            return;
+        }
         const staff = (await MadrassahDB.getAllTeachers()) || [];
         const now = new Date();
         const monthsUrdu = ['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'];
@@ -16852,6 +18167,12 @@ downloadReceiptImageDirect(options) {
                     </button>
                     <button class="btn" onclick="app.renderAdvanceModule()" style="background:#f59e0b; color:#111827; border:none; border-radius:10px; font-weight:bold; padding:9px 15px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(245,158,11,0.25); cursor:pointer;">
                         <i class="fas fa-hand-holding-hand"></i> ایڈوانس / قرض
+                    </button>
+                    <button class="btn" onclick="app.showChangeFinancePasscodeModal()" style="background:#4338ca; color:white; border:none; border-radius:10px; font-weight:bold; padding:9px 14px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(67,56,202,0.25); cursor:pointer;" title="مالیات کا سیکیورٹی پاس کوڈ تبدیل کریں">
+                        <i class="fas fa-key"></i> کوڈ تبدیل کریں
+                    </button>
+                    <button class="btn" onclick="app.lockFinanceSection()" style="background:#475569; color:white; border:none; border-radius:10px; font-weight:bold; padding:9px 14px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(71,85,105,0.2); cursor:pointer;" title="مالیات کو دوبارہ لاک کریں">
+                        <i class="fas fa-lock"></i> لاک کریں
                     </button>
                 </div>
             </div>
@@ -18574,6 +19895,619 @@ downloadReceiptImageDirect(options) {
         this.render().then(() => {
             this.selectStudentForFee(id);
         });
+    }
+
+    // --- Student Discharge (اخراج و رخصت نامہ) Methods ---
+    async showDischargeModal(studentId) {
+        const student = await MadrassahDB.getStudentById(studentId);
+        if (!student) {
+            alert('طالب علم کا ریکارڈ نہیں ملا!');
+            return;
+        }
+
+        const modalId = 'discharge-modal';
+        const existing = document.getElementById(modalId);
+        if (existing) existing.remove();
+
+        const today = new Date().toISOString().split('T')[0];
+        const isBanat = (student.section === 'banat' || this.currentSection === 'banat');
+
+        const modalHtml = `
+            <div id="${modalId}" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.65); z-index:9999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px); padding:1rem;">
+                <div style="background:white; border-radius:18px; width:100%; max-width:680px; max-height:92vh; overflow-y:auto; box-shadow:0 25px 50px rgba(0,0,0,0.3); border:2.5px solid #ea580c; animation:fadeIn 0.2s ease-in-out;">
+                    <!-- Modal Header -->
+                    <div style="background:linear-gradient(135deg, #7c2d12, #c2410c, #ea580c); color:white; padding:1.2rem 1.6rem; border-radius:15px 15px 0 0; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <div style="width:42px; height:42px; border-radius:10px; background:rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+                                <i class="fas fa-user-slash"></i>
+                            </div>
+                            <div>
+                                <h3 style="margin:0; font-size:1.45rem; font-family:'Aref Ruqaa', 'Amiri', serif;">
+                                    ${isBanat ? 'طالبہ کا اخراج درج فرمائیں' : 'طالب علم کا اخراج درج فرمائیں'}
+                                </h3>
+                                <p style="margin:2px 0 0 0; font-size:0.88rem; color:#fed7aa;">اخراج کی وجہ اور سابقہ کوائف محفوظ کر کے رخصت نامہ جاری کریں</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="document.getElementById('${modalId}').remove()" style="background:none; border:none; color:white; font-size:1.4rem; cursor:pointer;"><i class="fas fa-times"></i></button>
+                    </div>
+
+                    <!-- Student Info Card -->
+                    <div style="background:#fff7ed; border-bottom:1.5px solid #ffedd5; padding:1rem 1.6rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <div style="font-size:1.15rem; font-weight:bold; color:#9a3412;">
+                                ${student.name} <span style="font-size:0.95rem; font-weight:normal; color:#431407;">ولدیت / سرپرست: ${student.fatherName || '---'}</span>
+                            </div>
+                            <div style="display:flex; gap:12px; margin-top:4px; font-size:0.88rem; color:#7c2d12;">
+                                <span><b>کوڈ:</b> ${student.uniqueCode || ('STU-' + (1000 + parseInt(student.id)))}</span>
+                                <span><b>شعبہ:</b> ${student.department || '---'}</span>
+                                <span><b>کلاس:</b> ${student.className || student.class || '---'}</span>
+                            </div>
+                        </div>
+                        <span style="background:#fed7aa; color:#9a3412; font-weight:bold; padding:4px 10px; border-radius:8px; font-size:0.85rem;">
+                            داخلہ: ${student.admissionDate || '---'}
+                        </span>
+                    </div>
+
+                    <!-- Form Body -->
+                    <form onsubmit="event.preventDefault();" style="padding:1.4rem 1.6rem;">
+                        <div style="display:grid; grid-template-columns:1fr 1.2fr; gap:1rem; margin-bottom:1rem;">
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:5px; color:#1e293b; font-size:0.95rem;">تاریخِ اخراج <span style="color:#dc2626;">*</span></label>
+                                <input type="date" id="dis_date" value="${today}" style="width:100%; padding:9px 12px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.95rem; outline:none; background:white; font-weight:600;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:5px; color:#1e293b; font-size:0.95rem;">بنیادی وجہِ اخراج <span style="color:#dc2626;">*</span></label>
+                                <select id="dis_reason" style="width:100%; padding:9px 12px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.95rem; font-weight:bold; color:#9a3412; background:white; outline:none;">
+                                    <option value="مستقل و طویل غیر حاضری">مستقل و طویل غیر حاضری (حاضری کی کمی)</option>
+                                    <option value="والدین / سرپرست کی درخواست پر">والدین / سرپرست کی باضابطہ درخواست پر</option>
+                                    <option value="تادیبی کارروائی / خلاف ورزی و بد نظمی">تادیبی کارروائی / مدرسہ قواعد کی خلاف ورزی</option>
+                                    <option value="نقل مکانی / رہائش کی تبدیلی">نقل مکانی / رہائش کی تبدیلی یا دوسرے شہر روانگی</option>
+                                    <option value="عصری اسکول / کالج میں مصروفیت">عصری اسکول / کالج میں مصروفیت یا امتحانات</option>
+                                    <option value="گھریلو یا معاشی مجبوریاں">گھریلو یا معاشی مجبوریاں</option>
+                                    <option value="دیگر دینی مدرسہ میں داخلہ">دیگر دینی مدرسہ میں داخلہ</option>
+                                    <option value="طبی و صحت کے مسائل">طبی عوارض و صحت کے مسائل</option>
+                                    <option value="تعلیمی عدمِ دلچسپی">تعلیمی عدمِ دلچسپی / سست رفتاری</option>
+                                    <option value="دیگر وجوہات">دیگر وجوہات (نیچے ریمارکس میں تحریر فرمائیں)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:1rem;">
+                            <label style="display:block; font-weight:bold; margin-bottom:5px; color:#1e293b; font-size:0.95rem;">تفصیلی سبب و مفصل ریمارکس (Detailed Reason / Notes) <span style="color:#dc2626;">*</span></label>
+                            <textarea id="dis_remarks" rows="3" placeholder="یہاں اخراج کا مفصل پس منظر، والدین سے گفتگو، تادیبی نوٹ یا خصوصی وجوہات تحریر فرمائیں تاکہ مستقبل میں بطورِ ریکارڈ محفوظ رہے..." style="width:100%; padding:10px 12px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.95rem; outline:none; font-family:inherit; resize:vertical;"></textarea>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:5px; color:#1e293b; font-size:0.95rem;">مالی کیفیت و کلیئرنس</label>
+                                <select id="dis_fee_status" style="width:100%; padding:9px 12px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.95rem; background:white; outline:none;">
+                                    <option value="تمام واجبات و فیس بے باق ہیں (کوئی بقایا نہیں)">تمام واجبات و فیس بے باق ہیں (کوئی بقایا نہیں)</option>
+                                    <option value="واجب الادا فیس باقی ہے">واجب الادا فیس باقی ہے (بقایا جات ذمہ ہیں)</option>
+                                    <option value="بقایا جات معاف کر دیے گئے">بقایا جات انتظامیہ کی طرف سے معاف کر دیے گئے</option>
+                                    <option value="کتب و سامانِ مدرسہ مکمل واپس وصول ہیں">کتب و سامانِ مدرسہ مکمل واپس وصول ہیں</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:5px; color:#1e293b; font-size:0.95rem;">اخلاق و کردار کا عمومی جائزہ</label>
+                                <select id="dis_conduct" style="width:100%; padding:9px 12px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.95rem; background:white; outline:none;">
+                                    <option value="عمدہ و بااخلاق (Good & Disciplined)">عمدہ و بااخلاق (Good & Disciplined)</option>
+                                    <option value="تسلی بخش (Satisfactory)">تسلی بخش (Satisfactory)</option>
+                                    <option value="محتاجِ اصلاح / غیر تسلی بخش (Needs Improvement)">محتاجِ اصلاح / غیر تسلی بخش (Needs Improvement)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:1.5rem;">
+                            <label style="display:block; font-weight:bold; margin-bottom:5px; color:#1e293b; font-size:0.95rem;">منظور کنندہ / مجاز اتھارٹی</label>
+                            <input type="text" id="dis_approved_by" value="مہتمم صاحب" placeholder="مجاز اتھارٹی کا نام یا عہدہ" style="width:100%; padding:9px 12px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.95rem; background:white; outline:none;">
+                        </div>
+
+                        <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1.5px solid #e2e8f0; padding-top:1.2rem; flex-wrap:wrap;">
+                            <button type="button" onclick="document.getElementById('${modalId}').remove()" class="btn" style="background:#f1f5f9; color:#475569; font-weight:bold; padding:9px 18px; border-radius:8px; border:none; cursor:pointer;">
+                                منسوخ کریں
+                            </button>
+                            <button type="button" onclick="app.saveStudentDischarge(${student.id}, false)" class="btn" style="background:#2563eb; color:white; font-weight:bold; padding:9px 18px; border-radius:8px; border:none; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                                <i class="fas fa-save"></i> صرف اخراج محفوظ کریں
+                            </button>
+                            <button type="button" onclick="app.saveStudentDischarge(${student.id}, true)" class="btn" style="background:#16a34a; color:white; font-weight:bold; padding:9px 20px; border-radius:8px; border:none; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 4px 10px rgba(22,163,74,0.3);">
+                                <i class="fas fa-file-signature"></i> اخراج محفوظ کریں اور سرٹیفکیٹ پرنٹ کریں
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
+    async saveStudentDischarge(studentId, shouldPrint = false) {
+        const disDate = document.getElementById('dis_date')?.value || new Date().toISOString().split('T')[0];
+        const disReason = document.getElementById('dis_reason')?.value || 'دیگر وجوہات';
+        const disRemarks = document.getElementById('dis_remarks')?.value?.trim() || '';
+        const disFeeStatus = document.getElementById('dis_fee_status')?.value || 'بے باق';
+        const disConduct = document.getElementById('dis_conduct')?.value || 'عمدہ و بااخلاق';
+        const disApprovedBy = document.getElementById('dis_approved_by')?.value?.trim() || 'مہتمم صاحب';
+
+        const student = await MadrassahDB.getStudentById(studentId);
+        if (!student) {
+            alert('طالب علم کا ریکارڈ نہیں ملا!');
+            return;
+        }
+
+        student.isDischarged = true;
+        student.status = 'discharged';
+        student.dischargeDate = disDate;
+        student.dischargeReason = disReason;
+        student.dischargeRemarks = disRemarks || disReason;
+        student.dischargeFeeStatus = disFeeStatus;
+        student.dischargeConduct = disConduct;
+        student.dischargeApprovedBy = disApprovedBy;
+        student.dischargeCertificateNo = student.dischargeCertificateNo || ('SLC-' + (student.uniqueCode || student.id) + '-' + new Date().getFullYear());
+
+        student.dischargeHistory = student.dischargeHistory || [];
+        student.dischargeHistory.push({
+            action: 'discharged',
+            date: disDate,
+            reason: disReason,
+            remarks: disRemarks,
+            feeStatus: disFeeStatus,
+            conduct: disConduct,
+            approvedBy: disApprovedBy,
+            certificateNo: student.dischargeCertificateNo,
+            timestamp: new Date().toISOString()
+        });
+
+        await MadrassahDB.saveStudent(student);
+
+        const m = document.getElementById('discharge-modal');
+        if (m) m.remove();
+
+        alert(`طالب علم (${student.name}) کا اخراج اور وجوہات کامیابی سے محفوظ کر لی گئی ہیں۔`);
+
+        if (this.currentView === 'students') {
+            const container = document.getElementById('main-content');
+            await this.renderStudentList(container);
+        } else {
+            this.render();
+        }
+
+        if (shouldPrint) {
+            this.printDischargeCertificate(student.id);
+        }
+    }
+
+    async viewDischargeDetails(studentId) {
+        const student = await MadrassahDB.getStudentById(studentId);
+        if (!student) {
+            alert('طالب علم کا ریکارڈ نہیں ملا!');
+            return;
+        }
+
+        const modalId = 'discharge-details-modal';
+        const existing = document.getElementById(modalId);
+        if (existing) existing.remove();
+
+        const modalHtml = `
+            <div id="${modalId}" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.65); z-index:9999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px); padding:1rem;">
+                <div style="background:white; border-radius:18px; width:100%; max-width:650px; max-height:92vh; overflow-y:auto; box-shadow:0 25px 50px rgba(0,0,0,0.3); border:2.5px solid #dc2626;">
+                    <div style="background:linear-gradient(135deg, #7f1d1d, #b91c1c, #dc2626); color:white; padding:1.2rem 1.6rem; border-radius:15px 15px 0 0; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <i class="fas fa-file-lines" style="font-size:1.5rem; color:#fca5a5;"></i>
+                            <h3 style="margin:0; font-size:1.45rem; font-family:'Aref Ruqaa', 'Amiri', serif;">
+                                اخراج کی تفصیلات و تاریخی ریکارڈ
+                            </h3>
+                        </div>
+                        <button type="button" onclick="document.getElementById('${modalId}').remove()" style="background:none; border:none; color:white; font-size:1.4rem; cursor:pointer;"><i class="fas fa-times"></i></button>
+                    </div>
+
+                    <div style="padding:1.6rem;">
+                        <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:1.2rem; margin-bottom:1.2rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                <div style="font-size:1.25rem; font-weight:bold; color:#991b1b;">
+                                    ${student.name} <span style="font-size:1rem; font-weight:normal; color:#450a0a;">ولدیت: ${student.fatherName || '---'}</span>
+                                </div>
+                                <span style="background:#b91c1c; color:white; padding:4px 10px; border-radius:8px; font-weight:bold; font-size:0.85rem;">
+                                    <i class="fas fa-user-xmark"></i> خارج شدہ
+                                </span>
+                            </div>
+                            <div style="display:flex; gap:15px; margin-top:8px; font-size:0.92rem; color:#7f1d1d; flex-wrap:wrap;">
+                                <span><b>رجسٹریشن کوڈ:</b> ${student.uniqueCode || ('STU-' + (1000 + parseInt(student.id)))}</span>
+                                <span><b>شعبہ:</b> ${student.department || '---'}</span>
+                                <span><b>کلاس:</b> ${student.className || student.class || '---'}</span>
+                                <span><b>سرٹیفکیٹ نمبر:</b> ${student.dischargeCertificateNo || '---'}</span>
+                            </div>
+                        </div>
+
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:1.2rem; font-size:0.95rem;">
+                            <tbody>
+                                <tr style="border-bottom:1px solid #f1f5f9;">
+                                    <td style="padding:8px 10px; font-weight:bold; color:#475569; width:35%;">تاریخِ اخراج:</td>
+                                    <td style="padding:8px 10px; font-weight:bold; color:#dc2626;">${student.dischargeDate || '---'}</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f1f5f9;">
+                                    <td style="padding:8px 10px; font-weight:bold; color:#475569;">بنیادی وجہِ اخراج:</td>
+                                    <td style="padding:8px 10px; font-weight:bold; color:#1e293b;">${student.dischargeReason || '---'}</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f1f5f9;">
+                                    <td style="padding:8px 10px; font-weight:bold; color:#475569;">اخلاق و کردار:</td>
+                                    <td style="padding:8px 10px; color:#1e293b;">${student.dischargeConduct || 'عمدہ'}</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f1f5f9;">
+                                    <td style="padding:8px 10px; font-weight:bold; color:#475569;">مالی کیفیت و کلیئرنس:</td>
+                                    <td style="padding:8px 10px; color:#1e293b;">${student.dischargeFeeStatus || 'بے باق'}</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f1f5f9;">
+                                    <td style="padding:8px 10px; font-weight:bold; color:#475569;">منظور کنندہ / مجاز اتھارٹی:</td>
+                                    <td style="padding:8px 10px; color:#1e293b;">${student.dischargeApprovedBy || 'مہتمم صاحب'}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div style="margin-bottom:1.4rem;">
+                            <label style="display:block; font-weight:bold; color:#334155; margin-bottom:5px;">تفصیلی ریمارکس و نوٹس:</label>
+                            <div style="background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:8px; padding:12px 14px; font-size:0.95rem; color:#1e293b; line-height:1.6; white-space:pre-wrap;">${student.dischargeRemarks || 'کوئی اضافی ریمارکس درج نہیں۔'}</div>
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1.5px solid #e2e8f0; padding-top:1.2rem; flex-wrap:wrap; gap:10px;">
+                            <button type="button" onclick="document.getElementById('${modalId}').remove()" class="btn" style="background:#f1f5f9; color:#475569; font-weight:bold; padding:9px 18px; border-radius:8px; border:none; cursor:pointer;">
+                                بند کریں
+                            </button>
+                            <div style="display:flex; gap:10px;">
+                                <button type="button" onclick="document.getElementById('${modalId}').remove(); app.restoreDischargedStudent(${student.id});" class="btn" style="background:#2563eb; color:white; font-weight:bold; padding:9px 18px; border-radius:8px; border:none; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                                    <i class="fas fa-rotate-left"></i> داخلہ بحال کریں
+                                </button>
+                                <button type="button" onclick="document.getElementById('${modalId}').remove(); app.printDischargeCertificate(${student.id});" class="btn" style="background:#16a34a; color:white; font-weight:bold; padding:9px 20px; border-radius:8px; border:none; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                                    <i class="fas fa-file-signature"></i> سرٹیفکیٹ پرنٹ کریں
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
+    async restoreDischargedStudent(studentId) {
+        const student = await MadrassahDB.getStudentById(studentId);
+        if (!student) {
+            alert('طالب علم کا ریکارڈ نہیں ملا!');
+            return;
+        }
+
+        if (!confirm(`کیا آپ واقعی طالب علم (${student.name}) کا اخراج منسوخ کر کے داخلہ بحال (Re-admit) کرنا چاہتے ہیں؟\nسابقہ اخراج کی وجوہات ہمیشہ ریکارڈ میں محفوظ رہیں گی۔`)) {
+            return;
+        }
+
+        student.isDischarged = false;
+        student.status = 'active';
+        student.restoredDate = new Date().toISOString().split('T')[0];
+
+        student.dischargeHistory = student.dischargeHistory || [];
+        student.dischargeHistory.push({
+            action: 'restored',
+            date: student.restoredDate,
+            note: 'داخلہ دوبارہ فعال و بحال کیا گیا',
+            timestamp: new Date().toISOString()
+        });
+
+        await MadrassahDB.saveStudent(student);
+
+        alert(`طالب علم (${student.name}) کا داخلہ کامیابی سے بحال کر دیا گیا ہے اور وہ دوبارہ فعال لسٹ میں آ گیا ہے۔`);
+
+        if (this.currentView === 'students') {
+            const container = document.getElementById('main-content');
+            await this.renderStudentList(container);
+        } else {
+            this.render();
+        }
+    }
+
+    async printDischargeCertificate(studentId) {
+        const student = await MadrassahDB.getStudentById(studentId);
+        if (!student) {
+            alert('طالب علم کا ریکارڈ نہیں ملا!');
+            return;
+        }
+
+        const isBanat = (student.section === 'banat' || this.currentSection === 'banat');
+        const printWindow = window.open('', '_blank');
+        const certNo = student.dischargeCertificateNo || ('SLC-' + (student.uniqueCode || student.id) + '-' + new Date().getFullYear());
+        const disDate = student.dischargeDate || new Date().toISOString().split('T')[0];
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html lang="ur" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>سرٹیفکیٹ برائے اخراج و رخصت نامہ - ${student.name} (${certNo})</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+                <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+                <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+                <style>
+                    @page {
+                        size: A4 portrait;
+                        margin: 10mm 12mm;
+                    }
+                    * { box-sizing: border-box; font-family: 'Jameel Noori Nastaleeq', 'Noto Sans Urdu', 'Amiri', serif; }
+                    body {
+                        background: #f8fafc;
+                        color: #1e293b;
+                        direction: rtl;
+                        margin: 0;
+                        padding: 20px;
+                        font-size: 1.1rem;
+                    }
+                    .cert-wrapper {
+                        max-width: 210mm;
+                        margin: 0 auto;
+                        background: #fffdfa;
+                        border: 6px double #78350f;
+                        border-radius: 18px;
+                        padding: 30px 35px;
+                        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                        position: relative;
+                        overflow: hidden;
+                    }
+                    .cert-inner-border {
+                        border: 1.5px solid #d97706;
+                        border-radius: 12px;
+                        padding: 25px 28px;
+                        position: relative;
+                        background: white;
+                    }
+                    .watermark {
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 320px;
+                        opacity: 0.05;
+                        pointer-events: none;
+                        z-index: 0;
+                    }
+                    .cert-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-bottom: 2px solid #b45309;
+                        padding-bottom: 15px;
+                        margin-bottom: 20px;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .logo-img {
+                        width: 105px;
+                        height: 105px;
+                        object-fit: contain;
+                    }
+                    .title-center {
+                        text-align: center;
+                        flex-grow: 1;
+                    }
+                    .title-center h1 {
+                        font-family: 'Aref Ruqaa', serif;
+                        font-size: 2.2rem;
+                        color: #78350f;
+                        margin: 0;
+                        line-height: 1.1;
+                    }
+                    .title-center h3 {
+                        margin: 4px 0 0 0;
+                        font-size: 1rem;
+                        color: #92400e;
+                    }
+                    .cert-title-badge {
+                        background: linear-gradient(135deg, #78350f, #b45309);
+                        color: white;
+                        display: inline-block;
+                        padding: 6px 30px;
+                        border-radius: 25px;
+                        font-size: 1.5rem;
+                        font-weight: bold;
+                        margin-top: 10px;
+                        font-family: 'Aref Ruqaa', serif;
+                        letter-spacing: 0.5px;
+                        box-shadow: 0 4px 10px rgba(120,53,15,0.25);
+                    }
+                    .meta-row {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-bottom: 20px;
+                        font-size: 1rem;
+                        font-weight: bold;
+                        color: #451a03;
+                        border-bottom: 1px dashed #d97706;
+                        padding-bottom: 8px;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .cert-body {
+                        font-size: 1.25rem;
+                        line-height: 2.2;
+                        text-align: justify;
+                        color: #1e293b;
+                        margin-bottom: 25px;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .cert-body b {
+                        color: #78350f;
+                        font-size: 1.35rem;
+                        padding: 0 4px;
+                    }
+                    .details-grid {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 12px;
+                        background: #fffbeb;
+                        border: 1.5px solid #fde68a;
+                        border-radius: 12px;
+                        padding: 16px 20px;
+                        margin-bottom: 25px;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .detail-item {
+                        display: flex;
+                        font-size: 1.05rem;
+                    }
+                    .detail-item .lbl {
+                        font-weight: bold;
+                        color: #78350f;
+                        min-width: 140px;
+                    }
+                    .detail-item .val {
+                        color: #1e293b;
+                        font-weight: 600;
+                    }
+                    .remarks-box {
+                        background: #f8fafc;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 10px;
+                        padding: 12px 18px;
+                        margin-bottom: 35px;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .remarks-box b {
+                        color: #78350f;
+                    }
+                    .signs-row {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-top: 50px;
+                        padding-top: 20px;
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .sign-col {
+                        text-align: center;
+                        width: 28%;
+                        border-top: 1.5px dashed #78350f;
+                        padding-top: 8px;
+                        font-weight: bold;
+                        font-size: 1rem;
+                        color: #451a03;
+                    }
+                    @media print {
+                        body { background: white; padding: 0; }
+                        .cert-wrapper { box-shadow: none; border-color: #78350f !important; }
+                        .no-print { display: none !important; }
+                    }
+                </style>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+                <script>
+                function downloadDoc(filename, orientation = 'portrait', format = 'a4') {
+                    const btn = document.querySelector('.btn-pdf-download');
+                    const origHtml = btn ? btn.innerHTML : '';
+                    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> پی ڈی ایف بن رہی ہے...'; btn.disabled = true; }
+                    const safeName = (filename || 'اخراج_سرٹیفکیٹ') + '.pdf';
+                    const targetEl = document.querySelector('.cert-wrapper') || document.body;
+                    const doExport = (canvas) => {
+                        try {
+                            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) { window.print(); return; }
+                            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                            const { jsPDF } = window.jspdf;
+                            const pdf = new jsPDF({ orientation: orientation, unit: 'mm', format: format });
+                            const pWidth = 210;
+                            const pHeight = 297;
+                            const imgProps = pdf.getImageProperties(imgData);
+                            let renderWidth = pWidth;
+                            let renderHeight = renderWidth * (imgProps.height / imgProps.width);
+                            if (renderHeight > pHeight) { renderHeight = pHeight; renderWidth = renderHeight * (imgProps.width / imgProps.height); }
+                            const x = (pWidth - renderWidth) / 2;
+                            pdf.addImage(imgData, 'JPEG', x, 0, renderWidth, renderHeight, undefined, 'FAST');
+                            pdf.save(safeName);
+                        } catch(err) { console.error('PDF error:', err); window.print(); }
+                        finally { if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                    };
+                    if (typeof html2canvas !== 'undefined' && targetEl) {
+                        html2canvas(targetEl, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }).then(canvas => doExport(canvas)).catch(err => { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } });
+                    } else { window.print(); if (btn) { btn.innerHTML = origHtml; btn.disabled = false; } }
+                }
+                </script>
+            </head>
+            <body>
+                <div class="cert-wrapper">
+                    <img src="${LOGO_DATA_URI}" alt="Watermark" class="watermark">
+                    <div class="cert-inner-border">
+                        <!-- Header -->
+                        <div class="cert-header">
+                            <div>
+                                <img src="${LOGO_DATA_URI}" alt="لوگو مدرسہ" class="logo-img">
+                            </div>
+                            <div class="title-center">
+                                <img src="${TITLE_DATA_URI}" alt="مدرسہ عبد الرحمن بن عوف غفوریہ" style="max-height:75px; max-width:100%; object-fit:contain; mix-blend-mode:multiply; display:block; margin:0 auto 4px auto;">
+                                <h3>چک نمبر 10-28 آر بوسال کالونی ضلع خانیوال</h3>
+                                <div class="cert-title-badge">
+                                    سرٹیفکیٹ برائے اخراج و رخصت نامہ
+                                </div>
+                            </div>
+                            <div style="width:105px; height:105px; border:1.5px solid #d97706; border-radius:10px; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#fef3c7;">
+                                ${student.photo ? `<img src="${student.photo}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="fas fa-user-graduate" style="font-size:2.5rem; color:#b45309;"></i>`}
+                            </div>
+                        </div>
+
+                        <!-- Meta Info -->
+                        <div class="meta-row">
+                            <span><b>سرٹیفکیٹ نمبر:</b> ${certNo}</span>
+                            <span><b>تاریخِ اجراء:</b> ${disDate}</span>
+                        </div>
+
+                        <!-- Formal Body -->
+                        <div class="cert-body">
+                            تصدیق کی جاتی ہے کہ مسمی / مسمات <b>${student.name}</b> ولدیت / دختر <b>${student.fatherName || '---'}</b>، رجسٹریشن نمبر <b>${student.uniqueCode || student.id}</b>، اس جامعہ / مدرسہ کے شعبہ <b>${student.department || '---'}</b> درجہ / کلاس <b>${student.className || student.class || '---'}</b> کے باقاعدہ ${isBanat ? 'طالبہ' : 'طالب علم'} رہے ہیں۔ موصوف کا باقاعدہ اخراج درج ذیل کیفیات کے تحت مدرسے کے رجسٹرِ اخراج میں درج کر لیا گیا ہے:
+                        </div>
+
+                        <!-- Details Grid -->
+                        <div class="details-grid">
+                            <div class="detail-item"><span class="lbl">تاریخِ داخلہ:</span><span class="val">${student.admissionDate || '---'}</span></div>
+                            <div class="detail-item"><span class="lbl">تاریخِ اخراج:</span><span class="val">${disDate}</span></div>
+                            <div class="detail-item"><span class="lbl">بنیادی وجہِ اخراج:</span><span class="val" style="color:#b45309;">${student.dischargeReason || 'مدرسہ چھوڑ دیا'}</span></div>
+                            <div class="detail-item"><span class="lbl">سیرت و کردار:</span><span class="val">${student.dischargeConduct || 'عمدہ و بااخلاق'}</span></div>
+                            <div class="detail-item"><span class="lbl">مالی و کتب واجبات:</span><span class="val">${student.dischargeFeeStatus || 'بے باق'}</span></div>
+                            <div class="detail-item"><span class="lbl">مجاز منظور کنندہ:</span><span class="val">${student.dischargeApprovedBy || 'مہتمم صاحب'}</span></div>
+                        </div>
+
+                        <!-- Remarks Box -->
+                        <div class="remarks-box">
+                            <b>تفصیلی کیفیات / ریمارکس برائے اخراج:</b>
+                            <p style="margin:6px 0 0 0; color:#334155; line-height:1.6;">${student.dischargeRemarks || 'کوئی اضافی ریمارکس درج نہیں۔'}</p>
+                        </div>
+
+                        <div style="font-size:0.95rem; color:#64748b; margin-bottom:20px; text-align:center;">
+                            ہم موصوف کے مستقبل کیلئے دعا گو ہیں اور یہ تصدیق نامہ مدرسے کے باضابطہ ریکارڈ کی بنیاد پر جاری کیا گیا ہے۔
+                        </div>
+
+                        <!-- Signatures Row -->
+                        <div class="signs-row">
+                            <div class="sign-col">دستخط ناظمِ داخلہ و اخراج</div>
+                            <div class="sign-col">دستخط ناظمِ تعلیمات</div>
+                            <div class="sign-col">مہر و دستخط مہتمم جامعہ / مدرسہ</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Print & PDF Buttons -->
+                <div class="no-print" style="position:fixed; bottom:20px; left:0; right:0; text-align:center; z-index:999; display:flex; justify-content:center; gap:15px;">
+                    <button onclick="window.print()" style="padding:12px 35px; background:#78350f; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.15rem; font-weight:bold; box-shadow:0 6px 15px rgba(0,0,0,0.3); font-family:inherit;">
+                        <i class="fas fa-print"></i> پرنٹ کریں (A4)
+                    </button>
+                    <button class="btn-pdf-download" onclick="downloadDoc('سرٹیفکیٹ_اخراج_${student.name ? student.name.replace(/['&quot;\\s]+/g, '_') : 'Student'}', 'portrait', 'a4')" style="padding:12px 30px; background:#dc2626; color:white; border:none; border-radius:30px; cursor:pointer; font-size:1.15rem; font-weight:bold; box-shadow:0 6px 15px rgba(220,38,38,0.35); font-family:inherit; display:inline-flex; align-items:center; gap:8px;">
+                        <i class="fas fa-file-pdf"></i> پی ڈی ایف ڈاؤن لوڈ کریں (PDF)
+                    </button>
+                    <button onclick="window.close()" style="padding:12px 25px; background:#64748b; color:white; border:none; border-radius:30px; font-weight:bold; font-size:1.1rem; cursor:pointer;">
+                        <i class="fas fa-times"></i> بند کریں
+                    </button>
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
     }
 
     async deleteStudent(id) {

@@ -15,6 +15,12 @@ const HifzModule = {
     collectiveHalaqaFilter: 'all',
     collectiveSort: 'position',
     showPositions: true,
+    awardListActiveExamId: null,
+    awardListSelectedClass: 'all',
+    awardListSection: null,
+    awardListMaxQuran: 100,
+    awardListMaxNamaz: 50,
+    awardListMaxQaida: 50,
 
     // Main Entry Point
     async render(container) {
@@ -70,6 +76,7 @@ const HifzModule = {
             { id: 'juz_progress', label: '30 پارے پروگریس', icon: 'fa-book-open' },
             { id: 'revisions', label: 'دہرائی (Revision)', icon: 'fa-rotate' },
             { id: 'exams', label: 'حفظ امتحانات', icon: 'fa-file-signature' },
+            { id: 'exam_award_list', label: 'تفصیلی نتیجہ (ایوارڈ لسٹ)', icon: 'fa-file-invoice' },
             { id: 'reports', label: 'حفظ رپورٹس', icon: 'fa-chart-pie' },
             { id: 'completions', label: 'تکمیل و سرٹیفکیٹ', icon: 'fa-award' },
             { id: 'halaqas', label: 'حلقہ جات', icon: 'fa-mosque' },
@@ -113,6 +120,7 @@ const HifzModule = {
             case 'juz_progress': await this.renderJuzProgressBoard(container); break;
             case 'revisions': await this.renderRevisionModule(container); break;
             case 'exams': await this.renderExamsModule(container); break;
+            case 'exam_award_list': await this.renderExamAwardListModule(container); break;
             case 'reports': await this.renderReportsModule(container); break;
             case 'completions': await this.renderCompletionsModule(container); break;
             case 'halaqas': await this.renderHalaqasModule(container); break;
@@ -541,23 +549,22 @@ const HifzModule = {
                         </div>
 
                         <div class="form-group-horizontal">
-                            <label>شروع/موجودہ پارہ</label>
-                            <select name="currentJuz">
-                                ${QuranData.paras.map(p => `<option value="${p.id}" ${existing && existing.currentJuz === p.id ? 'selected' : ''}>پارہ ${p.id} (${p.name})</option>`).join('')}
+                            <label style="font-weight:bold; color:var(--primary);"><i class="fas fa-book-open"></i> شروع / موجودہ پارہ</label>
+                            <select name="currentJuz" id="hifzEnrollJuzSelect" onchange="HifzModule.onEnrollJuzChange(this.value)" required style="font-weight:600;">
+                                ${QuranData.paras.map(p => `<option value="${p.id}" ${(existing ? existing.currentJuz === p.id : p.id === 1) ? 'selected' : ''}>پارہ ${p.id} (${p.name})</option>`).join('')}
                             </select>
                         </div>
 
                         <div class="form-group-horizontal">
-                            <label>موجودہ صفحہ (1 تا 20)</label>
-                            <input type="number" name="currentPage" min="1" max="20" value="${existing ? existing.currentPage : 1}">
+                            <label style="font-weight:bold; color:var(--primary);"><i class="fas fa-quran"></i> موجودہ سورت (متعلقہ پارہ)</label>
+                            <select name="currentSurah" id="hifzEnrollSurahSelect" required style="font-weight:600;">
+                                <option value="">سورت کا انتخاب کریں...</option>
+                            </select>
                         </div>
 
                         <div class="form-group-horizontal" style="grid-column:span 2;">
-                            <label>موجودہ سورت</label>
-                            <select name="currentSurah">
-                                <option value="">انتخاب کریں...</option>
-                                ${QuranData.surahs.map(s => `<option value="${s.name}" ${existing && existing.currentSurah === s.name ? 'selected' : ''}>${s.id}. ${s.name}</option>`).join('')}
-                            </select>
+                            <label>موجودہ صفحہ (1 تا 20)</label>
+                            <input type="number" name="currentPage" min="1" max="20" value="${existing ? existing.currentPage : 1}">
                         </div>
 
                         <div class="form-group-horizontal" style="grid-column:span 2;">
@@ -574,6 +581,31 @@ const HifzModule = {
             </div>
         `;
         document.body.appendChild(modalDiv);
+
+        // Dynamically load surahs matching current Juz
+        const initialJuz = existing ? (parseInt(existing.currentJuz) || 1) : 1;
+        const initialSurah = existing ? (existing.currentSurah || '') : '';
+        this.onEnrollJuzChange(initialJuz, initialSurah);
+    },
+
+    onEnrollJuzChange(juzNumber, selectedSurah = '') {
+        const surahSelect = document.getElementById('hifzEnrollSurahSelect');
+        if (!surahSelect) return;
+        const surahs = (typeof QuranData !== 'undefined' && QuranData.getSurahsForPara) 
+            ? QuranData.getSurahsForPara(juzNumber) 
+            : [];
+        
+        if (surahs.length > 0) {
+            surahSelect.innerHTML = '<option value="">سورت کا انتخاب کریں...</option>' + 
+                surahs.map(s => `<option value="${s.name}" ${(selectedSurah && selectedSurah === s.name) || (!selectedSurah && s.name === surahs[0].name && surahs.length === 1) ? 'selected' : ''}>${s.id}. سورة ${s.name} (${s.ayahs} آیات)</option>`).join('');
+            if (selectedSurah && surahs.some(s => s.name === selectedSurah)) {
+                surahSelect.value = selectedSurah;
+            } else if (!selectedSurah && surahs.length > 0) {
+                surahSelect.selectedIndex = 1;
+            }
+        } else {
+            surahSelect.innerHTML = '<option value="">کوئی سورت دستیاب نہیں</option>';
+        }
     },
 
     async onEnrollStudentChange(studentId) {
@@ -601,14 +633,16 @@ const HifzModule = {
             if (juzSelect && student.recommendedJuz) {
                 const normalized = String(student.recommendedJuz)
                     .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
-                    .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+                    .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧۸۹'.indexOf(d));
                 const match = normalized.match(/\d+/);
                 if (match && QuranData.paras.some(p => p.id === parseInt(match[0]))) {
                     juzSelect.value = match[0];
+                    this.onEnrollJuzChange(match[0]);
                 }
             } else if (juzSelect && student.hifzTotalParas) {
                 const nextJuz = Math.min(30, (parseInt(student.hifzTotalParas) || 0) + 1);
                 juzSelect.value = nextJuz;
+                this.onEnrollJuzChange(nextJuz);
             }
         } else {
             hintDiv.style.display = 'none';
@@ -1097,16 +1131,15 @@ const HifzModule = {
                         </div>
                         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:0.8rem;">
                             <div class="form-group-horizontal">
-                                <label>پارہ</label>
-                                <select name="sabaqJuz" id="sabaqJuzSelect">
+                                <label style="font-weight:600;"><i class="fas fa-book-open"></i> پارہ</label>
+                                <select name="sabaqJuz" id="sabaqJuzSelect" onchange="HifzModule.onSabaqJuzChange(this.value)">
                                     ${QuranData.paras.map(p => `<option value="${p.id}" ${currentEnrollment && currentEnrollment.currentJuz === p.id ? 'selected' : ''}>پارہ ${p.id} (${p.name})</option>`).join('')}
                                 </select>
                             </div>
                             <div class="form-group-horizontal">
-                                <label>سورت</label>
-                                <select name="sabaqSurah">
+                                <label style="font-weight:600;"><i class="fas fa-quran"></i> سورت (متعلقہ پارہ)</label>
+                                <select name="sabaqSurah" id="sabaqSurahSelect">
                                     <option value="">انتخاب کریں</option>
-                                    ${QuranData.surahs.map(s => `<option value="${s.name}" ${currentEnrollment && currentEnrollment.currentSurah === s.name ? 'selected' : ''}>${s.id}. ${s.name}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="form-group-horizontal">
@@ -1249,6 +1282,32 @@ const HifzModule = {
                 </form>
             </div>
         `;
+
+        // Initialize dynamic Surah dropdown for selected/first Juz
+        const initJuz = currentEnrollment ? (parseInt(currentEnrollment.currentJuz) || 1) : 1;
+        const initSurah = currentEnrollment ? (currentEnrollment.currentSurah || '') : '';
+        setTimeout(() => {
+            this.onSabaqJuzChange(initJuz, initSurah);
+        }, 30);
+    },
+
+    onSabaqJuzChange(juzNumber, selectedSurah = '') {
+        const surahSelect = document.getElementById('sabaqSurahSelect');
+        if (!surahSelect) return;
+        const surahs = (typeof QuranData !== 'undefined' && QuranData.getSurahsForPara) 
+            ? QuranData.getSurahsForPara(juzNumber) 
+            : [];
+        if (surahs.length > 0) {
+            surahSelect.innerHTML = '<option value="">انتخاب کریں</option>' + 
+                surahs.map(s => `<option value="${s.name}" ${(selectedSurah && selectedSurah === s.name) || (!selectedSurah && s.name === surahs[0].name && surahs.length === 1) ? 'selected' : ''}>${s.id}. سورة ${s.name} (${s.ayahs} آیات)</option>`).join('');
+            if (selectedSurah && surahs.some(s => s.name === selectedSurah)) {
+                surahSelect.value = selectedSurah;
+            } else if (!selectedSurah && surahs.length > 0) {
+                surahSelect.selectedIndex = 1;
+            }
+        } else {
+            surahSelect.innerHTML = '<option value="">کوئی سورت دستیاب نہیں</option>';
+        }
     },
 
     openDailyEntryForStudent(studentId) {
@@ -1269,6 +1328,8 @@ const HifzModule = {
             if (juzSel && enrollment.currentJuz) juzSel.value = enrollment.currentJuz;
             const teacherSel = document.getElementById('daily_teacher_select');
             if (teacherSel && enrollment.teacherId) teacherSel.value = enrollment.teacherId;
+            const currentJuz = enrollment.currentJuz || (juzSel ? juzSel.value : 1);
+            this.onSabaqJuzChange(currentJuz, enrollment.currentSurah || '');
         }
     },
 
@@ -1356,6 +1417,7 @@ const HifzModule = {
         const enrollment = await MadrassahDB.getHifzEnrollmentByStudentId(studentId);
         if (enrollment) {
             enrollment.currentJuz = sabaqJuz;
+            if (record.sabaqSurah) enrollment.currentSurah = record.sabaqSurah;
             enrollment.currentPage = sabaqEndPage < 20 ? sabaqEndPage + 1 : 1;
             if (sabaqEndPage >= 20 && sabaqJuz < 30) {
                 // Juz completed!
@@ -2215,8 +2277,8 @@ const HifzModule = {
         modalDiv.className = 'mms-modal-backdrop';
 
         modalDiv.innerHTML = `
-            <div class="mms-modal-box" style="max-width: 600px; max-height:92vh; overflow-y:auto; border-radius:20px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
-                <div class="mms-modal-header" style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:1.2rem 1.5rem; border-radius:20px 20px 0 0;">
+            <div class="mms-modal-box" style="max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto; border-radius: 20px; padding: 0; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+                <div class="mms-modal-header" style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:1.2rem 1.5rem; border-radius:20px 20px 0 0; margin-bottom: 0;">
                     <h3 style="margin:0; color:var(--primary); font-size:1.3rem; display:flex; align-items:center; gap:8px;">
                         <i class="fas ${isEdit ? 'fa-pen-to-square' : 'fa-file-circle-plus'}"></i>
                         ${isEdit ? 'حفظ امتحان میں ترمیم کریں' : 'نیا حفظ امتحان بنائیں'}
@@ -3686,6 +3748,854 @@ const HifzModule = {
                         بند کریں
                     </button>
                 </div>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+    },
+
+    // ==========================================
+    // 8-B. HIFZ DETAILED EXAM AWARD LIST (تفصیلی نتیجہ)
+    // ==========================================
+    async renderExamAwardListModule(container) {
+        if (!container) return;
+        const exams = await MadrassahDB.getAllHifzExams();
+        const activeSection = this.awardListSection || (window.app ? window.app.currentSection : 'banat');
+        const allStudents = await MadrassahDB.getAllStudents(activeSection);
+        const halaqas = await MadrassahDB.getAllHifzHalaqas();
+        const teachers = await MadrassahDB.getAllTeachers();
+        const teacherMap = new Map(teachers.map(t => [t.id, t.name]));
+
+        // Determine active exam
+        let activeExam = null;
+        if (this.awardListActiveExamId) {
+            activeExam = exams.find(e => e.id === this.awardListActiveExamId);
+        }
+        if (!activeExam && exams.length > 0) {
+            activeExam = exams[0];
+            this.awardListActiveExamId = activeExam.id;
+        }
+
+        // Set max marks from active exam if available
+        if (activeExam) {
+            if (activeExam.maxMarksQuran !== undefined) this.awardListMaxQuran = activeExam.maxMarksQuran;
+            if (activeExam.maxMarksNamaz !== undefined) this.awardListMaxNamaz = activeExam.maxMarksNamaz;
+            if (activeExam.maxMarksQaida !== undefined) this.awardListMaxQaida = activeExam.maxMarksQaida;
+        }
+
+        const totalMaxMarks = (parseInt(this.awardListMaxQuran) || 0) + (parseInt(this.awardListMaxNamaz) || 0) + (parseInt(this.awardListMaxQaida) || 0);
+
+        // Extract unique classes from students
+        const classSet = new Set();
+        const standardHifzClasses = [
+            'تحفیظ القرآن الکریم (مکمل)',
+            'حفظ سال اول (پارہ ۱ تا ۱۰)',
+            'حفظ سال دوم (پارہ ۱۱ تا ۲۰)',
+            'حفظ سال سوم (پارہ ۲۱ تا ۳۰)',
+            'تکمیل حفظ و دور',
+            'ناظرہ قرآن'
+        ];
+        standardHifzClasses.forEach(c => classSet.add(c));
+        allStudents.forEach(s => {
+            if (s.currentClass) classSet.add(s.currentClass);
+        });
+
+        const examinerName = activeExam ? (teacherMap.get(activeExam.examinerTeacherId) || activeExam.examinerName || '---') : '---';
+        const sectionTitle = activeSection === 'banat' ? 'شعبہ بنات' : 'شعبہ بنین';
+        const studentLabel = activeSection === 'banat' ? 'نام طالبہ' : 'نام طالب علم';
+        const fatherLabel = activeSection === 'banat' ? 'بنت' : 'ولد';
+        const allStudentsLabel = activeSection === 'banat' ? 'تمام طالبات' : 'تمام طلبہ';
+
+        // Load saved results if exam is active
+        let savedResults = [];
+        if (activeExam) {
+            savedResults = await MadrassahDB.getHifzExamResults(activeExam.id);
+        }
+        const resultMap = new Map();
+        savedResults.forEach(r => {
+            if (r.studentId) resultMap.set(r.studentId, r);
+        });
+
+        // Filter students by selected class/halaqa
+        let targetStudents = allStudents;
+        if (this.awardListSelectedClass && this.awardListSelectedClass !== 'all') {
+            targetStudents = allStudents.filter(s => {
+                if (s.currentClass === this.awardListSelectedClass) return true;
+                if (s.department === this.awardListSelectedClass) return true;
+                return false;
+            });
+            // If none found by class name, also check halaqas
+            if (targetStudents.length === 0) {
+                const enrollments = await MadrassahDB.getAllHifzEnrollments();
+                const matchedIds = new Set(enrollments.filter(e => e.halaqa === this.awardListSelectedClass).map(e => e.studentId));
+                targetStudents = allStudents.filter(s => matchedIds.has(s.id));
+            }
+        }
+
+        if (targetStudents.length === 0 && this.awardListSelectedClass === 'all') {
+            targetStudents = allStudents;
+        }
+
+        container.innerHTML = `
+            <div class="hifz-award-list-module" style="animation:fadeIn 0.3s ease;">
+                <!-- Control Panel / Toolbar (Hidden in print) -->
+                <div class="card no-print" style="margin-bottom:1.5rem; background:#ffffff; border-radius:16px; border:1px solid #e2e8f0; padding:1.2rem 1.5rem; box-shadow:0 2px 10px rgba(0,0,0,0.03);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:1.2rem; border-bottom:1px solid #f1f5f9; padding-bottom:1rem;">
+                        <div>
+                            <h3 style="color:var(--primary); margin:0; font-size:1.4rem; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-file-invoice"></i> تفصیلی نتیجہ و امتحانی ایوارڈ لسٹ (حفظ القرآن)
+                            </h3>
+                            <p style="margin:0.25rem 0 0 0; color:var(--text-muted); font-size:0.92rem;">
+                                بغیر ڈیٹ شیٹ فوری امتحانی نتیجہ، ہو بہو حوالہ جاتی فارم، مقدارِ خواندگی، اور مکمل مارکس شیٹ
+                            </p>
+                        </div>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="HifzModule.showCreateAwardListExamModal()" style="display:flex; align-items:center; gap:6px; padding:7px 16px; border-radius:10px; font-weight:bold;">
+                                <i class="fas fa-plus-circle"></i> نیا امتحان درج کریں
+                            </button>
+                            <button type="button" class="btn btn-sm" onclick="HifzModule.saveAwardListRecords()" style="background:#059669; color:#fff; border:none; padding:7px 18px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(5,150,105,0.25);">
+                                <i class="fas fa-save"></i> ریکارڈ محفوظ کریں
+                            </button>
+                            <button type="button" class="btn btn-sm" onclick="HifzModule.printAwardListSheet()" style="background:#065f46; color:#fff; border:none; padding:7px 18px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:6px;">
+                                <i class="fas fa-print"></i> پرنٹ (A4 لینڈ سکیپ)
+                            </button>
+                            <button type="button" class="btn btn-sm" onclick="HifzModule.addAwardListManualRow()" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:7px 14px; border-radius:10px; font-weight:bold;">
+                                <i class="fas fa-plus"></i> خالی سطر شامل کریں
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Dropdowns Row -->
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; align-items:end;">
+                        <div>
+                            <label style="font-weight:bold; font-size:0.9rem; color:#334155; display:block; margin-bottom:4px;">
+                                <i class="fas fa-file-signature"></i> امتحان کا انتخاب:
+                            </label>
+                            <select id="award_exam_select" onchange="HifzModule.onAwardListExamChange(this.value)" style="width:100%; padding:8px 12px; border-radius:8px; border:1.5px solid #cbd5e1; font-weight:600; font-size:0.95rem;">
+                                ${exams.length === 0 ? '<option value="">کوئی امتحان موجود نہیں - نیا بنائیں</option>' : ''}
+                                ${exams.map(e => {
+                                    let cleanTitle = (e.title || 'امتحان').replace(/ماہانہ\s+ماہانہ/g, 'ماہانہ').replace(/\(\s*\)/g, '').trim();
+                                    const month = (e.month || '').trim();
+                                    const year = (e.year || e.session || '').trim();
+                                    let extras = [];
+                                    if (month && month !== 'ماہانہ' && !cleanTitle.includes(month)) {
+                                        extras.push(month);
+                                    }
+                                    if (year && !cleanTitle.includes(year)) {
+                                        extras.push(year);
+                                    }
+                                    const extraStr = extras.length > 0 ? ` (${extras.join(' - ')})` : '';
+                                    return `<option value="${e.id}" ${activeExam && activeExam.id === e.id ? 'selected' : ''}>${cleanTitle}${extraStr}</option>`;
+                                }).join('')}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style="font-weight:bold; font-size:0.9rem; color:#334155; display:block; margin-bottom:4px;">
+                                <i class="fas fa-graduation-cap"></i> کلاس / درجہ / حلقہ منتخب کریں:
+                            </label>
+                            <select id="award_class_select" onchange="HifzModule.onAwardListClassChange(this.value)" style="width:100%; padding:8px 12px; border-radius:8px; border:1.5px solid #cbd5e1; font-weight:600; font-size:0.95rem;">
+                                <option value="all" ${this.awardListSelectedClass === 'all' ? 'selected' : ''}>${allStudentsLabel} (${allStudents.length})</option>
+                                <optgroup label="شعبہ حفظ کے باقاعدہ درجات">
+                                    ${Array.from(classSet).map(c => `<option value="${c}" ${this.awardListSelectedClass === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                </optgroup>
+                                ${halaqas.length > 0 ? `
+                                    <optgroup label="حلقہ جاتِ حفظ">
+                                        ${halaqas.map(h => `<option value="${h.name}" ${this.awardListSelectedClass === h.name ? 'selected' : ''}>حلقہ: ${h.name}</option>`).join('')}
+                                    </optgroup>
+                                ` : ''}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style="font-weight:bold; font-size:0.9rem; color:#334155; display:block; margin-bottom:4px;">
+                                <i class="fas fa-venus-mars"></i> شعبہ:
+                            </label>
+                            <div style="display:flex; gap:6px;">
+                                <button type="button" class="btn btn-sm" onclick="HifzModule.awardListSection='banat'; HifzModule.renderExamAwardListModule(document.getElementById('hifz-subview-container'))" 
+                                        style="flex:1; padding:7px; border-radius:8px; font-weight:bold; ${activeSection === 'banat' ? 'background:var(--primary); color:#fff;' : 'background:#f8fafc; color:#64748b; border:1px solid #cbd5e1;'}">
+                                    شعبہ بنات (طالبات)
+                                </button>
+                                <button type="button" class="btn btn-sm" onclick="HifzModule.awardListSection='banin'; HifzModule.renderExamAwardListModule(document.getElementById('hifz-subview-container'))" 
+                                        style="flex:1; padding:7px; border-radius:8px; font-weight:bold; ${activeSection === 'banin' ? 'background:var(--primary); color:#fff;' : 'background:#f8fafc; color:#64748b; border:1px solid #cbd5e1;'}">
+                                    شعبہ بنین (طلباء)
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label style="font-weight:bold; font-size:0.9rem; color:#334155; display:block; margin-bottom:4px;">
+                                <i class="fas fa-calculator"></i> کل نمبرات کی ترتیب (Max Marks):
+                            </label>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                <span style="font-size:0.85rem;">قرآن:</span>
+                                <input type="number" id="award_ctrl_quran" value="${this.awardListMaxQuran}" style="width:55px; padding:4px; text-align:center; border-radius:6px; border:1px solid #cbd5e1;" oninput="HifzModule.syncAwardMaxMarks('quran', this.value)">
+                                <span style="font-size:0.85rem;">نماز:</span>
+                                <input type="number" id="award_ctrl_namaz" value="${this.awardListMaxNamaz}" style="width:55px; padding:4px; text-align:center; border-radius:6px; border:1px solid #cbd5e1;" oninput="HifzModule.syncAwardMaxMarks('namaz', this.value)">
+                                <span style="font-size:0.85rem;">قاعدہ:</span>
+                                <input type="number" id="award_ctrl_qaida" value="${this.awardListMaxQaida}" style="width:55px; padding:4px; text-align:center; border-radius:6px; border:1px solid #cbd5e1;" oninput="HifzModule.syncAwardMaxMarks('qaida', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- THE OFFICIAL AUTHENTIC EXAM RESULT SHEET (ہو بہو فارم) -->
+                <!-- ======================================================== -->
+                <div id="hifz-award-sheet-outer" style="background:#ffffff; border-radius:8px; padding:15px; box-shadow:0 4px 20px rgba(0,0,0,0.06); overflow-x:auto;">
+                    <div id="hifz-award-sheet-inner" class="award-sheet-frame" style="border:3px solid #000; outline:1.5px solid #000; outline-offset:-5px; padding:16px 20px 24px; background:#ffffff; color:#000; font-family:'Jameel Noori Nastaleeq', 'Amiri', 'Noto Nastaliq Urdu', serif; direction:rtl; min-width:980px;">
+
+                        <!-- Top Main Header (As per reference image) -->
+                        <div style="display:grid; grid-template-columns: 200px 1fr 200px; align-items:center; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:8px;">
+                            
+                            <!-- Right Column: تفصیلی نتیجہ -->
+                            <div style="text-align:right;">
+                                <div style="font-size:2.2rem; font-weight:bold; line-height:1.1; font-family:'Aref Ruqaa', 'Amiri', serif;">
+                                    تفصیلی نتیجہ
+                                </div>
+                            </div>
+
+                            <!-- Center Column: شعبہ + مدرسہ نام -->
+                            <div style="text-align:center; display:flex; align-items:center; justify-content:center; gap:24px;">
+                                <div style="font-size:1.6rem; font-weight:bold; border:2px solid #000; border-radius:24px; padding:2px 20px; display:inline-block; font-family:'Aref Ruqaa', 'Amiri', serif; letter-spacing:0.5px;">
+                                    ${sectionTitle}
+                                </div>
+                                <div style="font-size:2.2rem; font-weight:bold; font-family:'Aref Ruqaa', 'Amiri', serif;">
+                                    مدرسہ عبد الرحمن بن عوف غفوریہ
+                                </div>
+                            </div>
+
+                            <!-- Left Column: پتہ + مونوگرام -->
+                            <div style="text-align:left; display:flex; align-items:center; justify-content:flex-end; gap:12px;">
+                                <div style="text-align:center; font-size:1.05rem; font-weight:bold; line-height:1.25;">
+                                    <div>بوسال کالونی</div>
+                                    <div style="direction:ltr; font-family:sans-serif; font-size:0.95rem;">28 / 10 - R پلاٹ نمبر</div>
+                                </div>
+                                <img src="logo.png" alt="Logo" style="width:68px; height:68px; object-fit:contain;" onerror="this.src='logo.jpg'">
+                            </div>
+                        </div>
+
+                        <!-- Sub-Header Information Line (امتحان | ماہ | سال | ممتحن) -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 12px 10px; font-size:1.25rem; font-weight:bold; border-bottom:1.5px solid #000; margin-bottom:12px;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span>امتحان:</span>
+                                <span style="border-bottom:1px dashed #000; min-width:140px; text-align:center; display:inline-block;" id="award_sheet_title">${activeExam ? (activeExam.title || '---').replace(/ماہانہ\s+ماہانہ/g, 'ماہانہ').replace(/\(\s*\)/g, '').trim() : '---'}</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span>ماہ:</span>
+                                <span style="border-bottom:1px dashed #000; min-width:100px; text-align:center; display:inline-block;" id="award_sheet_month">${activeExam && activeExam.month && activeExam.month !== 'ماہانہ' ? activeExam.month : (activeExam && activeExam.date ? new Date(activeExam.date).toLocaleDateString('ur-PK', {month: 'long'}) : '---')}</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span>سال:</span>
+                                <span style="border-bottom:1px dashed #000; min-width:100px; text-align:center; display:inline-block;" id="award_sheet_year">${activeExam && activeExam.year ? activeExam.year : '1446-1447ھ'}</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span>ممتحن:</span>
+                                <span style="border-bottom:1px dashed #000; min-width:160px; text-align:center; display:inline-block;" id="award_sheet_examiner">${examinerName}</span>
+                            </div>
+                        </div>
+
+                        <!-- Table Grid matching image exactly -->
+                        <table id="award-list-table" style="width:100%; border-collapse:collapse; border:2px solid #000; text-align:center; font-size:1.02rem;">
+                            <thead>
+                                <!-- Header Row 1 -->
+                                <tr style="border-bottom:1.5px solid #000; font-weight:bold; background:#fafafa;">
+                                    <th rowspan="2" style="border:1.5px solid #000; width:45px; padding:4px; vertical-align:middle;">
+                                        نمبر<br>شمار
+                                    </th>
+                                    <th rowspan="2" style="border:1.5px solid #000; min-width:140px; padding:6px; vertical-align:middle; font-size:1.15rem;">
+                                        ${studentLabel}
+                                    </th>
+                                    <th rowspan="2" style="border:1.5px solid #000; min-width:120px; padding:6px; vertical-align:middle; font-size:1.15rem;">
+                                        ${fatherLabel}
+                                    </th>
+                                    <th colspan="3" style="border:1.5px solid #000; padding:4px; font-size:1.2rem; background:#f5f5f5;">
+                                        مقدار خواندگی
+                                    </th>
+                                    <th colspan="3" style="border:1.5px solid #000; padding:4px; font-size:1.2rem; background:#f5f5f5;">
+                                        حاصل کردہ نمبر
+                                    </th>
+                                    <th rowspan="2" style="border:1.5px solid #000; width:75px; padding:4px; vertical-align:middle; font-size:1.15rem;">
+                                        کل نمبر
+                                        <div style="font-size:0.85rem; font-weight:normal;" id="award_col_total_max">(${totalMaxMarks})</div>
+                                    </th>
+                                    <th rowspan="2" style="border:1.5px solid #000; width:85px; padding:4px; vertical-align:middle; font-size:1.15rem;">
+                                        کیفیت
+                                    </th>
+                                    <th rowspan="2" class="no-print" style="border:1.5px solid #000; width:45px; vertical-align:middle; font-size:0.85rem;">
+                                        حذف
+                                    </th>
+                                </tr>
+
+                                <!-- Header Row 2: Sub-columns and Max Marks -->
+                                <tr style="border-bottom:1.5px solid #000; font-weight:bold; background:#ffffff;">
+                                    <!-- مقدار خواندگی -->
+                                    <th style="border:1.5px solid #000; width:115px; padding:5px;">قرآن</th>
+                                    <th style="border:1.5px solid #000; width:100px; padding:5px;">نماز حنفی</th>
+                                    <th style="border:1.5px solid #000; width:90px; padding:5px;">قاعدہ</th>
+                                    
+                                    <!-- حاصل کردہ نمبر مع کل نمبر درج کرنے کی ترتیب -->
+                                    <th style="border:1.5px solid #000; width:80px; padding:4px;">
+                                        <div>قرآن</div>
+                                        <div style="font-size:0.8rem; font-weight:normal; color:#444;" id="award_header_quran_max">
+                                            (کل: <b>${this.awardListMaxQuran}</b>)
+                                        </div>
+                                    </th>
+                                    <th style="border:1.5px solid #000; width:80px; padding:4px;">
+                                        <div>نماز حنفی</div>
+                                        <div style="font-size:0.8rem; font-weight:normal; color:#444;" id="award_header_namaz_max">
+                                            (کل: <b>${this.awardListMaxNamaz}</b>)
+                                        </div>
+                                    </th>
+                                    <th style="border:1.5px solid #000; width:75px; padding:4px;">
+                                        <div>قاعدہ</div>
+                                        <div style="font-size:0.8rem; font-weight:normal; color:#444;" id="award_header_qaida_max">
+                                            (کل: <b>${this.awardListMaxQaida}</b>)
+                                        </div>
+                                    </th>
+                                </tr>
+
+                                <!-- Header Row 3: Iconic Rosettes (جیسے حوالہ جاتی فارم میں پھول ہیں) -->
+                                <tr style="border-bottom:2px solid #000; background:#fcfcfc; font-size:0.95rem; height:24px;">
+                                    <th style="border:1px solid #000; padding:2px;">۞</th>
+                                    <th style="border:1px solid #000; padding:2px;">۞ ۞</th>
+                                    <th style="border:1px solid #000; padding:2px;">۞ ۞</th>
+                                    <th style="border:1px solid #000; padding:2px; font-size:0.8rem; color:#666;">سبق / پارے</th>
+                                    <th style="border:1px solid #000; padding:2px; font-size:0.8rem; color:#666;">دعائیں / کلمے</th>
+                                    <th style="border:1px solid #000; padding:2px; font-size:0.8rem; color:#666;">تختی / اسباق</th>
+                                    <th style="border:1px solid #000; padding:2px;">۞</th>
+                                    <th style="border:1px solid #000; padding:2px;">۞</th>
+                                    <th style="border:1px solid #000; padding:2px;">۞</th>
+                                    <th style="border:1px solid #000; padding:2px;">۞</th>
+                                    <th style="border:1px solid #000; padding:2px;">۞ ۞</th>
+                                    <th class="no-print" style="border:1px solid #000; padding:2px;">-</th>
+                                </tr>
+                            </thead>
+                            <tbody id="award-list-table-body">
+                                <!-- Student Rows rendered dynamically -->
+                            </tbody>
+                        </table>
+
+                        <!-- Bottom Signatures (ہو بہو فارم کے مطابق) -->
+                        <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; padding:0 35px 10px; font-size:1.3rem; font-weight:bold;">
+                            <div style="text-align:center; min-width:200px;">
+                                <div style="border-top:1.5px solid #000; padding-top:6px; font-family:'Aref Ruqaa', 'Amiri', serif;">
+                                    دستخط ممتحن
+                                </div>
+                            </div>
+                            <div style="text-align:center; min-width:200px;">
+                                <div style="border-top:1.5px solid #000; padding-top:6px; font-family:'Aref Ruqaa', 'Amiri', serif;">
+                                    دستخط مہتمم
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const tbody = document.getElementById('award-list-table-body');
+        if (tbody) {
+            this.renderAwardListRows(tbody, targetStudents, resultMap);
+        }
+    },
+
+    renderAwardListRows(tbody, students, resultMap) {
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (!students || students.length === 0) {
+            // Render 10 blank rows ready for manual writing or data entry
+            for (let i = 1; i <= 10; i++) {
+                this.appendAwardListSingleRow(tbody, {
+                    srNo: i,
+                    studentId: '',
+                    studentName: '',
+                    fatherName: '',
+                    portionQuran: '',
+                    portionNamaz: '',
+                    portionQaida: '',
+                    marksQuran: '',
+                    marksNamaz: '',
+                    marksQaida: '',
+                    totalObtained: '',
+                    remarks: ''
+                });
+            }
+            return;
+        }
+
+        students.forEach((st, idx) => {
+            const saved = resultMap.get(st.id) || {};
+            this.appendAwardListSingleRow(tbody, {
+                srNo: idx + 1,
+                studentId: st.id,
+                studentName: st.name,
+                fatherName: st.fatherName || '',
+                portionQuran: saved.portionQuran || '',
+                portionNamaz: saved.portionNamaz || '',
+                portionQaida: saved.portionQaida || '',
+                marksQuran: saved.marksQuran !== undefined ? saved.marksQuran : '',
+                marksNamaz: saved.marksNamaz !== undefined ? saved.marksNamaz : '',
+                marksQaida: saved.marksQaida !== undefined ? saved.marksQaida : '',
+                totalObtained: saved.totalObtained !== undefined ? saved.totalObtained : '',
+                remarks: saved.remarks || ''
+            });
+        });
+
+        // Ensure at least 10 rows in the table for print aesthetic
+        if (students.length < 10) {
+            const startSr = students.length + 1;
+            for (let i = startSr; i <= 10; i++) {
+                this.appendAwardListSingleRow(tbody, {
+                    srNo: i,
+                    studentId: '',
+                    studentName: '',
+                    fatherName: '',
+                    portionQuran: '',
+                    portionNamaz: '',
+                    portionQaida: '',
+                    marksQuran: '',
+                    marksNamaz: '',
+                    marksQaida: '',
+                    totalObtained: '',
+                    remarks: ''
+                });
+            }
+        }
+    },
+
+    appendAwardListSingleRow(tbody, data) {
+        const isBanat = (this.awardListSection || (window.app ? window.app.currentSection : 'banat')) === 'banat';
+        const namePlaceholder = isBanat ? 'نام طالبہ' : 'نام طالب علم';
+        const fatherPlaceholder = isBanat ? 'بنت' : 'ولد / ولدیت';
+        const tr = document.createElement('tr');
+        tr.style.cssText = 'border-bottom:1px solid #000; height:34px;';
+        tr.innerHTML = `
+            <td style="border:1px solid #000; padding:2px; font-weight:bold; font-size:0.95rem;">
+                <span class="award-sr-no">${data.srNo}</span>
+            </td>
+            <td style="border:1px solid #000; padding:2px 4px; text-align:right;">
+                <input type="text" class="award-input award-st-name" value="${data.studentName || ''}" data-student-id="${data.studentId || ''}" placeholder="${namePlaceholder}" style="width:100%; border:none; text-align:right; font-weight:bold; font-size:1rem; font-family:inherit; background:transparent;">
+            </td>
+            <td style="border:1px solid #000; padding:2px 4px; text-align:right;">
+                <input type="text" class="award-input award-st-father" value="${data.fatherName || ''}" placeholder="${fatherPlaceholder}" style="width:100%; border:none; text-align:right; font-size:0.95rem; font-family:inherit; background:transparent;">
+            </td>
+            <td style="border:1px solid #000; padding:2px;">
+                <input type="text" class="award-input award-portion-quran" value="${data.portionQuran || ''}" placeholder="پارہ ۱ تا ۵" style="width:100%; border:none; text-align:center; font-size:0.9rem; font-family:inherit; background:transparent;">
+            </td>
+            <td style="border:1px solid #000; padding:2px;">
+                <input type="text" class="award-input award-portion-namaz" value="${data.portionNamaz || ''}" placeholder="فرائض و سنن" style="width:100%; border:none; text-align:center; font-size:0.9rem; font-family:inherit; background:transparent;">
+            </td>
+            <td style="border:1px solid #000; padding:2px;">
+                <input type="text" class="award-input award-portion-qaida" value="${data.portionQaida || ''}" placeholder="تختی ۱ تا ۱۰" style="width:100%; border:none; text-align:center; font-size:0.9rem; font-family:inherit; background:transparent;">
+            </td>
+            <td style="border:1px solid #000; padding:2px;">
+                <input type="number" class="award-input award-marks-quran" value="${data.marksQuran}" min="0" max="${this.awardListMaxQuran}" oninput="HifzModule.calcAwardListRowTotal(this)" style="width:100%; border:none; text-align:center; font-size:1.05rem; font-weight:bold; font-family:inherit; background:transparent;">
+            </td>
+            <td style="border:1px solid #000; padding:2px;">
+                <input type="number" class="award-input award-marks-namaz" value="${data.marksNamaz}" min="0" max="${this.awardListMaxNamaz}" oninput="HifzModule.calcAwardListRowTotal(this)" style="width:100%; border:none; text-align:center; font-size:1.05rem; font-weight:bold; font-family:inherit; background:transparent;">
+            </td>
+            <td style="border:1px solid #000; padding:2px;">
+                <input type="number" class="award-input award-marks-qaida" value="${data.marksQaida}" min="0" max="${this.awardListMaxQaida}" oninput="HifzModule.calcAwardListRowTotal(this)" style="width:100%; border:none; text-align:center; font-size:1.05rem; font-weight:bold; font-family:inherit; background:transparent;">
+            </td>
+            <td style="border:1px solid #000; padding:2px;">
+                <input type="number" class="award-input award-total-obtained" value="${data.totalObtained}" readonly style="width:100%; border:none; text-align:center; font-size:1.15rem; font-weight:bold; color:#065f46; font-family:inherit; background:transparent;">
+            </td>
+            <td style="border:1px solid #000; padding:2px;">
+                <input type="text" class="award-input award-remarks" value="${data.remarks || ''}" placeholder="پاس / ممتاز" style="width:100%; border:none; text-align:center; font-size:0.95rem; font-family:inherit; background:transparent;">
+            </td>
+            <td class="no-print" style="border:1px solid #000; padding:2px; text-align:center;">
+                <button type="button" onclick="HifzModule.removeAwardListRow(this)" style="background:none; border:none; color:#dc2626; cursor:pointer; font-size:0.9rem;" title="سطر حذف کریں">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    },
+
+    calcAwardListRowTotal(inputEl) {
+        const row = inputEl.closest('tr');
+        if (!row) return;
+        const qEl = row.querySelector('.award-marks-quran');
+        const nEl = row.querySelector('.award-marks-namaz');
+        const cEl = row.querySelector('.award-marks-qaida');
+        const totEl = row.querySelector('.award-total-obtained');
+        const remEl = row.querySelector('.award-remarks');
+
+        const qVal = parseFloat(qEl ? qEl.value : 0) || 0;
+        const nVal = parseFloat(nEl ? nEl.value : 0) || 0;
+        const cVal = parseFloat(cEl ? cEl.value : 0) || 0;
+
+        const hasAnyMarks = (qEl && qEl.value !== '') || (nEl && nEl.value !== '') || (cEl && cEl.value !== '');
+
+        if (hasAnyMarks) {
+            const sum = qVal + nVal + cVal;
+            if (totEl) totEl.value = sum;
+            if (remEl && !remEl.value) {
+                const totalMax = (parseInt(this.awardListMaxQuran) || 0) + (parseInt(this.awardListMaxNamaz) || 0) + (parseInt(this.awardListMaxQaida) || 0);
+                const pct = totalMax > 0 ? (sum / totalMax) * 100 : 0;
+                if (pct >= 80) remEl.value = 'ممتاز (Pass)';
+                else if (pct >= 60) remEl.value = 'جید (Pass)';
+                else if (pct >= 50) remEl.value = 'مقبول (Pass)';
+                else remEl.value = 'راسب (Fail)';
+            }
+        } else {
+            if (totEl) totEl.value = '';
+        }
+    },
+
+    addAwardListManualRow() {
+        const tbody = document.getElementById('award-list-table-body');
+        if (!tbody) return;
+        const rows = tbody.querySelectorAll('tr');
+        const newSr = rows.length + 1;
+        this.appendAwardListSingleRow(tbody, {
+            srNo: newSr,
+            studentId: '',
+            studentName: '',
+            fatherName: '',
+            portionQuran: '',
+            portionNamaz: '',
+            portionQaida: '',
+            marksQuran: '',
+            marksNamaz: '',
+            marksQaida: '',
+            totalObtained: '',
+            remarks: ''
+        });
+    },
+
+    removeAwardListRow(btn) {
+        const row = btn.closest('tr');
+        if (row) {
+            row.remove();
+            const tbody = document.getElementById('award-list-table-body');
+            if (tbody) {
+                const srSpans = tbody.querySelectorAll('.award-sr-no');
+                srSpans.forEach((span, idx) => {
+                    span.textContent = idx + 1;
+                });
+            }
+        }
+    },
+
+    syncAwardMaxMarks(type, val) {
+        const v = parseInt(val) || 0;
+        if (type === 'quran') this.awardListMaxQuran = v;
+        if (type === 'namaz') this.awardListMaxNamaz = v;
+        if (type === 'qaida') this.awardListMaxQaida = v;
+
+        const hQ = document.getElementById('award_header_quran_max');
+        if (hQ) hQ.innerHTML = `(کل: <b>${this.awardListMaxQuran}</b>)`;
+        const hN = document.getElementById('award_header_namaz_max');
+        if (hN) hN.innerHTML = `(کل: <b>${this.awardListMaxNamaz}</b>)`;
+        const hC = document.getElementById('award_header_qaida_max');
+        if (hC) hC.innerHTML = `(کل: <b>${this.awardListMaxQaida}</b>)`;
+
+        const totalMaxMarks = (parseInt(this.awardListMaxQuran) || 0) + (parseInt(this.awardListMaxNamaz) || 0) + (parseInt(this.awardListMaxQaida) || 0);
+        const colTot = document.getElementById('award_col_total_max');
+        if (colTot) colTot.textContent = `(${totalMaxMarks})`;
+
+        // Update inputs max attribute on rows
+        document.querySelectorAll('.award-marks-quran').forEach(el => el.max = this.awardListMaxQuran);
+        document.querySelectorAll('.award-marks-namaz').forEach(el => el.max = this.awardListMaxNamaz);
+        document.querySelectorAll('.award-marks-qaida').forEach(el => el.max = this.awardListMaxQaida);
+    },
+
+    async onAwardListExamChange(examId) {
+        this.awardListActiveExamId = parseInt(examId) || null;
+        const subContainer = document.getElementById('hifz-subview-container');
+        if (subContainer) {
+            await this.renderExamAwardListModule(subContainer);
+        }
+    },
+
+    async onAwardListClassChange(className) {
+        this.awardListSelectedClass = className;
+        const subContainer = document.getElementById('hifz-subview-container');
+        if (subContainer) {
+            await this.renderExamAwardListModule(subContainer);
+        }
+    },
+
+    showCreateAwardListExamModal() {
+        const existing = document.getElementById('createAwardListExamModal');
+        if (existing) existing.remove();
+
+        const modalDiv = document.createElement('div');
+        modalDiv.id = 'createAwardListExamModal';
+        modalDiv.className = 'mms-modal-backdrop';
+
+        const today = new Date().toISOString().split('T')[0];
+
+        modalDiv.innerHTML = `
+            <div class="mms-modal-box" style="max-width: 550px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; border-radius: 18px; padding: 0; overflow: hidden; border: 2px solid var(--primary); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+                <!-- Fixed Header -->
+                <div style="padding: 1.1rem 1.4rem; background: #f8fafc; border-bottom: 1.5px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                    <div style="font-weight: bold; color: var(--primary); font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-file-circle-plus"></i> نیا امتحانی سیشن / ریکارڈ بنائیں
+                    </div>
+                    <button type="button" onclick="document.getElementById('createAwardListExamModal').remove()" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #64748b; line-height: 1;" title="بند کریں">&times;</button>
+                </div>
+
+                <!-- Scrollable Form Body -->
+                <form onsubmit="HifzModule.handleCreateAwardListExamSubmit(event)" style="padding: 1.3rem 1.5rem; overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch;">
+                    <div style="display: flex; flex-direction: column; gap: 0.95rem;">
+                        <div class="form-group-horizontal">
+                            <label style="font-weight: bold; font-size: 0.95rem; color: #1e293b; margin-bottom: 4px; display: block;">امتحان کا عنوان / نام <span style="color: #dc2626;">*</span></label>
+                            <input type="text" name="title" required placeholder="مثلاً: سالانہ امتحان، ششماہی، سہ ماہی، ماہانہ" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; box-sizing: border-box;">
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div class="form-group-horizontal">
+                                <label style="font-size: 0.9rem; font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">ماہ (Month)</label>
+                                <input type="text" name="month" placeholder="مثلاً: مارچ / شعبان / رمضان" value="رمضان المبارک" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.95rem; box-sizing: border-box;">
+                            </div>
+                            <div class="form-group-horizontal">
+                                <label style="font-size: 0.9rem; font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">سال (Year / Session)</label>
+                                <input type="text" name="year" placeholder="1446-1447ھ" value="1446-1447ھ" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.95rem; box-sizing: border-box;">
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div class="form-group-horizontal">
+                                <label style="font-size: 0.9rem; font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">تاریخِ امتحان <span style="color: #dc2626;">*</span></label>
+                                <input type="date" name="date" value="${today}" required style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.95rem; box-sizing: border-box;">
+                            </div>
+                            <div class="form-group-horizontal">
+                                <label style="font-size: 0.9rem; font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">ممتحن کا نام (Examiner) <span style="color: #dc2626;">*</span></label>
+                                <input type="text" name="examinerName" placeholder="مثلاً: قاری عبد الرحمن صاحب" required style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.95rem; box-sizing: border-box;">
+                            </div>
+                        </div>
+
+                        <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 12px 14px; margin-top: 4px;">
+                            <div style="font-weight: bold; color: #166534; margin-bottom: 8px; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-sliders" style="color: #059669;"></i> کل نمبرات کا تعین (Max Marks):
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+                                <div>
+                                    <label style="font-size: 0.88rem; color: #14532d; font-weight: 600; display: block; margin-bottom: 4px;">قرآن مجید</label>
+                                    <input type="number" name="maxMarksQuran" value="100" min="1" style="width: 100%; text-align: center; font-weight: bold; border-radius: 8px; border: 1.5px solid #86efac; padding: 6px; font-size: 1.05rem; background: #ffffff; box-sizing: border-box;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.88rem; color: #14532d; font-weight: 600; display: block; margin-bottom: 4px;">نماز حنفی</label>
+                                    <input type="number" name="maxMarksNamaz" value="50" min="0" style="width: 100%; text-align: center; font-weight: bold; border-radius: 8px; border: 1.5px solid #86efac; padding: 6px; font-size: 1.05rem; background: #ffffff; box-sizing: border-box;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.88rem; color: #14532d; font-weight: 600; display: block; margin-bottom: 4px;">قاعدہ</label>
+                                    <input type="number" name="maxMarksQaida" value="50" min="0" style="width: 100%; text-align: center; font-weight: bold; border-radius: 8px; border: 1.5px solid #86efac; padding: 6px; font-size: 1.05rem; background: #ffffff; box-sizing: border-box;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 1.3rem; padding-top: 0.8rem; border-top: 1px solid #f1f5f9; text-align: center; display: flex; justify-content: center; gap: 12px;">
+                        <button type="submit" class="btn btn-primary" style="min-width: 170px; font-weight: bold; padding: 10px 22px; font-size: 1.05rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(6,95,70,0.25);">
+                            <i class="fas fa-check-circle"></i> امتحان محفوظ کریں
+                        </button>
+                        <button type="button" class="btn" style="background: #e2e8f0; color: #475569; padding: 10px 20px; font-weight: bold; border-radius: 10px;" onclick="document.getElementById('createAwardListExamModal').remove()">
+                            منسوخ
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modalDiv);
+    },
+
+    async handleCreateAwardListExamSubmit(e) {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const qMax = parseInt(fd.get('maxMarksQuran')) || 100;
+        const nMax = parseInt(fd.get('maxMarksNamaz')) || 50;
+        const cMax = parseInt(fd.get('maxMarksQaida')) || 50;
+        const total = qMax + nMax + cMax;
+
+        const examData = {
+            title: fd.get('title'),
+            month: fd.get('month'),
+            year: fd.get('year'),
+            date: fd.get('date'),
+            examinerName: fd.get('examinerName'),
+            maxMarksQuran: qMax,
+            maxMarksNamaz: nMax,
+            maxMarksQaida: cMax,
+            maxMarks: total,
+            passingMarks: Math.round(total * 0.5),
+            session: fd.get('year'),
+            examType: 'تفصیلی نتیجہ (حفظ)'
+        };
+
+        const newId = await MadrassahDB.saveHifzExam(examData);
+        document.getElementById('createAwardListExamModal')?.remove();
+        this.awardListActiveExamId = newId;
+        this.awardListMaxQuran = qMax;
+        this.awardListMaxNamaz = nMax;
+        this.awardListMaxQaida = cMax;
+
+        const subContainer = document.getElementById('hifz-subview-container');
+        if (subContainer) {
+            await this.renderExamAwardListModule(subContainer);
+        }
+        alert('امتحان کامیابی کے ساتھ درج کر دیا گیا ہے۔');
+    },
+
+    async saveAwardListRecords() {
+        if (!this.awardListActiveExamId) {
+            alert('براہِ کرم پہلے کوئی امتحان منتخب یا نیا امتحان درج فرمائیں!');
+            return;
+        }
+        const tbody = document.getElementById('award-list-table-body');
+        if (!tbody) return;
+
+        const rows = tbody.querySelectorAll('tr');
+        let savedCount = 0;
+
+        for (const row of rows) {
+            const nameInput = row.querySelector('.award-st-name');
+            const studentName = nameInput ? nameInput.value.trim() : '';
+            if (!studentName) continue;
+
+            const studentIdVal = nameInput ? nameInput.getAttribute('data-student-id') : null;
+            const studentId = studentIdVal && parseInt(studentIdVal) ? parseInt(studentIdVal) : (10000 + savedCount + 1);
+
+            const fatherName = row.querySelector('.award-st-father')?.value.trim() || '';
+            const portionQuran = row.querySelector('.award-portion-quran')?.value.trim() || '';
+            const portionNamaz = row.querySelector('.award-portion-namaz')?.value.trim() || '';
+            const portionQaida = row.querySelector('.award-portion-qaida')?.value.trim() || '';
+
+            const marksQuran = row.querySelector('.award-marks-quran')?.value !== '' ? parseFloat(row.querySelector('.award-marks-quran')?.value) : null;
+            const marksNamaz = row.querySelector('.award-marks-namaz')?.value !== '' ? parseFloat(row.querySelector('.award-marks-namaz')?.value) : null;
+            const marksQaida = row.querySelector('.award-marks-qaida')?.value !== '' ? parseFloat(row.querySelector('.award-marks-qaida')?.value) : null;
+            const totalObt = row.querySelector('.award-total-obtained')?.value !== '' ? parseFloat(row.querySelector('.award-total-obtained')?.value) : 0;
+            const remarks = row.querySelector('.award-remarks')?.value.trim() || '';
+
+            const resultObj = {
+                examId: this.awardListActiveExamId,
+                studentId,
+                studentName,
+                fatherName,
+                portionQuran,
+                portionNamaz,
+                portionQaida,
+                marksQuran,
+                marksNamaz,
+                marksQaida,
+                totalObtained: totalObt,
+                obtainedMarks: totalObt,
+                maxMarksQuran: this.awardListMaxQuran,
+                maxMarksNamaz: this.awardListMaxNamaz,
+                maxMarksQaida: this.awardListMaxQaida,
+                totalMarks: (this.awardListMaxQuran + this.awardListMaxNamaz + this.awardListMaxQaida),
+                remarks,
+                date: new Date().toISOString().split('T')[0]
+            };
+
+            await MadrassahDB.saveHifzExamResult(resultObj);
+            savedCount++;
+        }
+
+        const activeExam = await MadrassahDB.getHifzExamById(this.awardListActiveExamId);
+        if (activeExam) {
+            activeExam.maxMarksQuran = this.awardListMaxQuran;
+            activeExam.maxMarksNamaz = this.awardListMaxNamaz;
+            activeExam.maxMarksQaida = this.awardListMaxQaida;
+            activeExam.maxMarks = (this.awardListMaxQuran + this.awardListMaxNamaz + this.awardListMaxQaida);
+            await MadrassahDB.saveHifzExam(activeExam);
+        }
+
+        alert(`ماشاءاللہ! کل ${savedCount} طلبہ/طالبات کے امتحانی نمبرات کامیابی سے محفوظ کر لیے گئے ہیں۔`);
+    },
+
+    async printAwardListSheet() {
+        const exam = this.awardListActiveExamId ? await MadrassahDB.getHifzExamById(this.awardListActiveExamId) : null;
+        const sheetInner = document.getElementById('hifz-award-sheet-inner');
+        if (!sheetInner) return;
+
+        const clone = sheetInner.cloneNode(true);
+        clone.querySelectorAll('.no-print').forEach(el => el.remove());
+
+        // Replace inputs with their text contents for printing
+        clone.querySelectorAll('input').forEach(input => {
+            const val = input.value || '';
+            const span = document.createElement('span');
+            span.textContent = val;
+            span.style.fontFamily = 'inherit';
+            span.style.fontSize = 'inherit';
+            span.style.fontWeight = input.style.fontWeight || 'normal';
+            span.style.color = '#000';
+            input.parentNode.replaceChild(span, input);
+        });
+
+        const printWin = window.open('', '_blank');
+        printWin.document.write(`
+            <!DOCTYPE html>
+            <html lang="ur" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>تفصیلی نتیجہ - ${exam ? exam.title : 'امتحان حفظ'}</title>
+                <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+                <style>
+                    @page {
+                        size: A4 landscape;
+                        margin: 6mm 8mm;
+                    }
+                    * {
+                        box-sizing: border-box;
+                    }
+                    body {
+                        font-family: 'Jameel Noori Nastaleeq', 'Amiri', 'Noto Nastaliq Urdu', serif;
+                        direction: rtl;
+                        background: #ffffff;
+                        color: #000000;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    .award-sheet-frame {
+                        border: 3px solid #000000 !important;
+                        outline: 1.5px solid #000000 !important;
+                        outline-offset: -5px !important;
+                        padding: 12px 16px !important;
+                        background: #ffffff !important;
+                        width: 100% !important;
+                        min-width: 0 !important;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        border: 1.5px solid #000;
+                        margin-top: 6px;
+                    }
+                    th, td {
+                        border: 1px solid #000;
+                        padding: 3px 4px;
+                        text-align: center;
+                    }
+                    @media print {
+                        .no-print { display: none !important; }
+                        body { padding: 0; }
+                    }
+                </style>
+            </head>
+            <body>
+                ${clone.outerHTML}
+                <div class="no-print" style="text-align:center; margin-top:20px;">
+                    <button onclick="window.print()" style="padding:9px 30px; background:#065f46; color:white; border:none; border-radius:20px; font-size:1.1rem; cursor:pointer; font-weight:bold;">
+                        پرنٹ کریں (Print)
+                    </button>
+                    <button onclick="window.close()" style="padding:9px 24px; background:#f1f5f9; color:#475569; border:none; border-radius:20px; font-size:1.1rem; cursor:pointer; margin-right:10px;">
+                        بند کریں
+                    </button>
+                </div>
+                <script>
+                    window.onload = function() {
+                        setTimeout(function() {
+                            window.print();
+                        }, 500);
+                    };
+                <\/script>
             </body>
             </html>
         `);
