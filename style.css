@@ -61,57 +61,207 @@ aside { width: var(--sidebar-width); background: var(--sidebar-bg); border-left:
 .dash-logo-img { max-width: 100%; height: auto; max-height: 130px; object-fit: contain; mix-blend-mode: multiply; display: block; filter: contrast(1.1); }
 .dash-title-img { max-height: 135px; max-width: 950px; width: 100%; height: auto; object-fit: contain; object-position: right center; mix-blend-mode: multiply; display: block; filter: contrast(1.12); }
 
-/* Dashboard Header Banner Card */
+/* Dashboard Executive Header Banner Card (3-Column Layout: Right Logo, Center Madrassah Name, Left Analog Clock) */
 .dash-header-card {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 2.5rem;
-    margin-bottom: 2rem;
+    padding: 1rem 2rem;
+    margin-bottom: 1.5rem;
     background: #ffffff;
     border: 1px solid var(--glass-border);
     border-top: 4px solid var(--primary);
     border-radius: 20px;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 4px 18px rgba(0,0,0,0.04);
     position: relative;
     overflow: hidden;
-    gap: 2rem;
-    min-height: 140px;
+    gap: 1.5rem;
+    min-height: 130px;
     transition: all 0.35s ease;
 }
-.dash-header-right {
+
+/* 1. Right Side: Logo */
+.dash-header-logo-side {
     display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    flex: 1;
-    height: 100%;
-}
-.dash-header-left {
-    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    height: 100%;
+    gap: 6px;
+    min-width: 110px;
+}
+.dash-logo-shield-frame {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ffffff 60%, #f0fdf4 100%);
+    border: 2.5px solid rgba(6, 95, 70, 0.2);
+    box-shadow: 0 4px 16px rgba(6, 95, 70, 0.1), inset 0 2px 5px rgba(255,255,255,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.dash-logo-shield-frame:hover {
+    transform: scale(1.06) rotate(-3deg);
+    border-color: var(--primary);
+    box-shadow: 0 8px 24px rgba(6, 95, 70, 0.18);
+}
+.dash-logo-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+    display: block;
+    filter: contrast(1.1);
+}
+.dash-motto-tag {
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--primary);
+    background: var(--primary-subtle);
+    padding: 2px 10px;
+    border-radius: 12px;
+    white-space: nowrap;
+    border: 1px solid var(--primary-border);
 }
 
-@media (max-width: 768px) {
+/* 2. Center: Centered Madrassah Calligraphy Title */
+.dash-header-center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 5px;
+    padding: 0 0.5rem;
+}
+.dash-bismillah-mini {
+    font-family: 'Amiri', 'Traditional Arabic', serif;
+    font-size: 1.18rem;
+    color: #b45309;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-shadow: 0 1px 2px rgba(180, 83, 9, 0.1);
+}
+.dash-title-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+.dash-header-center .dash-title-img {
+    max-height: 105px;
+    max-width: 680px;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: center;
+    mix-blend-mode: multiply;
+    display: block;
+    filter: contrast(1.15) brightness(0.96);
+    margin: 0 auto;
+    transition: transform 0.3s ease;
+}
+.dash-header-center .dash-title-img:hover {
+    transform: scale(1.015);
+}
+.dash-header-badges {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.header-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+.badge-session {
+    background: #f8fafc;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+.badge-section-current {
+    background: var(--primary-subtle);
+    color: var(--primary);
+    border: 1px solid var(--primary-border);
+}
+
+/* 3. Left Side: Analog Clock */
+.dash-header-clock-side {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    min-width: 125px;
+}
+.dash-clock-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #ffffff, #f8fafc);
+    border: 1.5px solid #e2e8f0;
+    padding: 8px 14px;
+    border-radius: 18px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.04);
+    gap: 5px;
+    transition: all 0.3s ease;
+    cursor: default;
+}
+.dash-clock-wrap:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    border-color: var(--primary-border);
+}
+.analog-clock-svg {
+    display: block;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.08));
+}
+.clock-info {
+    text-align: center;
+    line-height: 1.2;
+}
+.clock-time-digital {
+    font-family: 'Dubai', 'Segoe UI', Tahoma, sans-serif;
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: #0f172a;
+    direction: ltr;
+    display: inline-block;
+    letter-spacing: 0.5px;
+}
+.clock-date-digital {
+    font-size: 0.76rem;
+    color: #64748b;
+    font-weight: 600;
+    margin-top: 1px;
+}
+
+@media (max-width: 900px) {
     .dash-header-card {
-        flex-direction: column-reverse;
-        padding: 1.5rem 1rem;
+        flex-direction: column;
         text-align: center;
-        gap: 1.25rem;
-        min-height: auto;
+        padding: 1.25rem 1rem;
+        gap: 1.2rem;
     }
-    .dash-header-right {
-        justify-content: center;
+    .dash-header-logo-side,
+    .dash-header-clock-side {
         width: 100%;
+        justify-content: center;
     }
-    .dash-title-img {
-        object-position: center;
-        max-height: 85px;
-    }
-    .dash-logo-img {
-        max-height: 95px;
+    .dash-header-center .dash-title-img {
+        max-height: 75px;
     }
 }
 .madrsa-logo-header { max-width: 100%; height: auto; max-height: 70px; object-fit: contain; mix-blend-mode: multiply; display: inline-block; }
@@ -452,46 +602,54 @@ body[data-section="banat"] .card {
 }
 
 .hifz-subnav-scroll {
-    overflow-x: auto;
-    padding-bottom: 6px;
-    margin-bottom: 1rem;
+    width: 100%;
+    margin-bottom: 1.2rem;
 }
 
 .hifz-subnav {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
-    background: white;
-    padding: 0.5rem;
+    background: #ffffff;
+    padding: 0.6rem 0.8rem;
     border-radius: 16px;
     border: 1px solid var(--glass-border);
-    width: max-content;
-    min-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 }
 
 .hifz-nav-pill {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
+    justify-content: center;
+    gap: 7px;
+    padding: 8px 14px;
     border-radius: 12px;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     font-weight: 700;
     color: var(--text-muted);
     cursor: pointer;
     transition: all 0.25s ease;
     white-space: nowrap;
     user-select: none;
+    flex: 1 1 auto;
+    text-align: center;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
 }
 
 .hifz-nav-pill:hover {
     background: var(--primary-subtle);
     color: var(--primary);
+    border-color: var(--primary-border, #a7f3d0);
     transform: translateY(-2px);
 }
 
 .hifz-nav-pill.active {
     background: var(--badge-gradient, var(--primary));
     color: white !important;
+    border-color: transparent;
     box-shadow: 0 4px 12px var(--primary-shadow);
 }
 
@@ -826,9 +984,9 @@ body[data-section="banat"] .card {
    Mobile & Tablet Responsiveness (Drawer Navigation & Adaptive Layout)
    ========================================================================== */
 
-/* Toggle Button (Hidden on Desktop, Visible on Mobile/Tablet) */
+/* Toggle Button — Visible on ALL screens (Desktop + Mobile) */
 .sidebar-toggle-btn {
-    display: none;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 42px;
@@ -842,6 +1000,26 @@ body[data-section="banat"] .card {
     transition: all 0.25s ease;
     flex-shrink: 0;
 }
+
+/* Desktop Sidebar Collapse — toggled by JS adding .sidebar-collapsed on #app */
+#app.sidebar-collapsed aside#mms-sidebar {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: none !important;
+    opacity: 0 !important;
+}
+
+#app.sidebar-collapsed #mms-main {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+}
+
+aside#mms-sidebar {
+    transition: width 0.3s ease, right 0.35s cubic-bezier(0.16,1,0.3,1), opacity 0.3s ease, padding 0.3s ease !important;
+}
+
 
 .sidebar-toggle-btn:hover,
 .sidebar-toggle-btn:active {
@@ -1438,3 +1616,981 @@ body[data-section="banat"] .card {
 .highlighted-student-row {
     animation: highlightPulse 3s ease-out;
 }
+
+/* ==========================================================================
+   Modern Minimalist Dashboard & Live Drive Guardian System
+   ========================================================================== */
+
+/* Dashboard Header Clean Refinement */
+.dash-header-card.modern-header {
+    min-height: 110px;
+    padding: 0.8rem 2rem;
+    margin-bottom: 1.25rem;
+    background: #ffffff;
+    border: 1px solid var(--glass-border);
+    border-top: 4px solid var(--primary);
+    border-radius: 18px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+}
+
+/* Dashboard Action Bar: Compact Search + Live Drive Guardian Sign */
+.dash-action-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 100;
+}
+
+/* Compact Universal Search Box */
+.dash-search-box {
+    flex: 1;
+    min-width: 290px;
+    max-width: 620px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.dash-search-input-wrapper {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+.dash-search-input-wrapper .search-icon {
+    position: absolute;
+    right: 14px;
+    color: #94a3b8;
+    font-size: 1.05rem;
+    pointer-events: none;
+    transition: color 0.2s;
+}
+.dash-search-input-wrapper input {
+    width: 100%;
+    height: 44px;
+    padding: 0 42px 0 42px;
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 12px;
+    font-size: 0.98rem;
+    color: var(--text-main);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    transition: all 0.2s ease;
+    font-family: inherit;
+    outline: none;
+}
+.dash-search-input-wrapper input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-shadow);
+}
+.dash-search-input-wrapper input:focus ~ .search-icon {
+    color: var(--primary);
+}
+.dash-barcode-badge {
+    position: absolute;
+    left: 10px;
+    background: #f1f5f9;
+    color: #64748b;
+    padding: 3px 7px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    cursor: help;
+}
+.dash-search-action-btn {
+    height: 44px;
+    padding: 0 18px;
+    background: var(--badge-gradient, var(--primary));
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+    box-shadow: 0 3px 10px var(--primary-shadow);
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+.dash-search-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px var(--primary-shadow);
+}
+.dash-search-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    left: 0;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    max-height: 380px;
+    overflow-y: auto;
+    z-index: 999;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    padding: 6px;
+}
+
+/* ==========================================
+   Real-Time Drive Guardian Sign (Pure Visual Sign, No Clutter)
+   ========================================== */
+.dash-guardian-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+.dash-guardian-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    color: var(--primary);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    transition: all 0.25s ease;
+    outline: none;
+}
+.dash-guardian-btn:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px var(--primary-shadow);
+}
+.dash-guardian-btn.active {
+    border-color: #10b981;
+    background: #f0fdf4;
+    color: #059669;
+}
+.dash-guardian-btn.syncing {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    color: #2563eb;
+}
+.dash-guardian-btn.alert {
+    border-color: #f59e0b;
+    background: #fffbeb;
+    color: #d97706;
+}
+.guardian-icon-main {
+    font-size: 1.3rem;
+    transition: all 0.3s;
+}
+.dash-guardian-btn.syncing .guardian-icon-main {
+    animation: driveSpin 1.2s linear infinite;
+}
+@keyframes driveSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.guardian-beacon {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    animation: beaconPulse 2s infinite;
+}
+.guardian-beacon.amber {
+    background: #f59e0b;
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+    animation: beaconAmberPulse 1.8s infinite;
+}
+.guardian-beacon.blue {
+    background: #3b82f6;
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+    animation: beaconBluePulse 1.2s infinite;
+}
+@keyframes beaconPulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1.15); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+@keyframes beaconAmberPulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+    70% { transform: scale(1.15); box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+@keyframes beaconBluePulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+    70% { transform: scale(1.15); box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+.guardian-shield-mini {
+    font-size: 0.85rem;
+    opacity: 0.85;
+}
+
+/* Guardian Floating Popover */
+.guardian-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 320px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 20px 45px -4px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.06);
+    padding: 16px;
+    z-index: 99999 !important;
+    animation: popoverFadeIn 0.2s ease;
+    direction: rtl;
+    text-align: right;
+}
+@keyframes popoverFadeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.guardian-popover-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+}
+.guardian-popover-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.guardian-popover-badge {
+    font-size: 0.78rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 700;
+}
+.guardian-popover-badge.active { background: #dcfce7; color: #15803d; }
+.guardian-popover-badge.alert { background: #fef3c7; color: #b45309; }
+.guardian-popover-badge.syncing { background: #dbeafe; color: #1d4ed8; }
+.guardian-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.92rem;
+    margin-bottom: 8px;
+    color: #64748b;
+}
+.guardian-row-val {
+    font-weight: 700;
+    color: #1e293b;
+    max-width: 170px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: ltr;
+    text-align: left;
+}
+.guardian-popover-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 12px;
+}
+.guardian-popover-actions button {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+/* Modern Dashboard Stat Cards */
+.dash-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 1.8rem;
+    position: relative;
+    z-index: 1;
+}
+@media (max-width: 1024px) {
+    .dash-stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+    .dash-stat-grid { grid-template-columns: 1fr; }
+}
+.dash-stat-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    transition: all 0.25s ease;
+}
+.dash-stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+    border-color: var(--primary-border);
+}
+.dash-stat-icon-wrap {
+    width: 54px;
+    height: 54px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+.dash-stat-meta h4 {
+    font-size: 0.95rem;
+    color: #64748b;
+    margin-bottom: 2px;
+    font-weight: 600;
+}
+.dash-stat-meta .stat-number {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+}
+
+/* Modern Quick Action Grid */
+.dash-quick-section {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 1.5rem 1.75rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+}
+.dash-quick-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+.dash-quick-header h3 {
+    color: var(--primary);
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.dash-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+}
+@media (max-width: 900px) {
+    .dash-quick-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 500px) {
+    .dash-quick-grid { grid-template-columns: 1fr; }
+}
+.dash-quick-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 1rem 1.1rem;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #1e293b;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    text-align: right;
+}
+.dash-quick-btn:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.06);
+    background: #ffffff;
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.dash-quick-btn i {
+    font-size: 1.25rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.dash-quick-btn:hover i {
+    transform: scale(1.15);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+.dash-quick-btn .quick-btn-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.dash-quick-btn .quick-btn-text span {
+    font-weight: 700;
+    font-size: 0.96rem;
+    line-height: 1.2;
+}
+.dash-quick-btn .quick-btn-text small {
+    font-size: 0.78rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* Executive Trio Action Bar (Right: شعبہ بنین, Center: یونیورسل رپورٹ, Left: شعبہ بنات + کلاؤڈ گارڈین) */
+.dash-action-bar.executive-trio-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    margin-bottom: 1.6rem;
+    width: 100%;
+    position: relative;
+    z-index: 100;
+}
+.dash-bar-side {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 105;
+}
+.dash-guardian-wrapper {
+    position: relative;
+    z-index: 110;
+    display: inline-flex;
+    align-items: center;
+}
+.dash-bar-center.dash-center-search {
+    flex: 1;
+    max-width: 640px;
+    display: flex;
+    justify-content: center;
+    margin: 0 auto;
+    width: 100%;
+}
+.dash-bar-center.dash-center-search .dash-search-box {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Department Executive Banner Buttons (شعبہ بنین و بنات) */
+.dash-dept-banner-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    border-radius: 14px;
+    border: 1.5px solid #e2e8f0;
+    background: #ffffff;
+    cursor: pointer;
+    transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    outline: none;
+    text-align: right;
+}
+.dash-dept-banner-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+.dept-btn-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    transition: all 0.25s ease;
+}
+.dept-btn-text {
+    display: flex;
+    flex-direction: column;
+    text-align: right;
+    line-height: 1.25;
+}
+.dept-title {
+    font-weight: 800;
+    font-size: 0.98rem;
+    color: #1e293b;
+}
+.dept-sub {
+    font-size: 0.74rem;
+    color: #64748b;
+    font-weight: 600;
+}
+.dept-active-badge {
+    background: #ffffff;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 0.74rem;
+    font-weight: 800;
+    margin-right: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.12);
+}
+
+/* شعبہ بنین (Emerald Theme) */
+.dept-banin-btn .dept-btn-icon {
+    background: #ecfdf5;
+    color: #059669;
+}
+.dept-banin-btn:hover {
+    border-color: #059669;
+}
+.dept-banin-btn.active {
+    background: linear-gradient(135deg, #065f46 0%, #047857 100%);
+    border-color: #047857;
+    box-shadow: 0 6px 18px rgba(6, 95, 70, 0.28);
+}
+.dept-banin-btn.active .dept-title {
+    color: #ffffff;
+}
+.dept-banin-btn.active .dept-sub {
+    color: #a7f3d0;
+}
+.dept-banin-btn.active .dept-btn-icon {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+.dept-banin-btn.active .dept-active-badge {
+    color: #065f46;
+}
+
+/* شعبہ بنات (Rose Gold / Ruby Theme) */
+.dept-banat-btn .dept-btn-icon {
+    background: #fdf2f8;
+    color: #be185d;
+}
+.dept-banat-btn:hover {
+    border-color: #be185d;
+}
+.dept-banat-btn.active {
+    background: linear-gradient(135deg, #9d174d 0%, #be185d 100%);
+    border-color: #be185d;
+    box-shadow: 0 6px 18px rgba(157, 23, 77, 0.28);
+}
+.dept-banat-btn.active .dept-title {
+    color: #ffffff;
+}
+.dept-banat-btn.active .dept-sub {
+    color: #fbcfe8;
+}
+.dept-banat-btn.active .dept-btn-icon {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+.dept-banat-btn.active .dept-active-badge {
+    color: #9d174d;
+}
+
+@media (max-width: 960px) {
+    .dash-action-bar.executive-trio-bar {
+        flex-direction: column;
+        gap: 12px;
+    }
+    .dash-bar-center.dash-center-search {
+        order: 1;
+        width: 100%;
+        max-width: 100%;
+    }
+    .dash-bar-side.dash-side-banin {
+        order: 2;
+        width: 100%;
+    }
+    .dash-bar-side.dash-side-banat {
+        order: 3;
+        width: 100%;
+        justify-content: space-between;
+    }
+    .dash-dept-banner-btn {
+        flex: 1;
+    }
+}
+
+/* Executive Lower Grid (Hadith of Knowledge + Live Cloud Data Hub) */
+.dash-overview-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    margin-top: 1.5rem;
+}
+@media (max-width: 960px) {
+    .dash-overview-grid { grid-template-columns: 1fr; }
+}
+.dash-card-panel {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 1.35rem 1.6rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+.dash-card-panel:hover {
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    border-color: var(--primary-border);
+}
+.dash-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+.dash-panel-header h4 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+}
+.dash-wisdom-quote {
+    background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+    border-right: 4px solid var(--primary);
+    padding: 1.1rem 1.3rem;
+    border-radius: 12px;
+}
+.wisdom-arabic {
+    font-family: 'Amiri', 'Traditional Arabic', serif;
+    font-size: 1.25rem;
+    color: #065f46;
+    line-height: 1.7;
+    font-weight: 700;
+    direction: rtl;
+    margin-bottom: 6px;
+    text-shadow: 0 1px 2px rgba(6, 95, 70, 0.08);
+}
+.wisdom-urdu {
+    font-size: 0.95rem;
+    color: #334155;
+    line-height: 1.55;
+}
+.wisdom-reference {
+    font-size: 0.8rem;
+    color: #059669;
+    font-weight: 700;
+    margin-top: 6px;
+    display: inline-block;
+}
+.dash-security-status-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0.85rem 1rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+}
+.dash-security-icon-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #ecfdf5;
+    color: #059669;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+.dash-security-info h5 {
+    margin: 0 0 3px 0;
+    font-size: 0.96rem;
+    color: #0f172a;
+    font-weight: 700;
+}
+.dash-security-info p {
+    margin: 0;
+    font-size: 0.82rem;
+    color: #64748b;
+}
+.dash-security-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.btn-dash-action-sm {
+    flex: 1;
+    min-width: 140px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #1e293b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+.btn-dash-action-sm:hover {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px var(--primary-shadow);
+}
+
+
+/* ==========================================================================
+   Smooth Auto-Hide Sidebar (مینو بار کرسر آنے پر کھلنا اور کام کے دوران چھپنا)
+   ========================================================================== */
+@media (min-width: 993px) {
+    #app.sidebar-autohide aside#mms-sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100vh;
+        width: var(--sidebar-width);
+        z-index: 1050;
+        transform: translateX(calc(100% + 15px));
+        box-shadow: -8px 0 35px rgba(0, 0, 0, 0.16);
+        transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease;
+        border-left: 2px solid var(--primary-border);
+    }
+    
+    #app.sidebar-autohide aside#mms-sidebar.hover-open,
+    #app.sidebar-autohide aside#mms-sidebar:hover,
+    #app.sidebar-autohide aside#mms-sidebar.pinned {
+        transform: translateX(0);
+    }
+    
+    #app.sidebar-autohide #mms-main {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+        margin-right: 0 !important;
+        transition: margin-right 0.35s ease;
+    }
+    
+    #app.sidebar-autohide.sidebar-pinned aside#mms-sidebar {
+        position: sticky;
+        transform: translateX(0);
+        box-shadow: none;
+    }
+    #app.sidebar-autohide.sidebar-pinned #mms-main {
+        width: calc(100% - var(--sidebar-width)) !important;
+        flex: 1 !important;
+    }
+}
+
+/* Edge Trigger Zone (Right screen border for mouse proximity detection) */
+.sidebar-edge-trigger {
+    position: fixed;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 100px;
+    background: transparent;
+    z-index: 1040;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    transition: all 0.25s ease;
+}
+.edge-trigger-handle {
+    width: 5px;
+    height: 50px;
+    background: var(--primary);
+    border-radius: 4px 0 0 4px;
+    opacity: 0.4;
+    box-shadow: -2px 0 8px var(--primary-shadow);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.sidebar-edge-trigger:hover .edge-trigger-handle {
+    width: 12px;
+    height: 70px;
+    opacity: 1;
+    background: var(--badge-gradient, var(--primary));
+    box-shadow: -3px 0 14px var(--primary-shadow);
+}
+.sidebar-edge-trigger.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Sidebar Pin Button */
+.sidebar-pin-btn {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.25s ease;
+    z-index: 10;
+}
+.sidebar-pin-btn:hover {
+    background: var(--primary-subtle);
+    color: var(--primary);
+    border-color: var(--primary-border);
+}
+.sidebar-pin-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    transform: rotate(45deg);
+}
+
+/* ==========================================================================
+   Dashboard Aesthetic Animations (انیمیشنز)
+   ========================================================================== */
+
+/* 1. Staggered Cascading Entry */
+@keyframes dashEntrance {
+    0% { opacity: 0; transform: translateY(18px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+.dash-header-card.modern-header {
+    position: relative;
+    overflow: hidden;
+    animation: dashEntrance 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Header Animated Shimmer Line */
+.dash-header-card.modern-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--primary-light), #38bdf8, var(--primary));
+    background-size: 300% 100%;
+    animation: gradientFlow 4s ease infinite;
+}
+@keyframes gradientFlow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.dash-action-bar {
+    position: relative;
+    z-index: 100;
+    animation: dashEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+.dash-stat-grid {
+    position: relative;
+    z-index: 1;
+    animation: dashEntrance 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+}
+.dash-quick-section {
+    animation: dashEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.22s both;
+}
+
+/* 2. Stat Cards Dynamic Animations */
+.dash-stat-card {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dash-stat-card:nth-child(1) { animation: dashEntrance 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both; }
+.dash-stat-card:nth-child(2) { animation: dashEntrance 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both; }
+.dash-stat-card:nth-child(3) { animation: dashEntrance 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.22s both; }
+.dash-stat-card:nth-child(4) { animation: dashEntrance 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both; }
+
+.dash-stat-card:hover {
+    transform: translateY(-6px) scale(1.015);
+    box-shadow: 0 12px 28px -4px rgba(0,0,0,0.08), 0 0 0 1.5px var(--primary-border);
+}
+.dash-stat-icon-wrap {
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease;
+}
+.dash-stat-card:hover .dash-stat-icon-wrap {
+    transform: scale(1.12) rotate(6deg);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+}
+
+/* Shimmer Light across stat cards on hover */
+.dash-stat-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+    transform: skewX(-25deg);
+    transition: 0.75s;
+    pointer-events: none;
+}
+.dash-stat-card:hover::after {
+    left: 160%;
+}
+
+/* 3. Live Drive Guardian Multi-Ring Sonar Animation */
+.dash-guardian-btn {
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dash-guardian-btn.active .guardian-beacon {
+    position: relative;
+}
+.dash-guardian-btn.active .guardian-beacon::before,
+.dash-guardian-btn.active .guardian-beacon::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(16, 185, 129, 0.6);
+    animation: beaconRipple 2.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+.dash-guardian-btn.active .guardian-beacon::after {
+    animation-delay: 1.2s;
+}
+@keyframes beaconRipple {
+    0% { transform: scale(0.8); opacity: 1; }
+    100% { transform: scale(2.6); opacity: 0; }
+}
+
+.dash-overview-grid {
+    animation: dashEntrance 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both;
+}
+
+

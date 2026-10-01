@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>مدرسہ عبد الرحمن بن عوف - Madrassah Pro Manager</title>
+    <!-- Fonts & Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.rawgit.com/mquandalle/bower-jameel-noori-nastaleeq/master/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Amiri:wght@400;700&family=Katibeh&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Identity Services for Drive Backup -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <style>
+        /* Guarantee sidebar is always clickable and above any overlay on desktop */
+        aside#mms-sidebar {
+            z-index: 1000 !important;
+        }
+        #mms-sidebar-overlay:not(.active) {
+            display: none !important;
+            pointer-events: none !important;
+        }
+        @media (min-width: 993px) {
+            #mms-sidebar-overlay {
+                display: none !important;
+                pointer-events: none !important;
+            }
+        }
+        .nav-link, .section-tabs .tab, .sidebar-toggle-btn {
+            cursor: pointer !important;
+            user-select: none;
+            pointer-events: auto !important;
+        }
+        #welcome-login-screen[style*="none"] {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            z-index: -9999 !important;
+        }
+    </style>
+
+    <!-- Global Navigation & Compatibility Helpers -->
+    <script>
+        function getAppInstance() {
+            if (window.app && typeof window.app.navigate === 'function') return window.app;
+            if (window.mmsApp && typeof window.mmsApp.navigate === 'function') return window.mmsApp;
+            return null;
+        }
+
+        // Global navigation delegates routing directly to window.app
+        window._nav = function(v) {
+            try {
+                var a = getAppInstance();
+                if (a && typeof a.navigate === 'function') {
+                    a.navigate(v);
+                } else {
+                    console.warn('Navigation: app not ready yet for view:', v);
+                }
+            } catch(err) {
+                console.error('Navigation error for view ' + v + ':', err);
+            }
+        };
+        window.navigate = window._nav;
+
+        window._sec = function(s) {
+            var a = getAppInstance();
+            if (a && typeof a.switchSection === 'function') {
+                a.switchSection(s);
+            }
+        };
+        window._tog = function(f) {
+            var a = getAppInstance();
+            if (a && typeof a.toggleSidebar === 'function') {
+                a.toggleSidebar(f);
+            }
+        };
+        window._out = function() {
+            var a = getAppInstance();
+            if (a && typeof a.logout === 'function') {
+                a.logout();
+            }
+        };
+
+        // Bug #2 Fix: مرکزی delegated click listener - صرف یہی navigation handle کرے گا
+        // inline onclick ہٹا دیے گئے ہیں - یہاں سے ہی سب navigation ہوگی
+        document.addEventListener('click', function(e) {
+            // Sidebar toggle button
+            var toggleBtn = e.target.closest('#mms-sidebar-toggle, .sidebar-toggle-btn');
+            if (toggleBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                window._tog();
+                return;
+            }
+
+            // Nav-link click handling
+            var navLink = e.target.closest('.nav-link');
+            if (navLink) {
+                // Logout action (data-action="logout")
+                var action = navLink.getAttribute('data-action');
+                if (action === 'logout') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._out();
+                    return;
+                }
+                // View navigation (data-view="...")
+                var view = navLink.getAttribute('data-view');
+                if (view) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._nav(view);
+                    return;
+                }
+                // Legacy: inline onclick میں logout (backward compatibility)
+                var oc = navLink.getAttribute('onclick') || '';
+                if (oc.includes('_out') || oc.includes('logout')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._out();
+                    return;
+                }
+            }
+
+            // Section tabs (بنین/بنات)
+            var tab = e.target.closest('.section-tabs .tab');
+            if (tab) {
+                var sec = tab.getAttribute('data-section');
+                if (sec) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._sec(sec);
+                    return;
+                }
+            }
+
+            // Sidebar overlay click → sidebar بند کریں
+            var overlay = e.target.closest('#mms-sidebar-overlay');
+            if (overlay) {
+                e.preventDefault();
+                window._tog(false);
+                return;
+            }
+        }, true);
+        window.enterSoftwareDirectly = function(enteredPass) {
+            try { sessionStorage.setItem('mms_authenticated', 'true'); } catch(e) {}
+            try { localStorage.setItem('mms_authenticated', 'true'); } catch(e) {}
+            if (enteredPass && window.MadrassahDB && typeof window.MadrassahDB.saveSetting === 'function') {
+                try { window.MadrassahDB.saveSetting('app_password', String(enteredPass).trim()); } catch(e) {}
+            }
+            var welcome = document.getElementById('welcome-login-screen');
+            if (welcome) {
+                welcome.style.setProperty('display', 'none', 'important');
+                welcome.style.visibility = 'hidden';
+                welcome.style.opacity = '0';
+                welcome.style.pointerEvents = 'none';
+            }
+            var appEl = document.getElementById('app');
+            if (appEl) {
+                appEl.style.setProperty('display', 'flex', 'important');
+                appEl.style.visibility = 'visible';
+                appEl.style.opacity = '1';
+            }
+            if (window.app) {
+                window.app.isAuthenticated = true;
+                if (typeof window.app.showAppScreen === 'function') window.app.showAppScreen();
+                if (typeof window.app.applySectionTheme === 'function') window.app.applySectionTheme(window.app.currentSection || 'banin');
+                if (typeof window.app.navigate === 'function') window.app.navigate('dashboard');
+                else if (typeof window.app.render === 'function') window.app.render();
+            }
+        };
+    </script>
+</head>
+<body class="mms-dashboard-body">
+    <!-- =========================================================================
+         --- WELCOME & LOGIN SCREEN (MINIMALIST & ELEGANT) ---
+         ========================================================================= -->
+    <div id="welcome-login-screen">
+        <div class="welcome-screen-content">
+            
+            <!-- 1 & 2: OUTSIDE TOP - Bismillah, Madrassah Logo, and Name -->
+            <div class="welcome-outside-header">
+                <!-- Bismillah in Beautiful Calligraphy -->
+                <div class="welcome-bismillah">
+                    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+                </div>
+
+                <!-- Madrassah Logo & Calligraphy Name -->
+                <div class="welcome-madrassah-brand">
+                    <div class="welcome-logo-circle">
+                        <img src="logo.png" alt="مدرسہ لوگو" class="welcome-logo-img" onerror="this.src='logo.jpg'">
+                    </div>
+                    <div class="welcome-madrassah-calligraphy-wrap">
+                        <img src="madrsa-title.png" alt="مدرسہ عبد الرحمن بن عوف غفوریہ" class="welcome-madrassah-calligraphy">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3: THE WHITE LOGIN CARD (خانہ) -->
+            <div class="welcome-login-card">
+                <div id="login-error-alert" class="login-alert-error" style="display:none;">
+                    <i class="fas fa-circle-exclamation"></i>
+                    <span id="login-error-text">پاسورڈ درست نہیں ہے۔ دوبارہ کوشش کریں۔</span>
+                </div>
+
+                <form onsubmit="var pass = document.getElementById('login-password-input')?.value; if (window.app && typeof window.app.handleLogin === 'function') { window.app.handleLogin(event); } else { if(event) event.preventDefault(); window.enterSoftwareDirectly(pass); } return false;">
+                    <div class="login-field-group">
+                        <label class="login-field-label" for="login-password-input">
+                            <i class="fas fa-shield-halved" style="color:var(--primary, #065f46);"></i> سیکیورٹی پاسورڈ (Password)
+                        </label>
+                        <div class="login-input-wrap">
+                            <i class="fas fa-key login-icon-right"></i>
+                            <input type="password" id="login-password-input" placeholder="پاسورڈ درج کریں..." autocomplete="current-password" autofocus>
+                            <button type="button" id="login-pass-toggle-btn" class="login-eye-btn" onclick="if (window.app && typeof window.app.toggleLoginPassVisibility === 'function') window.app.toggleLoginPassVisibility();" title="پاسورڈ دیکھیں / چھپائیں">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="login-options-bar">
+                        <label class="login-remember-label">
+                            <input type="checkbox" id="login-remember-checkbox" checked>
+                            <span>لاگ ان یاد رکھیں</span>
+                        </label>
+                        <!-- Hidden element for app.js compatibility without showing in UI -->
+                        <span id="login-current-pass-hint" style="display:none;">123</span>
+                    </div>
+
+                    <button type="submit" class="btn-login-submit" id="btn-login-submit" onclick="var pass = document.getElementById('login-password-input')?.value; if (window.app && typeof window.app.handleLogin === 'function') { window.app.handleLogin(event); } else { if(event) event.preventDefault(); window.enterSoftwareDirectly(pass); }">
+                        <i class="fas fa-arrow-right-to-bracket"></i> لاگ ان (Sign In)
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+        <!-- 4: OUTSIDE BOTTOM CORNERS - Developer Name (Right) and Novatix Logo (Left) -->
+        <div class="welcome-bottom-corners-bar">
+            <!-- Right Corner: Developer Name -->
+            <div class="corner-developer-info">
+                <span class="corner-dev-by">Designed & Developed by</span>
+                <span class="corner-dev-name">Muhammad Idrees Shaheen</span>
+            </div>
+
+            <!-- Left Corner: Novatix Logo & Branding -->
+            <div class="corner-novatix-info">
+                <img src="novatix-logo.jpg" alt="NOVATIX" class="corner-novatix-logo">
+                <span class="corner-novatix-text">NOVATIX</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="app">
+        <!-- Sidebar -->
+        <aside id="mms-sidebar">
+            <div class="mms-logo-area">
+                <img src="logo.jpg" alt="مدرسہ عبد الرحمن بن عوف" class="mms-logo-img">
+                <img src="madrsa-title.png" alt="مدرسہ عبد الرحمن بن عوف غفوریہ" style="max-width:100%; max-height:48px; object-fit:contain; margin-top:8px; mix-blend-mode:multiply; display:block; margin-left:auto; margin-right:auto;">
+            </div>
+            
+            <div class="section-tabs">
+                <div class="tab active" data-section="banin" onclick="window._sec('banin')"><i class="fas fa-mars"></i> <span>بنین</span></div>
+                <div class="tab" data-section="banat" onclick="window._sec('banat')"><i class="fas fa-venus"></i> <span>بنات</span></div>
+            </div>
+
+            <nav class="mms-nav">
+                <div class="nav-link active" data-view="dashboard">
+                    <i class="fas fa-chart-line"></i> <span>ڈیش بورڈ</span>
+                </div>
+                <div class="nav-link" data-view="admission">
+                    <i class="fas fa-user-plus"></i> <span id="nav-admission-label">نیا داخلہ</span>
+                </div>
+                <div class="nav-link" data-view="students">
+                    <i class="fas fa-user-graduate"></i> <span id="nav-students-label">طلباء کی فہرست</span>
+                </div>
+                <div class="nav-link" data-view="graduates">
+                    <i class="fas fa-graduation-cap"></i> <span id="nav-graduates-label">فارغ التحصیل طلباء</span>
+                </div>
+                <div class="nav-link" data-view="staff_list">
+                    <i class="fas fa-chalkboard-teacher"></i> <span>عملہ کی فہرست</span>
+                </div>
+                <div class="nav-link" data-view="salary_management">
+                    <i class="fas fa-hand-holding-dollar"></i> <span>تنخواہوں کا نظام</span>
+                </div>
+                <div class="nav-link" data-view="syllabus">
+                    <i class="fas fa-list-check"></i> <span>نصابِ تعلیم</span>
+                </div>
+                <div class="nav-link" data-view="timetable">
+                    <i class="fas fa-calendar-alt"></i> <span>جدول الاوقات</span>
+                </div>
+                <div class="nav-link" data-view="attendance">
+                    <i class="fas fa-calendar-check"></i> <span>حاضری ریکارڈ</span>
+                </div>
+                <div class="nav-link" data-view="hifz">
+                    <i class="fas fa-book-quran"></i> <span>حفظ القرآن</span>
+                </div>
+                <div class="nav-link" data-view="fees">
+                    <i class="fas fa-money-bill-wave"></i> <span>فیس وصولی</span>
+                </div>
+                <div class="nav-link" data-view="accounts">
+                    <i class="fas fa-wallet"></i> <span>بیت المال</span>
+                </div>
+                <div class="nav-link" data-view="donors">
+                    <i class="fas fa-hand-holding-heart"></i> <span>مستقل ڈونرز</span>
+                </div>
+                <div class="nav-link" data-view="exams">
+                    <i class="fas fa-file-signature"></i> <span>امتحانات</span>
+                </div>
+                <div class="nav-link" data-view="reports">
+                    <i class="fas fa-file-invoice"></i> <span>رپورٹس</span>
+                </div>
+                <div class="nav-link" data-view="settings">
+                    <i class="fas fa-cog"></i> <span>ترتیبات</span>
+                </div>
+                <div class="nav-link" data-action="logout" style="color:#dc2626; margin-top:1.5rem; border-top:1px solid #e2e8f0; padding-top:0.8rem;" title="سافٹ ویئر سے لاگ آؤٹ ہو کر ویلکم اسکرین پر جائیں">
+                    <i class="fas fa-arrow-right-from-bracket"></i> <span>لاگ آؤٹ (خروج)</span>
+                </div>
+            </nav>
+        </aside>
+        
+        <!-- Mobile Sidebar Overlay Backdrop -->
+        <div id="mms-sidebar-overlay" onclick="window._tog(false)"></div>
+
+        <!-- Main Content -->
+        <main id="mms-main">
+            <header id="mms-topbar">
+                <div class="mms-header-left" style="display:flex; align-items:center; gap:0.8rem;">
+                    <button id="mms-sidebar-toggle" class="sidebar-toggle-btn" onclick="window._tog()" title="مینو کھولیں / بند کریں">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h3 id="mms-view-title" style="margin:0;">ڈیش بورڈ</h3>
+                    <div id="mms-section-badge" class="mms-section-badge"></div>
+                    <span id="mms-version-badge" style="background:#e0f2fe; color:#0369a1; font-size:0.8rem; padding:3px 10px; border-radius:12px; font-weight:bold; border:1px solid #bae6fd;"><i class="fas fa-check-circle" style="color:#0284c7;"></i> ورژن 3.6</span>
+                </div>
+                <div class="mms-header-right" style="display:flex; align-items:center; gap:10px; flex-direction:row-reverse;">
+                    <span class="mms-user-name" style="font-weight:bold; font-size:1.2rem; letter-spacing:0.8px; color:var(--primary);">NOVATIX</span>
+                    <img src="novatix-logo.jpg" alt="NOVATIX Logo" style="height:40px; width:40px; border-radius:10px; object-fit:contain; background:#ffffff; padding:2px; border:1.5px solid #cbd5e1; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+                    <button type="button" class="btn btn-sm" onclick="app.logout()" title="سافٹ ویئر سے لاگ آؤٹ کریں" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; border-radius:10px; padding:6px 14px; font-weight:bold; display:flex; align-items:center; gap:6px; cursor:pointer; font-size:0.95rem;">
+                        <i class="fas fa-arrow-right-from-bracket"></i> <span>لاگ آؤٹ</span>
+                    </button>
+                </div>
+            </header>
+
+            <div id="main-content">
+                <div class="card dash-header-card">
+                    <!-- دائیں جانب: مدرسہ کا نام -->
+                    <div class="dash-header-right">
+                        <img src="madrsa-title.png" alt="مدرسہ عبد الرحمن بن عوف غفوریہ" class="dash-title-img">
+                    </div>
+
+                    <!-- بائیں جانب: لوگو -->
+                    <div class="dash-header-left">
+                        <img src="logo.jpg" alt="مدرسہ عبد الرحمن بن عوف" class="dash-logo-img">
+                    </div>
+                </div>
+
+                <!-- Universal Quick Search & 360 Dossier Hero Card -->
+                <div class="card" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; border: 1px solid #334155; border-radius: 16px; padding: 1.4rem 1.8rem; box-shadow: 0 12px 28px -5px rgba(0,0,0,0.3); position: relative; overflow: visible;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+                        <div>
+                            <h2 style="margin: 0; font-size: 1.35rem; color: #38bdf8; display: flex; align-items: center; gap: 10px;">
+                                <i class="fas fa-fingerprint" style="color:#38bdf8; font-size:1.5rem;"></i> یونیورسل کوڈ تلاش و ۳۶۰° لائف سائیکل رپورٹ
+                            </h2>
+                            <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 0.95rem;">
+                                طالب علم یا ملازم کا کوڈ (مثلاً <b style="color:#fcd34d; font-family:monospace;">STU-1001</b> یا <b style="color:#6ee7b7; font-family:monospace;">EMP-101</b>)، نام یا فون درج کر کے تمام حاضریاں، بقایا جات، رزلٹ اور بائیو ڈیٹا دیکھیں
+                            </p>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-barcode"></i> بارکوڈ اسکینر سپورٹ
+                            </span>
+                        </div>
+                    </div>
+
+                    <div style="position: relative; width: 100%;">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <div style="position: relative; flex: 1;">
+                                <i class="fas fa-search" style="position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 1.2rem;"></i>
+                                <input type="text" id="universalSearchInput" 
+                                    placeholder="کوڈ (مثلاً STU-1001، EMP-101)، طالب علم یا ملازم کا نام، یا فون نمبر لکھیں..." 
+                                    autocomplete="off"
+                                    oninput="if(window.app && typeof window.app.handleUniversalSearchInput==='function') window.app.handleUniversalSearchInput(this.value)"
+                                    onkeydown="if(event.key==='Enter' && window.app && typeof window.app.executeUniversalSearch==='function') window.app.executeUniversalSearch(this.value)"
+                                    style="width: 100%; padding: 13px 46px 13px 16px; border-radius: 12px; border: 2px solid #3b82f6; background: #0f172a; color: #ffffff; font-size: 1.15rem; font-family: inherit; outline: none; box-sizing: border-box; transition: all 0.2s;"
+                                    onfocus="this.style.borderColor='#60a5fa'; this.style.boxShadow='0 0 0 4px rgba(59,130,246,0.3)';"
+                                    onblur="setTimeout(() => { this.style.borderColor='#3b82f6'; this.style.boxShadow='none'; }, 200);">
+                            </div>
+                            <button class="btn" onclick="if(window.app && typeof window.app.executeUniversalSearch==='function') window.app.executeUniversalSearch(document.getElementById('universalSearchInput').value)" 
+                                style="background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; padding: 13px 26px; font-size: 1.1rem; font-weight: bold; border-radius: 12px; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4); white-space: nowrap;">
+                                <i class="fas fa-id-card"></i> رپورٹ دیکھیں
+                            </button>
+                        </div>
+
+                        <!-- Live search dropdown suggestions -->
+                        <div id="universalSearchResults" style="display:none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: #1e293b; border: 1px solid #475569; border-radius: 12px; max-height: 380px; overflow-y: auto; z-index: 999; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6); padding: 8px; box-sizing: border-box;"></div>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:var(--primary-subtle);color:var(--primary);"><i class="fas fa-user-graduate"></i></div>
+                        <div class="stat-info"><h3>کل طلباء (بنین)</h3><p id="dash-total-students">...</p></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:#eff6ff;color:#2563eb;"><i class="fas fa-chalkboard-teacher"></i></div>
+                        <div class="stat-info"><h3>کل اسٹاف</h3><p id="dash-total-teachers">...</p></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:#fefce8;color:#ca8a04;"><i class="fas fa-book-open"></i></div>
+                        <div class="stat-info"><h3>نصاب کی کتب</h3><p id="dash-total-books">...</p></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:var(--primary-subtle);color:var(--primary-light);"><i class="fas fa-calendar-check"></i></div>
+                        <div class="stat-info"><h3>ٹائم ٹیبل</h3><p>ایکٹو</p></div>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+                    <div class="card">
+                        <h3 style="color:var(--primary); margin-bottom:1.5rem; border-bottom:1px solid #eee; padding-bottom:0.5rem;"><i class="fas fa-rocket"></i> فوری لنکس - شعبہ بنین (طلباء)</h3>
+                        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:1rem;">
+                            <button class="btn btn-primary" onclick="app.navigate('admission')" style="text-align:right;"><i class="fas fa-user-plus"></i> نیا داخلہ طالب علم</button>
+                            <button class="btn btn-primary" onclick="app.navigate('staff_form')" style="background:#2563eb; text-align:right;"><i class="fas fa-user-tie"></i> نیا اندراج اسٹاف</button>
+                            <button class="btn btn-primary" onclick="app.navigate('timetable')" style="background:var(--secondary); text-align:right;"><i class="fas fa-clock"></i> ٹائم ٹیبل سیٹ کریں</button>
+                            <button class="btn btn-primary" onclick="app.navigate('syllabus')" style="background:#6366f1; text-align:right;"><i class="fas fa-book"></i> نصاب چیک کریں</button>
+                        </div>
+                    </div>
+                    <div class="card" style="text-align:center; display:flex; flex-direction:column; justify-content:center; background:var(--primary-subtle); border: 1px solid var(--primary-border);">
+                        <i class="fas fa-shield-halved" style="font-size:3rem; color:var(--primary); margin-bottom:1rem;"></i>
+                        <h4 style="color:var(--text-main);">سسٹم محفوظ ہے</h4>
+                        <p style="font-size:0.9rem; color:var(--text-muted);">آپ کا تمام ڈیٹا اسی کمپیوٹر میں محفوظ ہے اور کہیں شیئر نہیں ہو رہا۔</p>
+                    </div>
+                </div>
+            </div>
+
+            <footer id="mms-footer">
+                Designed and Developed by <b>محمد ادریس شاہین</b>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Camera Modal -->
+    <div id="camera-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:9999; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+        <div style="background:white; padding:1.5rem; border-radius:20px; text-align:center; max-width:480px; width:92%; box-shadow:0 20px 40px rgba(0,0,0,0.3); border:2px solid var(--primary);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid #e2e8f0; padding-bottom:0.5rem;">
+                <h3 style="color:var(--primary); font-family:'Aref Ruqaa', serif; font-size:1.6rem; margin:0;"><i class="fas fa-camera"></i> تصویر کھینچیں</h3>
+                <button type="button" onclick="app.closeCamera()" style="background:none; border:none; font-size:1.4rem; color:#94a3b8; cursor:pointer;"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="border-radius:12px; overflow:hidden; background:#000; position:relative; line-height:0;">
+                <video id="video" autoplay playsinline style="width:100%; height:260px; object-fit:cover;"></video>
+            </div>
+            <canvas id="canvas" style="display:none;"></canvas>
+            <div style="margin-top:1.2rem; display:flex; justify-content:center; gap:1rem;">
+                <button type="button" class="btn btn-primary" onclick="app.capturePhoto()" style="display:flex; align-items:center; gap:0.5rem; font-size:1.1rem;">
+                    <i class="fas fa-camera"></i> تصویر محفوظ کریں
+                </button>
+                <button type="button" class="btn" style="background:#f1f5f9; color:#475569;" onclick="app.closeCamera()">
+                    منسوخ کریں
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DB and App Scripts -->
+    <script src="assets/js/html2canvas.min.js"></script>
+    <script src="assets/js/jspdf.umd.min.js"></script>
+    <script src="db.js"></script>
+    <script src="assets/js/address-data.js"></script>
+    <script src="assets/js/quran-data.js"></script>
+    <script src="hifz.js"></script>
+    <script src="donors.js"></script>
+    <script src="graduates.js"></script>
+    <script src="timetable.js"></script>
+    <script src="app.js"></script>
+
+    <script>
+        // Safety net: اگر app.js کے اندر initial render نہ ہو سکا تو یہاں سے کریں
+        // app.js میں پہلے سے _initialRenderDone guard ہے - duplicate render نہیں ہوگا
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.app && window.app.isAuthenticated && typeof window.app.render === 'function') {
+                var mc = document.getElementById('main-content');
+                // صرف تب render کریں جب content ابھی خالی ہو یا spinner چل رہی ہو
+                if (mc && (!mc.querySelector('.stat-card') && !mc.querySelector('.card'))) {
+                    window.app.navigate(window.app.currentView || 'dashboard');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

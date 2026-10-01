@@ -277,7 +277,7 @@ const GraduatesModule = {
                                         </div>
                                         ${g.wafaqResultCardDoc ? `
                                             <div onclick="GraduatesModule.viewDocument('${g.id}', 'wafaq')" style="position:relative; width:100%; height:75px; border-radius:6px; overflow:hidden; cursor:pointer; border:1px solid #a7f3d0;" title="دیکھنے کے لیے کلک کریں">
-                                                <img src="${g.wafaqResultCardDoc}" alt="وفاق رزلٹ کارڈ" style="width:100%; height:100%; object-fit:cover;">
+                                                ${GraduatesModule.renderDocThumbnail(g.wafaqResultCardDoc, 'وفاق رزلٹ کارڈ')}
                                                 <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); color:white; font-size:0.7rem; padding:2px;">
                                                     <i class="fas fa-eye"></i> کلک کریں
                                                 </div>
@@ -296,7 +296,7 @@ const GraduatesModule = {
                                         </div>
                                         ${g.hifzSanadDoc ? `
                                             <div onclick="GraduatesModule.viewDocument('${g.id}', 'sanad')" style="position:relative; width:100%; height:75px; border-radius:6px; overflow:hidden; cursor:pointer; border:1px solid #bae6fd;" title="دیکھنے کے لیے کلک کریں">
-                                                <img src="${g.hifzSanadDoc}" alt="سندِ حفظ" style="width:100%; height:100%; object-fit:cover;">
+                                                ${GraduatesModule.renderDocThumbnail(g.hifzSanadDoc, 'سندِ حفظ')}
                                                 <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); color:white; font-size:0.7rem; padding:2px;">
                                                     <i class="fas fa-eye"></i> کلک کریں
                                                 </div>
@@ -633,7 +633,7 @@ const GraduatesModule = {
                                         </div>
                                         ${grad.wafaqResultCardDoc ? `
                                             <div onclick="GraduatesModule.viewDocument('${grad.id}', 'wafaq')" style="position:relative; width:100%; height:110px; border-radius:8px; overflow:hidden; cursor:pointer; border:1px solid #a7f3d0;" title="مکمل دیکھنے کے لیے کلک کریں">
-                                                <img src="${grad.wafaqResultCardDoc}" alt="وفاق رزلٹ کارڈ" style="width:100%; height:100%; object-fit:cover;">
+                                                ${GraduatesModule.renderDocThumbnail(grad.wafaqResultCardDoc, 'وفاق رزلٹ کارڈ')}
                                                 <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.65); color:white; font-size:0.8rem; padding:4px; display:flex; align-items:center; justify-content:center; gap:5px;">
                                                     <i class="fas fa-eye"></i> کلک کریں (دیکھیں)
                                                 </div>
@@ -652,7 +652,7 @@ const GraduatesModule = {
                                         </div>
                                         ${grad.hifzSanadDoc ? `
                                             <div onclick="GraduatesModule.viewDocument('${grad.id}', 'sanad')" style="position:relative; width:100%; height:110px; border-radius:8px; overflow:hidden; cursor:pointer; border:1px solid #bae6fd;" title="مکمل دیکھنے کے لیے کلک کریں">
-                                                <img src="${grad.hifzSanadDoc}" alt="سندِ حفظ" style="width:100%; height:100%; object-fit:cover;">
+                                                ${GraduatesModule.renderDocThumbnail(grad.hifzSanadDoc, 'سندِ حفظ')}
                                                 <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.65); color:white; font-size:0.8rem; padding:4px; display:flex; align-items:center; justify-content:center; gap:5px;">
                                                     <i class="fas fa-eye"></i> کلک کریں (دیکھیں)
                                                 </div>
@@ -980,7 +980,9 @@ const GraduatesModule = {
                                 <!-- Live Preview Container -->
                                 <div id="preview_wafaqResultCard_container" style="margin-top:10px; ${isEdit && grad.wafaqResultCardDoc ? '' : 'display:none;'}">
                                     <div style="display:flex; align-items:center; gap:10px; background:#ecfdf5; padding:8px 12px; border-radius:8px; border:1px solid #a7f3d0; width:fit-content;">
-                                        <img id="preview_wafaqResultCard_img" src="${isEdit && grad.wafaqResultCardDoc ? grad.wafaqResultCardDoc : ''}" alt="رزلٹ کارڈ" style="width:48px; height:48px; object-fit:cover; border-radius:6px; border:1px solid #10b981;">
+                                        <div id="preview_wafaqResultCard_img_wrap" style="width:48px; height:48px; border-radius:6px; overflow:hidden; border:1px solid #10b981;">
+                                            ${isEdit && grad.wafaqResultCardDoc ? GraduatesModule.renderDocThumbnail(grad.wafaqResultCardDoc, 'رزلٹ کارڈ') : ''}
+                                        </div>
                                         <div>
                                             <span style="font-size:0.85rem; font-weight:bold; color:#065f46; display:block;">رزلٹ کارڈ دستاویز کامیابی سے لوڈ ہو گئی</span>
                                             <button type="button" onclick="GraduatesModule.removeDoc('wafaq')" style="background:none; border:none; color:#e11d48; font-size:0.8rem; cursor:pointer; padding:0; text-decoration:underline;">
@@ -1027,7 +1029,9 @@ const GraduatesModule = {
                                 <!-- Live Preview Container -->
                                 <div id="preview_hifzSanad_container" style="margin-top:10px; ${isEdit && grad.hifzSanadDoc ? '' : 'display:none;'}">
                                     <div style="display:flex; align-items:center; gap:10px; background:#ecfdf5; padding:8px 12px; border-radius:8px; border:1px solid #a7f3d0; width:fit-content;">
-                                        <img id="preview_hifzSanad_img" src="${isEdit && grad.hifzSanadDoc ? grad.hifzSanadDoc : ''}" alt="سند حفظ" style="width:48px; height:48px; object-fit:cover; border-radius:6px; border:1px solid #10b981;">
+                                        <div id="preview_hifzSanad_img_wrap" style="width:48px; height:48px; border-radius:6px; overflow:hidden; border:1px solid #10b981;">
+                                            ${isEdit && grad.hifzSanadDoc ? GraduatesModule.renderDocThumbnail(grad.hifzSanadDoc, 'سندِ حفظ') : ''}
+                                        </div>
                                         <div>
                                             <span style="font-size:0.85rem; font-weight:bold; color:#065f46; display:block;">سندِ حفظ دستاویز کامیابی سے لوڈ ہو گئی</span>
                                             <button type="button" onclick="GraduatesModule.removeDoc('sanad')" style="background:none; border:none; color:#e11d48; font-size:0.8rem; cursor:pointer; padding:0; text-decoration:underline;">
@@ -1126,6 +1130,17 @@ const GraduatesModule = {
         else gradeSelect.value = 'مقبول (C)';
     },
 
+    renderDocThumbnail(docUrl, altText) {
+        if (!docUrl) return '';
+        if (docUrl.startsWith('data:application/pdf') || docUrl.toLowerCase().endsWith('.pdf')) {
+            return `<div style="width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#fee2e2; border-radius:6px; color:#dc2626;">
+                        <i class="fas fa-file-pdf" style="font-size:1.6rem;"></i>
+                        <span style="font-size:0.65rem; font-weight:bold; margin-top:2px;">PDF دستاویز</span>
+                    </div>`;
+        }
+        return `<img src="${docUrl}" alt="${altText || 'دستاویز'}" style="width:100%; height:100%; object-fit:cover;">`;
+    },
+
     handleFileUpload(event, type) {
         const file = event.target.files[0];
         if (!file) return;
@@ -1136,17 +1151,17 @@ const GraduatesModule = {
             if (type === 'wafaq') {
                 document.getElementById('input_wafaqResultCardDoc').value = base64;
                 const container = document.getElementById('preview_wafaqResultCard_container');
-                const img = document.getElementById('preview_wafaqResultCard_img');
+                const imgWrap = document.getElementById('preview_wafaqResultCard_img_wrap');
                 const label = document.getElementById('label_wafaqResultCard');
-                if (img) img.src = base64;
+                if (imgWrap) imgWrap.innerHTML = GraduatesModule.renderDocThumbnail(base64, 'وفاق رزلٹ کارڈ');
                 if (container) container.style.display = 'block';
                 if (label) label.innerHTML = `<span style="color:#059669; font-weight:bold;">✓ ${file.name} کامیابی سے لوڈ ہو گیا</span>`;
             } else if (type === 'sanad') {
                 document.getElementById('input_hifzSanadDoc').value = base64;
                 const container = document.getElementById('preview_hifzSanad_container');
-                const img = document.getElementById('preview_hifzSanad_img');
+                const imgWrap = document.getElementById('preview_hifzSanad_img_wrap');
                 const label = document.getElementById('label_hifzSanad');
-                if (img) img.src = base64;
+                if (imgWrap) imgWrap.innerHTML = GraduatesModule.renderDocThumbnail(base64, 'سندِ حفظ');
                 if (container) container.style.display = 'block';
                 if (label) label.innerHTML = `<span style="color:#059669; font-weight:bold;">✓ ${file.name} کامیابی سے لوڈ ہو گیا</span>`;
             }
@@ -1158,11 +1173,15 @@ const GraduatesModule = {
         if (type === 'wafaq') {
             document.getElementById('input_wafaqResultCardDoc').value = '';
             document.getElementById('preview_wafaqResultCard_container').style.display = 'none';
+            const imgWrap = document.getElementById('preview_wafaqResultCard_img_wrap');
+            if (imgWrap) imgWrap.innerHTML = '';
             document.getElementById('label_wafaqResultCard').innerText = 'کوئی فائل منتخب نہیں ہوئی';
             document.getElementById('file_wafaqResultCard').value = '';
         } else if (type === 'sanad') {
             document.getElementById('input_hifzSanadDoc').value = '';
             document.getElementById('preview_hifzSanad_container').style.display = 'none';
+            const imgWrap = document.getElementById('preview_hifzSanad_img_wrap');
+            if (imgWrap) imgWrap.innerHTML = '';
             document.getElementById('label_hifzSanad').innerText = 'کوئی فائل منتخب نہیں ہوئی';
             document.getElementById('file_hifzSanad').value = '';
         }

@@ -3,173 +3,266 @@
 
 const MadrassahDB = {
     dbName: 'MadrassahProDB',
-    dbVersion: 16, // Added Graduates / Alumni Module object store (graduates)
+    dbVersion: 22, // Upgraded to 22 for wheat donations and usage stores
+
+    _createObjectStores(db, txn) {
+        if (!db.objectStoreNames.contains('students')) {
+            db.createObjectStore('students', { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains('teachers')) {
+            db.createObjectStore('teachers', { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains('books')) {
+            db.createObjectStore('books', { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains('syllabus')) {
+            db.createObjectStore('syllabus', { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains('fees')) {
+            const feeStore = db.createObjectStore('fees', { keyPath: 'id', autoIncrement: true });
+            feeStore.createIndex('studentId', 'studentId', { unique: false });
+        } else if (txn) {
+            try {
+                const feeStore = txn.objectStore('fees');
+                if (!feeStore.indexNames.contains('studentId')) feeStore.createIndex('studentId', 'studentId', { unique: false });
+            } catch(e) {}
+        }
+        if (!db.objectStoreNames.contains('salaries')) {
+            db.createObjectStore('salaries', { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains('advances')) {
+            db.createObjectStore('advances', { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains('accounts')) {
+            db.createObjectStore('accounts', { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains('attendance')) {
+            const attStore = db.createObjectStore('attendance', { keyPath: 'id', autoIncrement: true });
+            attStore.createIndex('date', 'date', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('exams')) {
+            db.createObjectStore('exams', { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains('results')) {
+            const resStore = db.createObjectStore('results', { keyPath: 'id', autoIncrement: true });
+            resStore.createIndex('examId', 'examId', { unique: false });
+            resStore.createIndex('studentId', 'studentId', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('settings')) {
+            db.createObjectStore('settings', { keyPath: 'key' });
+        }
+        if (!db.objectStoreNames.contains('hifz_enrollments')) {
+            const hEnroll = db.createObjectStore('hifz_enrollments', { keyPath: 'id', autoIncrement: true });
+            hEnroll.createIndex('studentId', 'studentId', { unique: true });
+            hEnroll.createIndex('teacherId', 'teacherId', { unique: false });
+            hEnroll.createIndex('halaqa', 'halaqa', { unique: false });
+            hEnroll.createIndex('status', 'status', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('hifz_halaqas')) {
+            const hHalaqa = db.createObjectStore('hifz_halaqas', { keyPath: 'id', autoIncrement: true });
+            hHalaqa.createIndex('name', 'name', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('hifz_daily_records')) {
+            const hDaily = db.createObjectStore('hifz_daily_records', { keyPath: 'id', autoIncrement: true });
+            hDaily.createIndex('studentId', 'studentId', { unique: false });
+            hDaily.createIndex('date', 'date', { unique: false });
+            hDaily.createIndex('teacherId', 'teacherId', { unique: false });
+            hDaily.createIndex('halaqa', 'halaqa', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('hifz_revisions')) {
+            const hRev = db.createObjectStore('hifz_revisions', { keyPath: 'id', autoIncrement: true });
+            hRev.createIndex('studentId', 'studentId', { unique: false });
+            hRev.createIndex('date', 'date', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('hifz_exams')) {
+            const hExam = db.createObjectStore('hifz_exams', { keyPath: 'id', autoIncrement: true });
+            hExam.createIndex('date', 'date', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('hifz_exam_results')) {
+            const hRes = db.createObjectStore('hifz_exam_results', { keyPath: 'id', autoIncrement: true });
+            hRes.createIndex('examId', 'examId', { unique: false });
+            hRes.createIndex('studentId', 'studentId', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('hifz_juz_progress')) {
+            const hJuz = db.createObjectStore('hifz_juz_progress', { keyPath: 'id', autoIncrement: true });
+            hJuz.createIndex('studentId', 'studentId', { unique: false });
+            hJuz.createIndex('studentJuz', ['studentId', 'juzNumber'], { unique: true });
+        }
+        if (!db.objectStoreNames.contains('hifz_completions')) {
+            const hComp = db.createObjectStore('hifz_completions', { keyPath: 'id', autoIncrement: true });
+            hComp.createIndex('studentId', 'studentId', { unique: true });
+        }
+        if (!db.objectStoreNames.contains('donors')) {
+            const donorStore = db.createObjectStore('donors', { keyPath: 'id', autoIncrement: true });
+            donorStore.createIndex('name', 'name', { unique: false });
+            donorStore.createIndex('phone', 'phone', { unique: false });
+            donorStore.createIndex('status', 'status', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('donor_donations')) {
+            const dStore = db.createObjectStore('donor_donations', { keyPath: 'id', autoIncrement: true });
+            dStore.createIndex('donorId', 'donorId', { unique: false });
+            dStore.createIndex('year', 'year', { unique: false });
+            dStore.createIndex('receiptNo', 'receiptNo', { unique: false });
+            dStore.createIndex('date', 'date', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('graduates')) {
+            const gradStore = db.createObjectStore('graduates', { keyPath: 'id', autoIncrement: true });
+            gradStore.createIndex('studentId', 'studentId', { unique: false });
+            gradStore.createIndex('graduationYear', 'graduationYear', { unique: false });
+            gradStore.createIndex('graduationType', 'graduationType', { unique: false });
+            gradStore.createIndex('name', 'name', { unique: false });
+            gradStore.createIndex('section', 'section', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('wheat_donations')) {
+            const wDnr = db.createObjectStore('wheat_donations', { keyPath: 'id', autoIncrement: true });
+            wDnr.createIndex('name', 'name', { unique: false });
+            wDnr.createIndex('phone', 'phone', { unique: false });
+            wDnr.createIndex('season', 'season', { unique: false });
+            wDnr.createIndex('date', 'date', { unique: false });
+            wDnr.createIndex('receiptNo', 'receiptNo', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('wheat_usage')) {
+            const wUsg = db.createObjectStore('wheat_usage', { keyPath: 'id', autoIncrement: true });
+            wUsg.createIndex('season', 'season', { unique: false });
+            wUsg.createIndex('date', 'date', { unique: false });
+            wUsg.createIndex('purpose', 'purpose', { unique: false });
+        }
+    },
 
     initDB() {
         if (this.db) return Promise.resolve(this.db);
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(this.dbName, this.dbVersion);
+        if (this._initPromise) return this._initPromise;
 
-            request.onblocked = () => {
-                console.warn('[MMS DB] Database open blocked by another open connection.');
+        return this._initPromise = new Promise((resolve, reject) => {
+            let settled = false;
+            const complete = (db) => {
+                if (settled) return;
+                settled = true;
+                this.db = db;
+                this.dbVersion = db.version;
+                db.onversionchange = () => {
+                    try { db.close(); } catch(e) {}
+                    this.db = null;
+                    this._initPromise = null;
+                };
+                resolve(db);
             };
 
-            request.onupgradeneeded = (event) => {
-                const db = event.target.result;
-                const txn = event.target.transaction;
-                
-                if (!db.objectStoreNames.contains('students')) {
-                    db.createObjectStore('students', { keyPath: 'id', autoIncrement: true });
-                }
-                if (!db.objectStoreNames.contains('teachers')) {
-                    db.createObjectStore('teachers', { keyPath: 'id', autoIncrement: true });
-                }
-                if (!db.objectStoreNames.contains('books')) {
-                    db.createObjectStore('books', { keyPath: 'id', autoIncrement: true });
-                }
-                // Syllabus Store
-                if (!db.objectStoreNames.contains('syllabus')) {
-                    db.createObjectStore('syllabus', { keyPath: 'id', autoIncrement: true });
-                }
-                if (!db.objectStoreNames.contains('fees')) {
-                    const feeStore = db.createObjectStore('fees', { keyPath: 'id', autoIncrement: true });
-                    feeStore.createIndex('studentId', 'studentId', { unique: false });
-                } else {
-                    const feeStore = txn.objectStore('fees');
-                    if (!feeStore.indexNames.contains('studentId')) {
-                        feeStore.createIndex('studentId', 'studentId', { unique: false });
+            const fail = (err) => {
+                if (settled) return;
+                settled = true;
+                this._initPromise = null;
+                console.error('[MMS DB] initDB error:', err);
+                reject(err);
+            };
+
+            // Safety timeout: 1500ms max
+            const timeoutId = setTimeout(() => {
+                if (!settled) {
+                    console.warn('[MMS DB] initDB timeout reached. Connecting directly...');
+                    try {
+                        const fallbackReq = indexedDB.open(this.dbName);
+                        fallbackReq.onsuccess = (e) => complete(e.target.result);
+                        fallbackReq.onerror = (e) => fail(e.target.error || new Error('IDB Timeout'));
+                    } catch(e) {
+                        fail(e);
                     }
                 }
-                // Salary Store
-                if (!db.objectStoreNames.contains('salaries')) {
-                    db.createObjectStore('salaries', { keyPath: 'id', autoIncrement: true });
-                }
-                // Advances Store
-                if (!db.objectStoreNames.contains('advances')) {
-                    db.createObjectStore('advances', { keyPath: 'id', autoIncrement: true });
-                }
-                // Accounts Store
-                if (!db.objectStoreNames.contains('accounts')) {
-                    db.createObjectStore('accounts', { keyPath: 'id', autoIncrement: true });
-                }
-                // Attendance Store
-                if (!db.objectStoreNames.contains('attendance')) {
-                    const attStore = db.createObjectStore('attendance', { keyPath: 'id', autoIncrement: true });
-                    attStore.createIndex('date', 'date', { unique: false });
-                }
-                // Exams Store
-                if (!db.objectStoreNames.contains('exams')) {
-                    db.createObjectStore('exams', { keyPath: 'id', autoIncrement: true });
-                }
-                // Results Store
-                if (!db.objectStoreNames.contains('results')) {
-                    const resStore = db.createObjectStore('results', { keyPath: 'id', autoIncrement: true });
-                    resStore.createIndex('examId', 'examId', { unique: false });
-                    resStore.createIndex('studentId', 'studentId', { unique: false });
-                }
-                // Settings Store
-                if (!db.objectStoreNames.contains('settings')) {
-                    db.createObjectStore('settings', { keyPath: 'key' });
-                }
+            }, 1500);
 
-                // --- Hifz Module Stores (Version 13/14) ---
-                if (!db.objectStoreNames.contains('hifz_enrollments')) {
-                    const hEnroll = db.createObjectStore('hifz_enrollments', { keyPath: 'id', autoIncrement: true });
-                    hEnroll.createIndex('studentId', 'studentId', { unique: true });
-                    hEnroll.createIndex('teacherId', 'teacherId', { unique: false });
-                    hEnroll.createIndex('halaqa', 'halaqa', { unique: false });
-                    hEnroll.createIndex('status', 'status', { unique: false });
-                } else {
-                    const hEnroll = txn.objectStore('hifz_enrollments');
-                    if (!hEnroll.indexNames.contains('studentId')) hEnroll.createIndex('studentId', 'studentId', { unique: false });
-                }
-                if (!db.objectStoreNames.contains('hifz_halaqas')) {
-                    const hHalaqa = db.createObjectStore('hifz_halaqas', { keyPath: 'id', autoIncrement: true });
-                    hHalaqa.createIndex('name', 'name', { unique: false });
-                }
-                if (!db.objectStoreNames.contains('hifz_daily_records')) {
-                    const hDaily = db.createObjectStore('hifz_daily_records', { keyPath: 'id', autoIncrement: true });
-                    hDaily.createIndex('studentId', 'studentId', { unique: false });
-                    hDaily.createIndex('date', 'date', { unique: false });
-                    hDaily.createIndex('teacherId', 'teacherId', { unique: false });
-                    hDaily.createIndex('halaqa', 'halaqa', { unique: false });
-                } else {
-                    const hDaily = txn.objectStore('hifz_daily_records');
-                    if (!hDaily.indexNames.contains('studentId')) hDaily.createIndex('studentId', 'studentId', { unique: false });
-                }
-                if (!db.objectStoreNames.contains('hifz_revisions')) {
-                    const hRev = db.createObjectStore('hifz_revisions', { keyPath: 'id', autoIncrement: true });
-                    hRev.createIndex('studentId', 'studentId', { unique: false });
-                    hRev.createIndex('date', 'date', { unique: false });
-                } else {
-                    const hRev = txn.objectStore('hifz_revisions');
-                    if (!hRev.indexNames.contains('studentId')) hRev.createIndex('studentId', 'studentId', { unique: false });
-                }
-                if (!db.objectStoreNames.contains('hifz_exams')) {
-                    const hExam = db.createObjectStore('hifz_exams', { keyPath: 'id', autoIncrement: true });
-                    hExam.createIndex('date', 'date', { unique: false });
-                }
-                if (!db.objectStoreNames.contains('hifz_exam_results')) {
-                    const hRes = db.createObjectStore('hifz_exam_results', { keyPath: 'id', autoIncrement: true });
-                    hRes.createIndex('examId', 'examId', { unique: false });
-                    hRes.createIndex('studentId', 'studentId', { unique: false });
-                } else {
-                    const hRes = txn.objectStore('hifz_exam_results');
-                    if (!hRes.indexNames.contains('examId')) hRes.createIndex('examId', 'examId', { unique: false });
-                    if (!hRes.indexNames.contains('studentId')) hRes.createIndex('studentId', 'studentId', { unique: false });
-                }
-                if (!db.objectStoreNames.contains('hifz_juz_progress')) {
-                    const hJuz = db.createObjectStore('hifz_juz_progress', { keyPath: 'id', autoIncrement: true });
-                    hJuz.createIndex('studentId', 'studentId', { unique: false });
-                    hJuz.createIndex('studentJuz', ['studentId', 'juzNumber'], { unique: true });
-                } else {
-                    const hJuz = txn.objectStore('hifz_juz_progress');
-                    if (!hJuz.indexNames.contains('studentId')) hJuz.createIndex('studentId', 'studentId', { unique: false });
-                }
-                if (!db.objectStoreNames.contains('hifz_completions')) {
-                    const hComp = db.createObjectStore('hifz_completions', { keyPath: 'id', autoIncrement: true });
-                    hComp.createIndex('studentId', 'studentId', { unique: true });
-                } else {
-                    const hComp = txn.objectStore('hifz_completions');
-                    if (!hComp.indexNames.contains('studentId')) hComp.createIndex('studentId', 'studentId', { unique: false });
-                }
+            try {
+                // Open database directly without version parameter to instantly connect to existing version
+                const request = indexedDB.open(this.dbName);
 
-                // --- Donors Module Stores (Version 15) ---
-                if (!db.objectStoreNames.contains('donors')) {
-                    const donorStore = db.createObjectStore('donors', { keyPath: 'id', autoIncrement: true });
-                    donorStore.createIndex('name', 'name', { unique: false });
-                    donorStore.createIndex('phone', 'phone', { unique: false });
-                    donorStore.createIndex('status', 'status', { unique: false });
-                }
-                if (!db.objectStoreNames.contains('donor_donations')) {
-                    const dStore = db.createObjectStore('donor_donations', { keyPath: 'id', autoIncrement: true });
-                    dStore.createIndex('donorId', 'donorId', { unique: false });
-                    dStore.createIndex('year', 'year', { unique: false });
-                    dStore.createIndex('receiptNo', 'receiptNo', { unique: false });
-                    dStore.createIndex('date', 'date', { unique: false });
-                }
-
-                // --- Graduates / Alumni Module Store (Version 16) ---
-                if (!db.objectStoreNames.contains('graduates')) {
-                    const gradStore = db.createObjectStore('graduates', { keyPath: 'id', autoIncrement: true });
-                    gradStore.createIndex('studentId', 'studentId', { unique: false });
-                    gradStore.createIndex('graduationYear', 'graduationYear', { unique: false });
-                    gradStore.createIndex('graduationType', 'graduationType', { unique: false });
-                    gradStore.createIndex('name', 'name', { unique: false });
-                    gradStore.createIndex('section', 'section', { unique: false });
-                }
-            };
-
-            request.onsuccess = (event) => {
-                this.db = event.target.result;
-                this.db.onversionchange = () => {
-                    try { this.db.close(); } catch(e) {}
-                    this.db = null;
+                request.onblocked = () => {
+                    console.warn('[MMS DB] Database open blocked.');
                 };
-                resolve(this.db);
-            };
 
-            request.onerror = (event) => reject(event.target.error);
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    const txn = event.target.transaction;
+                    this._createObjectStores(db, txn);
+                };
+
+                request.onsuccess = (event) => {
+                    clearTimeout(timeoutId);
+                    const db = event.target.result;
+                    
+                    // Verify if all required stores exist
+                    const needed = [
+                        'students', 'teachers', 'books', 'syllabus', 'fees', 'salaries', 'advances',
+                        'accounts', 'attendance', 'exams', 'results', 'settings',
+                        'hifz_enrollments', 'hifz_halaqas', 'hifz_daily_records', 'hifz_revisions',
+                        'hifz_exams', 'hifz_exam_results', 'hifz_juz_progress', 'hifz_completions',
+                        'donors', 'donor_donations', 'graduates', 'wheat_donations', 'wheat_usage'
+                    ];
+                    const hasAll = needed.every(s => db.objectStoreNames.contains(s));
+                    
+                    if (hasAll) {
+                        complete(db);
+                    } else {
+                        // Missing stores: increment version to trigger onupgradeneeded
+                        const nextVer = Math.max(db.version + 1, 22);
+                        try { db.close(); } catch(e) {}
+                        const upReq = indexedDB.open(this.dbName, nextVer);
+                        upReq.onupgradeneeded = (ev) => {
+                            this._createObjectStores(ev.target.result, ev.target.transaction);
+                        };
+                        upReq.onsuccess = (ev) => complete(ev.target.result);
+                        upReq.onerror = (ev) => fail(ev.target.error || new Error('IDB Upgrade Failed'));
+                        upReq.onblocked = () => {
+                            console.warn('[MMS DB] Database upgrade blocked by open connection.');
+                        };
+                    }
+                };
+
+                request.onerror = (event) => {
+                    clearTimeout(timeoutId);
+                    fail(event.target.error);
+                };
+            } catch (ex) {
+                clearTimeout(timeoutId);
+                fail(ex);
+            }
+        });
+    },
+
+    async ensureStore(...storeNames) {
+        if (!this.db) {
+            await this.initDB();
+        }
+        const missing = storeNames.filter(s => !this.db.objectStoreNames.contains(s));
+        if (missing.length === 0) return this.db;
+
+        console.log('[MMS DB] Dynamically upgrading database for missing stores:', missing);
+        const nextVer = Math.max((this.db.version || 21) + 1, 22);
+        this.dbVersion = nextVer;
+        
+        try {
+            this.db.close();
+        } catch(e) {}
+        this.db = null;
+        this._initPromise = null;
+
+        return new Promise((resolve, reject) => {
+            const upReq = indexedDB.open(this.dbName, nextVer);
+            upReq.onupgradeneeded = (ev) => {
+                const db = ev.target.result;
+                const txn = ev.target.transaction;
+                this._createObjectStores(db, txn);
+            };
+            upReq.onsuccess = (ev) => {
+                const db = ev.target.result;
+                this.db = db;
+                this.dbVersion = db.version;
+                resolve(db);
+            };
+            upReq.onerror = (ev) => {
+                reject(ev.target.error || new Error('Failed to upgrade database for stores: ' + missing.join(', ')));
+            };
+            upReq.onblocked = () => {
+                console.warn('[MMS DB] Upgrade blocked. Retrying after brief delay...');
+            };
         });
     },
 
@@ -263,8 +356,8 @@ const MadrassahDB = {
                         return sSec === targetSec;
                     });
                 }
-                // Newest first
-                students.sort((a, b) => (parseInt(b.id || 0) - parseInt(a.id || 0)));
+                // Admission order: Oldest first, so newly admitted students appear at the end of lists
+                students.sort((a, b) => (parseInt(a.id || 0) - parseInt(b.id || 0)));
                 resolve(students); 
             }; 
             request.onerror = () => reject(request.target.error); 
@@ -278,10 +371,11 @@ const MadrassahDB = {
             const transaction = this.db.transaction(['students'], 'readonly'); 
             const store = transaction.objectStore('students'); 
             const request = store.getAll(); 
-            request.onsuccess = () => {
-                const all = request.result || [];
-                all.sort((a, b) => (parseInt(b.id || 0) - parseInt(a.id || 0)));
-                resolve(all);
+            request.onsuccess = () => { 
+                const all = request.result || []; 
+                // Admission order: Oldest first, newly admitted students appear at the end
+                all.sort((a, b) => (parseInt(a.id || 0) - parseInt(b.id || 0)));
+                resolve(all); 
             }; 
             request.onerror = () => reject(request.target.error); 
         }); 
@@ -413,8 +507,12 @@ const MadrassahDB = {
     getStaffSalaries(staffId) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['salaries'], 'readonly'); const store = transaction.objectStore('salaries'); const request = store.getAll(); request.onsuccess = () => { const idNum = parseInt(staffId); resolve((request.result || []).filter(s => parseInt(s.staffId) === idNum)); }; request.onerror = () => reject(request.target.error); }); },
     deleteSalary(id) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['salaries'], 'readwrite'); const store = transaction.objectStore('salaries'); const request = store.delete(parseInt(id)); request.onsuccess = () => resolve(); request.onerror = () => reject(request.target.error); }); },
     
-    saveAdvance(data) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['advances'], 'readwrite'); const store = transaction.objectStore('advances'); const request = store.add(data); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
-    getStaffAdvances(staffId) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['advances'], 'readonly'); const store = transaction.objectStore('advances'); const request = store.getAll(); request.onsuccess = () => resolve(request.result.filter(a => a.staffId === parseInt(staffId))); request.onerror = () => reject(request.target.error); }); },
+    saveAdvance(data) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['advances'], 'readwrite'); const store = transaction.objectStore('advances'); const request = data.id ? store.put(data) : store.add(data); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
+    getAllAdvances() { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['advances'], 'readonly'); const store = transaction.objectStore('advances'); const request = store.getAll(); request.onsuccess = () => resolve(request.result || []); request.onerror = () => reject(request.target.error); }); },
+    getStaffAdvances(staffId) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['advances'], 'readonly'); const store = transaction.objectStore('advances'); const request = store.getAll(); request.onsuccess = () => resolve((request.result || []).filter(a => parseInt(a.staffId) === parseInt(staffId))); request.onerror = () => reject(request.target.error); }); },
+    updateAdvance(data) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['advances'], 'readwrite'); const store = transaction.objectStore('advances'); const request = store.put(data); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
+    getAdvanceById(id) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['advances'], 'readonly'); const store = transaction.objectStore('advances'); const request = store.get(parseInt(id)); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.target.error); }); },
+    deleteAdvance(id) { return new Promise((resolve, reject) => { const transaction = this.db.transaction(['advances'], 'readwrite'); const store = transaction.objectStore('advances'); const request = store.delete(parseInt(id)); request.onsuccess = () => resolve(); request.onerror = () => reject(request.target.error); }); },
     updateAdvanceStatus(id, status) {
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction(['advances'], 'readwrite');
@@ -655,16 +753,17 @@ const MadrassahDB = {
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction(['results'], 'readwrite');
             const store = transaction.objectStore('results');
-            // Check if result exists for this student/exam and update if so
-            const index = store.index('examId');
-            const request = index.getAll(parseInt(data.examId));
+            if (data.examId) data.examId = parseInt(data.examId);
+            if (data.studentId) data.studentId = parseInt(data.studentId);
+            const request = store.getAll();
             request.onsuccess = () => {
-                const existing = request.result.find(r => r.studentId === parseInt(data.studentId));
-                if (existing) data.id = existing.id;
+                const existing = (request.result || []).find(r => parseInt(r.examId) === parseInt(data.examId) && parseInt(r.studentId) === parseInt(data.studentId));
+                if (existing && !data.id) data.id = existing.id;
                 const saveReq = data.id ? store.put(data) : store.add(data);
                 saveReq.onsuccess = () => resolve(saveReq.result);
                 saveReq.onerror = () => reject(saveReq.target.error);
             };
+            request.onerror = () => reject(request.target.error);
         });
     },
 
@@ -672,9 +771,12 @@ const MadrassahDB = {
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction(['results'], 'readonly');
             const store = transaction.objectStore('results');
-            const index = store.index('examId');
-            const request = index.getAll(parseInt(examId));
-            request.onsuccess = () => resolve(request.result);
+            const targetId = parseInt(examId);
+            const request = store.getAll();
+            request.onsuccess = () => {
+                const list = (request.result || []).filter(r => parseInt(r.examId) === targetId || String(r.examId) === String(examId));
+                resolve(list);
+            };
             request.onerror = () => reject(request.target.error);
         });
     },
@@ -683,9 +785,12 @@ const MadrassahDB = {
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction(['results'], 'readonly');
             const store = transaction.objectStore('results');
-            const index = store.index('studentId');
-            const request = index.getAll(parseInt(studentId));
-            request.onsuccess = () => resolve(request.result);
+            const targetId = parseInt(studentId);
+            const request = store.getAll();
+            request.onsuccess = () => {
+                const list = (request.result || []).filter(r => parseInt(r.studentId) === targetId || String(r.studentId) === String(studentId));
+                resolve(list);
+            };
             request.onerror = () => reject(request.target.error);
         });
     },
@@ -757,7 +862,12 @@ const MadrassahDB = {
             const transaction = this.db.transaction(['hifz_enrollments'], 'readonly');
             const store = transaction.objectStore('hifz_enrollments');
             const request = store.getAll();
-            request.onsuccess = () => resolve(request.result || []);
+            request.onsuccess = () => {
+                const list = request.result || [];
+                // Sort by studentId ascending so newly admitted/enrolled students appear at the end of lists
+                list.sort((a, b) => (parseInt(a.studentId || a.id || 0) - parseInt(b.studentId || b.id || 0)));
+                resolve(list);
+            };
             request.onerror = () => reject(request.target.error);
         });
     },
@@ -1152,20 +1262,12 @@ const MadrassahDB = {
             const transaction = this.db.transaction(['hifz_exam_results'], 'readonly');
             const store = transaction.objectStore('hifz_exam_results');
             const targetId = parseInt(studentId);
-
-            if (store.indexNames && store.indexNames.contains('studentId')) {
-                const index = store.index('studentId');
-                const request = index.getAll(targetId);
-                request.onsuccess = () => resolve(request.result || []);
-                request.onerror = () => reject(request.target.error);
-            } else {
-                const request = store.getAll();
-                request.onsuccess = () => {
-                    const list = (request.result || []).filter(r => r.studentId === targetId);
-                    resolve(list);
-                };
-                request.onerror = () => reject(request.target.error);
-            }
+            const request = store.getAll();
+            request.onsuccess = () => {
+                const list = (request.result || []).filter(r => parseInt(r.studentId) === targetId || String(r.studentId) === String(studentId));
+                resolve(list);
+            };
+            request.onerror = () => reject(request.target.error);
         });
     },
 
@@ -1277,6 +1379,27 @@ const MadrassahDB = {
 
     async importDatabaseBackup(backup) {
         if (!backup || !backup.data) throw new Error('ناموزوں بیک اپ فائل (Invalid backup file)');
+
+        // Preserve critical local configuration so restore never reverts active folder or security keys
+        let localFolderHandle = null;
+        let localFolderName = null;
+        let localReceipt = null;
+        let localAppPass = null;
+        let localFinancePass = null;
+        try {
+            localFolderHandle = await this.getSetting('backup_folder_handle');
+            localFolderName = await this.getSetting('backup_folder_name');
+            localReceipt = await this.getSetting('custom_receipt_bg');
+            localAppPass = await this.getSetting('app_password');
+            localFinancePass = await this.getSetting('baitulmaal_password');
+            if (!localFolderName && typeof localStorage !== 'undefined') {
+                localFolderName = localStorage.getItem('mms_backup_folder_name');
+            }
+            if (!localReceipt && typeof localStorage !== 'undefined') {
+                localReceipt = localStorage.getItem('custom_receipt_bg');
+            }
+        } catch(e) {}
+
         const storeNames = Object.keys(backup.data);
 
         for (const storeName of storeNames) {
@@ -1301,11 +1424,27 @@ const MadrassahDB = {
             });
         }
         try {
-            if (backup.data && backup.data.settings && Array.isArray(backup.data.settings) && typeof localStorage !== 'undefined') {
-                const receiptSetting = backup.data.settings.find(s => s.key === 'custom_receipt_bg');
-                if (receiptSetting && receiptSetting.value) {
-                    localStorage.setItem('custom_receipt_bg', receiptSetting.value);
+            // Restore persistent local machine settings
+            if (localFolderName) {
+                await this.saveSetting('backup_folder_name', localFolderName).catch(() => {});
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem('mms_backup_folder_name', localFolderName);
                 }
+            }
+            if (localFolderHandle) {
+                await this.saveSetting('backup_folder_handle', localFolderHandle).catch(() => {});
+            }
+            if (localReceipt) {
+                await this.saveSetting('custom_receipt_bg', localReceipt).catch(() => {});
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem('custom_receipt_bg', localReceipt);
+                }
+            }
+            if (localAppPass) {
+                await this.saveSetting('app_password', localAppPass).catch(() => {});
+            }
+            if (localFinancePass) {
+                await this.saveSetting('baitulmaal_password', localFinancePass).catch(() => {});
             }
         } catch(e) {}
         return true;
@@ -1627,6 +1766,46 @@ const MadrassahDB = {
         });
     },
 
+    ensureUniqueCodes() {
+        return new Promise((resolve) => {
+            if (!this.db) return resolve(false);
+            try {
+                const transaction = this.db.transaction(['students', 'teachers'], 'readwrite');
+                const studentStore = transaction.objectStore('students');
+                const teacherStore = transaction.objectStore('teachers');
+
+                const stuReq = studentStore.getAll();
+                stuReq.onsuccess = () => {
+                    const students = stuReq.result || [];
+                    for (const s of students) {
+                        if (s && s.id && !s.uniqueCode) {
+                            s.uniqueCode = 'STU-' + (1000 + parseInt(s.id));
+                            studentStore.put(s);
+                        }
+                    }
+                };
+
+                const tchReq = teacherStore.getAll();
+                tchReq.onsuccess = () => {
+                    const teachers = tchReq.result || [];
+                    for (const t of teachers) {
+                        if (t && t.id && !t.uniqueCode) {
+                            t.uniqueCode = 'EMP-' + (100 + parseInt(t.id));
+                            teacherStore.put(t);
+                        }
+                    }
+                };
+
+                transaction.oncomplete = () => resolve(true);
+                transaction.onerror = () => resolve(false);
+                transaction.onabort = () => resolve(false);
+            } catch (err) {
+                console.warn('[MMS DB] ensureUniqueCodes error:', err);
+                resolve(false);
+            }
+        });
+    },
+
     // --- Settings Storage Methods ---
     getSetting(key) {
         return new Promise((resolve, reject) => {
@@ -1660,6 +1839,169 @@ const MadrassahDB = {
         });
     },
 
+    // ==========================================
+    // --- WHEAT MODULE METHODS (شعبہ گندم و غلہ) ---
+    // ==========================================
+    async saveWheatDonation(data) {
+        await this.ensureStore('wheat_donations', 'wheat_usage');
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['wheat_donations'], 'readwrite');
+            const store = transaction.objectStore('wheat_donations');
+            
+            const hasValidId = data.id && String(data.id).trim() !== '' && !isNaN(data.id) && parseInt(data.id) > 0;
+            if (hasValidId) {
+                data.id = parseInt(data.id);
+            } else {
+                delete data.id;
+            }
+            if (!data.receiptNo) {
+                data.receiptNo = 'WHT-' + Math.floor(1000 + Math.random() * 9000);
+            }
+            if (!data.createdAt) data.createdAt = new Date().toISOString();
+            data.updatedAt = new Date().toISOString();
+
+            const request = data.id ? store.put(data) : store.add(data);
+            request.onsuccess = () => {
+                const insertedId = request.result;
+                if (!data.id && insertedId) {
+                    data.id = insertedId;
+                }
+                resolve(data.id || insertedId);
+            };
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    async getAllWheatDonations(season = null) {
+        await this.ensureStore('wheat_donations', 'wheat_usage');
+        return new Promise((resolve, reject) => {
+            if (!this.db) return resolve([]);
+            if (!this.db.objectStoreNames.contains('wheat_donations')) return resolve([]);
+            const transaction = this.db.transaction(['wheat_donations'], 'readonly');
+            const store = transaction.objectStore('wheat_donations');
+            const request = store.getAll();
+            request.onsuccess = () => {
+                let results = request.result || [];
+                if (season && season !== 'all') {
+                    results = results.filter(d => String(d.season) === String(season));
+                }
+                results.sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+                resolve(results);
+            };
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    async getWheatDonationById(id) {
+        await this.ensureStore('wheat_donations', 'wheat_usage');
+        return new Promise((resolve, reject) => {
+            if (!this.db) return resolve(null);
+            if (!this.db.objectStoreNames.contains('wheat_donations')) return resolve(null);
+            const transaction = this.db.transaction(['wheat_donations'], 'readonly');
+            const store = transaction.objectStore('wheat_donations');
+            const numId = Number(id);
+            const key = (!isNaN(numId) && numId > 0) ? numId : id;
+            const request = store.get(key);
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    async deleteWheatDonation(id) {
+        await this.ensureStore('wheat_donations', 'wheat_usage');
+        return new Promise((resolve, reject) => {
+            if (!this.db) return resolve();
+            if (!this.db.objectStoreNames.contains('wheat_donations')) return resolve();
+            const transaction = this.db.transaction(['wheat_donations'], 'readwrite');
+            const store = transaction.objectStore('wheat_donations');
+            const numId = Number(id);
+            const key = (!isNaN(numId) && numId > 0) ? numId : id;
+            const request = store.delete(key);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    async saveWheatUsage(data) {
+        await this.ensureStore('wheat_donations', 'wheat_usage');
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['wheat_usage'], 'readwrite');
+            const store = transaction.objectStore('wheat_usage');
+            
+            const hasValidId = data.id && String(data.id).trim() !== '' && !isNaN(data.id) && parseInt(data.id) > 0;
+            if (hasValidId) {
+                data.id = parseInt(data.id);
+            } else {
+                delete data.id;
+            }
+            if (!data.voucherNo) {
+                data.voucherNo = 'WUV-' + Math.floor(1000 + Math.random() * 9000);
+            }
+            if (!data.createdAt) data.createdAt = new Date().toISOString();
+            data.updatedAt = new Date().toISOString();
+
+            const request = data.id ? store.put(data) : store.add(data);
+            request.onsuccess = () => {
+                const insertedId = request.result;
+                if (!data.id && insertedId) {
+                    data.id = insertedId;
+                }
+                resolve(data.id || insertedId);
+            };
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    async getAllWheatUsage(season = null) {
+        await this.ensureStore('wheat_donations', 'wheat_usage');
+        return new Promise((resolve, reject) => {
+            if (!this.db) return resolve([]);
+            if (!this.db.objectStoreNames.contains('wheat_usage')) return resolve([]);
+            const transaction = this.db.transaction(['wheat_usage'], 'readonly');
+            const store = transaction.objectStore('wheat_usage');
+            const request = store.getAll();
+            request.onsuccess = () => {
+                let results = request.result || [];
+                if (season && season !== 'all') {
+                    results = results.filter(u => String(u.season) === String(season));
+                }
+                results.sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+                resolve(results);
+            };
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    async getWheatUsageById(id) {
+        await this.ensureStore('wheat_donations', 'wheat_usage');
+        return new Promise((resolve, reject) => {
+            if (!this.db) return resolve(null);
+            if (!this.db.objectStoreNames.contains('wheat_usage')) return resolve(null);
+            const transaction = this.db.transaction(['wheat_usage'], 'readonly');
+            const store = transaction.objectStore('wheat_usage');
+            const numId = Number(id);
+            const key = (!isNaN(numId) && numId > 0) ? numId : id;
+            const request = store.get(key);
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
+    async deleteWheatUsage(id) {
+        await this.ensureStore('wheat_donations', 'wheat_usage');
+        return new Promise((resolve, reject) => {
+            if (!this.db) return resolve();
+            if (!this.db.objectStoreNames.contains('wheat_usage')) return resolve();
+            const transaction = this.db.transaction(['wheat_usage'], 'readwrite');
+            const store = transaction.objectStore('wheat_usage');
+            const numId = Number(id);
+            const key = (!isNaN(numId) && numId > 0) ? numId : id;
+            const request = store.delete(key);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.target.error);
+        });
+    },
+
     deleteSetting(key) {
         return new Promise((resolve, reject) => {
             if (!this.db) return resolve(false);
@@ -1676,7 +2018,33 @@ const MadrassahDB = {
     }
 };
 
+// Auto-wrap all DB methods so this.db is 100% guaranteed to be initialized before any method runs
+for (const key of Object.keys(MadrassahDB)) {
+    if (typeof MadrassahDB[key] === 'function' && key !== 'initDB' && key !== '_createObjectStores' && key !== 'ensureStore') {
+        const origMethod = MadrassahDB[key];
+        MadrassahDB[key] = async function(...args) {
+            if (!this.db) {
+                await this.initDB();
+            }
+            const res = await origMethod.apply(this, args);
+            // Notify live drive guardian on any data mutation
+            if ((key.startsWith('save') || key.startsWith('delete') || key.startsWith('import')) && 
+                key !== 'saveSetting' && key !== 'addBackupLog') {
+                try {
+                    if (typeof window !== 'undefined' && window.app && typeof window.app.triggerDriveGuardianDebouncedSync === 'function') {
+                        window.app.triggerDriveGuardianDebouncedSync();
+                    }
+                } catch(syncNotice) {}
+            }
+            return res;
+        };
+    }
+}
+
 if (typeof window !== 'undefined') {
     window.MadrassahDB = MadrassahDB;
+    try {
+        MadrassahDB.initDB().catch(e => console.warn('[MMS DB] Early init warning:', e));
+    } catch(e) {}
 }
 

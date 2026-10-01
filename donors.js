@@ -550,7 +550,10 @@ const DonorsModule = {
                                             ${don.paymentDate ? don.paymentDate.split('-').reverse().join('/') : ''}
                                         </div>
                                         <!-- Actions on Paid Month -->
-                                        <div style="display:flex; justify-content:center; gap:6px; margin-top:6px; border-top:1px solid #dcfce7; padding-top:4px;">
+                                        <div style="display:flex; justify-content:center; gap:5px; margin-top:6px; border-top:1px solid #dcfce7; padding-top:4px; flex-wrap:wrap;">
+                                            <button onclick="DonorsModule.editDonation('${don.id}')" title="رقم یا تفصیل میں ترمیم کریں (کم / زیادہ رقم درج کریں)" style="background:#fef3c7; border:none; color:#b45309; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:0.8rem; font-weight:bold;">
+                                                <i class="fas fa-edit"></i> ایڈٹ
+                                            </button>
                                             <button onclick="DonorsModule.printDonationReceipt('${don.id}')" title="رسید پرنٹ / PDF" style="background:#dcfce7; border:none; color:#15803d; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:0.8rem;">
                                                 <i class="fas fa-print"></i> رسید
                                             </button>
@@ -676,8 +679,9 @@ const DonorsModule = {
                                     ${months.map(m => {
                                         const don = donorDons.find(d => Number(d.monthIndex) === m.index);
                                         if (don) {
-                                            return `<td style="padding:8px 4px; background:#ecfdf5; color:#15803d; font-weight:bold; font-family:monospace; font-size:0.9rem;" title="رسید: ${don.receiptNo}">
-                                                ${Number(don.amount).toLocaleString('en-US')}
+                                            return `<td onclick="DonorsModule.editDonation('${don.id}')" style="padding:6px 4px; background:#ecfdf5; color:#15803d; font-weight:bold; font-family:monospace; font-size:0.9rem; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='#dcfce7'" onmouseout="this.style.background='#ecfdf5'" title="رسید: ${don.receiptNo} (رقم ایڈٹ / تبدیل کرنے کے لیے کلک کریں)">
+                                                <div>${Number(don.amount).toLocaleString('en-US')}</div>
+                                                <div style="font-size:0.68rem; color:#059669; font-weight:normal; margin-top:1px;"><i class="fas fa-edit"></i> ترمیم</div>
                                             </td>`;
                                         } else {
                                             return `<td onclick="DonorsModule.showDonationModal('${donor.id}', ${m.index}, ${this.selectedYear})" style="padding:8px 4px; color:#cbd5e1; cursor:pointer;" title="کلک کر کے وصول کریں">—</td>`;
@@ -781,6 +785,9 @@ const DonorsModule = {
                                     </td>
                                     <td style="padding:10px 12px; text-align:center;">
                                         <div style="display:inline-flex; gap:6px;">
+                                            <button onclick="DonorsModule.editDonation('${d.id}')" class="btn" style="background:#fef3c7; color:#b45309; border:none; padding:4px 8px; border-radius:6px; font-size:0.85rem; cursor:pointer; font-weight:bold;" title="رقم یا تفصیل میں ترمیم کریں">
+                                                <i class="fas fa-edit"></i> ترمیم
+                                            </button>
                                             <button onclick="DonorsModule.printDonationReceipt('${d.id}')" class="btn" style="background:#0284c7; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:0.85rem; cursor:pointer;" title="رسید پرنٹ / PDF">
                                                 <i class="fas fa-print"></i> رسید
                                             </button>
@@ -1023,8 +1030,24 @@ const DonorsModule = {
         }
     },
 
-    // 2. DONATION PAYMENT ENTRY MODAL
-    async showDonationModal(preSelectDonorId = null, preSelectMonthIdx = null, preSelectYear = null) {
+    // Edit existing donation
+    async editDonation(donationId) {
+        try {
+            const donations = (await MadrassahDB.getAllDonorDonations()) || [];
+            const don = donations.find(d => String(d.id) === String(donationId) || parseInt(d.id) === parseInt(donationId));
+            if (!don) {
+                alert('متعلقہ عطیہ یا رسید کا ریکارڈ نہیں مل سکا!');
+                return;
+            }
+            await this.showDonationModal(don.donorId, don.monthIndex, don.year, don);
+        } catch (err) {
+            console.error('Error fetching donation for edit:', err);
+            alert('تفصیلات لوڈ کرنے میں غلطی پیش آئی: ' + err.message);
+        }
+    },
+
+    // 2. DONATION PAYMENT ENTRY / EDIT MODAL
+    async showDonationModal(preSelectDonorId = null, preSelectMonthIdx = null, preSelectYear = null, existingDonation = null) {
         const donors = (await MadrassahDB.getAllDonors()) || [];
         if (donors.length === 0) {
             alert('پہلے کم از کم ایک مستقل ڈونر رجسٹر فرمائیں!');
@@ -1032,52 +1055,72 @@ const DonorsModule = {
             return;
         }
 
+        const isEdit = !!existingDonation;
+
         // Safe donor lookup
         let currentDonor = null;
-        if (preSelectDonorId !== null && preSelectDonorId !== undefined && String(preSelectDonorId).trim() !== '') {
-            currentDonor = donors.find(d => String(d.id) === String(preSelectDonorId) || parseInt(d.id) === parseInt(preSelectDonorId));
+        const targetDonorId = isEdit ? existingDonation.donorId : preSelectDonorId;
+        if (targetDonorId !== null && targetDonorId !== undefined && String(targetDonorId).trim() !== '') {
+            currentDonor = donors.find(d => String(d.id) === String(targetDonorId) || parseInt(d.id) === parseInt(targetDonorId));
         }
         if (!currentDonor) {
             currentDonor = donors[0];
         }
         const selectedDonorId = currentDonor.id;
 
-        const selectedMonth = (preSelectMonthIdx !== null && preSelectMonthIdx !== undefined && !isNaN(preSelectMonthIdx)) ? parseInt(preSelectMonthIdx) : new Date().getMonth();
-        const selectedYr = (preSelectYear && !isNaN(preSelectYear)) ? parseInt(preSelectYear) : this.selectedYear;
+        const selectedMonth = isEdit 
+            ? (existingDonation.monthIndex !== undefined ? parseInt(existingDonation.monthIndex) : 0)
+            : ((preSelectMonthIdx !== null && preSelectMonthIdx !== undefined && !isNaN(preSelectMonthIdx)) ? parseInt(preSelectMonthIdx) : new Date().getMonth());
 
-        const defaultAmount = currentDonor.monthlyPledge || 5000;
-        const defaultFund = currentDonor.fundType || 'عام عطیہ / امداد';
+        const selectedYr = isEdit
+            ? (existingDonation.year ? parseInt(existingDonation.year) : this.selectedYear)
+            : ((preSelectYear && !isNaN(preSelectYear)) ? parseInt(preSelectYear) : this.selectedYear);
+
+        const currentAmount = isEdit ? existingDonation.amount : (currentDonor.monthlyPledge || 5000);
+        const currentFund = isEdit ? (existingDonation.fundType || currentDonor.fundType || 'عام عطیہ / امداد') : (currentDonor.fundType || 'عام عطیہ / امداد');
+        const currentMethod = isEdit ? (existingDonation.paymentMethod || 'نقد (Cash)') : 'نقد (Cash)';
+        const currentTxId = isEdit ? (existingDonation.transactionId || '') : '';
+        const currentReceivedBy = isEdit ? (existingDonation.receivedBy || 'ناظم مالیات') : 'ناظم مالیات';
+        const currentDate = isEdit && existingDonation.paymentDate ? existingDonation.paymentDate : new Date().toISOString().split('T')[0];
 
         const modalId = 'donation-entry-modal';
         const existing = document.getElementById(modalId);
         if (existing) existing.remove();
 
         const months = this.getMonths();
-        const todayStr = new Date().toISOString().split('T')[0];
 
         const modalHtml = `
             <div id="${modalId}" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.65); z-index:9999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px); padding:1rem;">
-                <div style="background:white; border-radius:18px; width:100%; max-width:620px; max-height:92vh; overflow-y:auto; box-shadow:0 20px 40px rgba(0,0,0,0.3); border:2px solid #059669;">
+                <div style="background:white; border-radius:18px; width:100%; max-width:620px; max-height:92vh; overflow-y:auto; box-shadow:0 20px 40px rgba(0,0,0,0.3); border:2.5px solid ${isEdit ? '#0284c7' : '#059669'};">
                     <!-- Modal Header -->
-                    <div style="background:linear-gradient(135deg, #059669, #047857); color:white; padding:1.2rem 1.6rem; border-radius:16px 16px 0 0; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="background:linear-gradient(135deg, ${isEdit ? '#0369a1, #0284c7' : '#059669, #047857'}); color:white; padding:1.2rem 1.6rem; border-radius:15px 15px 0 0; display:flex; justify-content:space-between; align-items:center;">
                         <div style="display:flex; align-items:center; gap:10px;">
-                            <i class="fas fa-hand-holding-dollar" style="font-size:1.5rem; color:#fef08a;"></i>
-                            <h3 style="margin:0; font-family:'Aref Ruqaa', 'Amiri', serif; font-size:1.5rem;">
-                                ماہانہ عطیہ وصولی و فوری رسید کا اجراء
-                            </h3>
+                            <i class="fas ${isEdit ? 'fa-edit' : 'fa-hand-holding-dollar'}" style="font-size:1.5rem; color:#fef08a;"></i>
+                            <div>
+                                <h3 style="margin:0; font-family:'Aref Ruqaa', 'Amiri', serif; font-size:1.45rem;">
+                                    ${isEdit ? 'ماہانہ عطیہ کی رقم و تفصیل میں ترمیم' : 'ماہانہ عطیہ وصولی و فوری رسید کا اجراء'}
+                                </h3>
+                                ${isEdit && existingDonation.receiptNo ? `<div style="font-size:0.85rem; color:#e0f2fe; margin-top:2px;">رسید نمبر: <b>${existingDonation.receiptNo}</b></div>` : ''}
+                            </div>
                         </div>
                         <button type="button" onclick="document.getElementById('${modalId}').remove()" style="background:none; border:none; color:white; font-size:1.4rem; cursor:pointer;"><i class="fas fa-times"></i></button>
                     </div>
 
                     <!-- Modal Body -->
                     <form id="donation-entry-form" onsubmit="DonorsModule.saveDonationForm(event)" style="padding:1.6rem;">
+                        ${isEdit ? `
+                            <input type="hidden" name="id" value="${existingDonation.id}">
+                            <input type="hidden" name="existingReceiptNo" value="${existingDonation.receiptNo || ''}">
+                            <input type="hidden" name="existingCreatedAt" value="${existingDonation.createdAt || ''}">
+                        ` : ''}
+
                         <!-- Donor Selection -->
                         <div style="margin-bottom:1.2rem;">
                             <label style="display:block; font-weight:bold; margin-bottom:5px; color:#1e293b;">مستقل ڈونر کا انتخاب فرمائیں <span style="color:#e11d48;">*</span></label>
-                            <select name="donorId" id="don_select_donor" required onchange="DonorsModule.onModalDonorChange(this.value)" style="width:100%; padding:11px; border-radius:8px; border:2px solid #a7f3d0; font-size:1.05rem; font-weight:bold; color:#065f46; background:#ecfdf5;">
+                            <select name="donorId" id="don_select_donor" required onchange="DonorsModule.onModalDonorChange(this.value)" style="width:100%; padding:11px; border-radius:8px; border:2px solid ${isEdit ? '#93c5fd' : '#a7f3d0'}; font-size:1.05rem; font-weight:bold; color:${isEdit ? '#0369a1' : '#065f46'}; background:${isEdit ? '#eff6ff' : '#ecfdf5'};">
                                 ${donors.map(d => `
                                     <option value="${d.id}" ${String(d.id) === String(selectedDonorId) ? 'selected' : ''} data-pledge="${d.monthlyPledge || 0}" data-fund="${d.fundType || 'عام عطیہ / امداد'}" data-phone="${d.phone || ''}" data-wa="${d.whatsapp || ''}">
-                                        ${d.name} ${d.fatherName ? `ولد ${d.fatherName}` : ''} [${d.donorCode || ('DNR-' + d.id)}] — طے شدہ: Rs. ${(Number(d.monthlyPledge) || 0).toLocaleString('en-US')}
+                                        ${d.name} ${d.fatherName ? `ولد ${d.fatherName}` : ''} [${d.donorCode || ('DNR-' + d.id)}] — طے شدہ ماہانہ: Rs. ${(Number(d.monthlyPledge) || 0).toLocaleString('en-US')}
                                     </option>
                                 `).join('')}
                             </select>
@@ -1102,13 +1145,17 @@ const DonorsModule = {
                         <!-- Amount and Date -->
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.2rem;">
                             <div>
-                                <label style="display:block; font-weight:bold; margin-bottom:4px; color:#065f46;">وصول شدہ رقم (PKR) <span style="color:#e11d48;">*</span></label>
-                                <input type="number" name="amount" id="don_input_amount" required min="1" step="any" value="${defaultAmount}" placeholder="مثلاً: 5000" style="width:100%; padding:10px; border-radius:8px; border:2px solid #86efac; font-size:1.3rem; font-weight:bold; color:#15803d; background:#f0fdf4;">
-                                <small style="display:block; color:#64748b; margin-top:3px; font-size:0.82rem;">(طے شدہ سے کم یا زیادہ کوئی بھی رقم آزادانہ درج کی جا سکتی ہے)</small>
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; color:#065f46;">
+                                    وصول شدہ رقم (PKR) <span style="color:#e11d48;">*</span>
+                                </label>
+                                <input type="number" name="amount" id="don_input_amount" required min="1" step="any" value="${currentAmount}" placeholder="مثلاً: 5000" style="width:100%; padding:10px; border-radius:8px; border:2px solid ${isEdit ? '#60a5fa' : '#86efac'}; font-size:1.3rem; font-weight:bold; color:${isEdit ? '#0284c7' : '#15803d'}; background:${isEdit ? '#f0f9ff' : '#f0fdf4'};">
+                                <small style="display:block; color:${isEdit ? '#b45309' : '#64748b'}; margin-top:4px; font-size:0.82rem; font-weight:bold;">
+                                    طے شدہ تعاون: Rs. ${(Number(currentDonor.monthlyPledge) || 0).toLocaleString('en-US')} (اس ماہ کے لیے کم یا زیادہ رقم درج کر سکتے ہیں)
+                                </small>
                             </div>
                             <div>
-                                <label style="display:block; font-weight:bold; margin-bottom:4px; color:#1e293b;">تاریخِ وصولی <span style="color:#e11d48;">*</span></label>
-                                <input type="date" name="paymentDate" required value="${todayStr}" style="width:100%; padding:10px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:1rem;">
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; color:#1e293b;">تاریخِ ادائیگی / وصولی <span style="color:#e11d48;">*</span></label>
+                                <input type="date" name="paymentDate" required value="${currentDate}" style="width:100%; padding:10px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:1rem;">
                             </div>
                         </div>
 
@@ -1117,21 +1164,21 @@ const DonorsModule = {
                             <div>
                                 <label style="display:block; font-weight:bold; margin-bottom:4px; color:#1e293b;">مد / فنڈ کی قسم</label>
                                 <select name="fundType" id="don_select_fund" style="width:100%; padding:10px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:1rem; background:white;">
-                                    <option value="عام عطیہ / امداد" ${defaultFund === 'عام عطیہ / امداد' ? 'selected' : ''}>عام عطیہ / امداد</option>
-                                    <option value="زکوٰۃ" ${defaultFund === 'زکوٰۃ' ? 'selected' : ''}>زکوٰۃ</option>
-                                    <option value="صدقات" ${defaultFund === 'صدقات' ? 'selected' : ''}>صدقات</option>
-                                    <option value="کفالت طلبہ (خوراک و کتب)" ${defaultFund === 'کفالت طلبہ (خوراک و کتب)' ? 'selected' : ''}>کفالت طلبہ (خوراک و کتب)</option>
-                                    <option value="تعمیراتی فنڈ" ${defaultFund === 'تعمیراتی فنڈ' ? 'selected' : ''}>تعمیراتی فنڈ</option>
+                                    <option value="عام عطیہ / امداد" ${currentFund === 'عام عطیہ / امداد' ? 'selected' : ''}>عام عطیہ / امداد</option>
+                                    <option value="زکوٰۃ" ${currentFund === 'زکوٰۃ' ? 'selected' : ''}>زکوٰۃ</option>
+                                    <option value="صدقات" ${currentFund === 'صدقات' ? 'selected' : ''}>صدقات</option>
+                                    <option value="کفالت طلبہ (خوراک و کتب)" ${currentFund === 'کفالت طلبہ (خوراک و کتب)' ? 'selected' : ''}>کفالت طلبہ (خوراک و کتب)</option>
+                                    <option value="تعمیراتی فنڈ" ${currentFund === 'تعمیراتی فنڈ' ? 'selected' : ''}>تعمیراتی فنڈ</option>
                                 </select>
                             </div>
                             <div>
                                 <label style="display:block; font-weight:bold; margin-bottom:4px; color:#1e293b;">طریقہ ادائیگی</label>
                                 <select name="paymentMethod" style="width:100%; padding:10px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:1rem; background:white;">
-                                    <option value="نقد (Cash)">نقد (Cash)</option>
-                                    <option value="بینک ٹرانسفر (Bank)">بینک ٹرانسفر (Bank)</option>
-                                    <option value="جاز کیش (JazzCash)">جاز کیش (JazzCash)</option>
-                                    <option value="ایزی پیسہ (EasyPaisa)">ایزی پیسہ (EasyPaisa)</option>
-                                    <option value="چیک (Cheque)">چیک (Cheque)</option>
+                                    <option value="نقد (Cash)" ${currentMethod === 'نقد (Cash)' ? 'selected' : ''}>نقد (Cash)</option>
+                                    <option value="بینک ٹرانسفر (Bank)" ${currentMethod === 'بینک ٹرانسفر (Bank)' ? 'selected' : ''}>بینک ٹرانسفر (Bank)</option>
+                                    <option value="جاز کیش (JazzCash)" ${currentMethod === 'جاز کیش (JazzCash)' ? 'selected' : ''}>جاز کیش (JazzCash)</option>
+                                    <option value="ایزی پیسہ (EasyPaisa)" ${currentMethod === 'ایزی پیسہ (EasyPaisa)' ? 'selected' : ''}>ایزی پیسہ (EasyPaisa)</option>
+                                    <option value="چیک (Cheque)" ${currentMethod === 'چیک (Cheque)' ? 'selected' : ''}>چیک (Cheque)</option>
                                 </select>
                             </div>
                         </div>
@@ -1140,11 +1187,11 @@ const DonorsModule = {
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.2rem;">
                             <div>
                                 <label style="display:block; font-weight:bold; margin-bottom:4px; color:#1e293b;">بینک حوالہ / ٹرانزیکشن آئی ڈی (اختیاری)</label>
-                                <input type="text" name="transactionId" placeholder="مثلاً: TRx-94821038" dir="ltr" style="width:100%; padding:9px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.95rem; text-align:right;">
+                                <input type="text" name="transactionId" value="${currentTxId}" placeholder="مثلاً: TRx-94821038" dir="ltr" style="width:100%; padding:9px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.95rem; text-align:right;">
                             </div>
                             <div>
                                 <label style="display:block; font-weight:bold; margin-bottom:4px; color:#1e293b;">وصول کنندہ</label>
-                                <input type="text" name="receivedBy" value="ناظم مالیات" placeholder="دستخط یا نام" style="width:100%; padding:9px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.95rem;">
+                                <input type="text" name="receivedBy" value="${currentReceivedBy}" placeholder="دستخط یا نام" style="width:100%; padding:9px; border-radius:8px; border:1.5px solid #cbd5e1; font-size:0.95rem;">
                             </div>
                         </div>
 
@@ -1152,8 +1199,8 @@ const DonorsModule = {
                         <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; margin-bottom:1.5rem; display:flex; align-items:center; gap:10px;">
                             <input type="checkbox" name="syncToAccounts" id="syncToAccountsCheck" checked style="width:18px; height:18px; cursor:pointer;">
                             <label for="syncToAccountsCheck" style="font-size:0.95rem; color:#1e293b; cursor:pointer; font-weight:bold;">
-                                بیت المال (مرکزی اکاؤنٹ) میں خودکار آمدن درج کریں
-                                <small style="display:block; color:#64748b; font-weight:normal;">اس سے مدرسہ کے کیش بیلنس میں یہ رقم خود بخود جمع ہو جائے گی۔</small>
+                                بیت المال (مرکزی اکاؤنٹ) میں خودکار اندراج / اپ ڈیٹ کریں
+                                <small style="display:block; color:#64748b; font-weight:normal;">اس سے مدرسہ کے کیش بک و کھاتوں میں یہ رقم خود بخود اپ ڈیٹ ہو جائے گی۔</small>
                             </label>
                         </div>
 
@@ -1162,8 +1209,8 @@ const DonorsModule = {
                             <button type="button" onclick="document.getElementById('${modalId}').remove()" class="btn" style="background:#f1f5f9; color:#475569; font-weight:bold; border-radius:8px; padding:10px 20px; border:none; cursor:pointer;">
                                 منسوخ کریں
                             </button>
-                            <button type="submit" class="btn btn-primary" style="background:#059669; font-weight:bold; border-radius:8px; padding:10px 24px; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; font-size:1.05rem; box-shadow:0 4px 12px rgba(5,150,105,0.25);">
-                                <i class="fas fa-receipt"></i> رقم محفوظ کریں اور رسید نکالیں
+                            <button type="submit" class="btn btn-primary" style="background:${isEdit ? '#0284c7' : '#059669'}; font-weight:bold; border-radius:8px; padding:10px 24px; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; font-size:1.05rem; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+                                <i class="fas ${isEdit ? 'fa-save' : 'fa-receipt'}"></i> ${isEdit ? 'تبدیلیاں محفوظ کریں اور رسید دیکھیں' : 'رقم محفوظ کریں اور رسید نکالیں'}
                             </button>
                         </div>
                     </form>
@@ -1196,6 +1243,13 @@ const DonorsModule = {
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
 
+        const isEdit = data.id && String(data.id).trim() !== '' && !isNaN(data.id) && parseInt(data.id) > 0;
+        if (isEdit) {
+            data.id = parseInt(data.id);
+        } else {
+            delete data.id;
+        }
+
         if (data.donorId && !isNaN(data.donorId)) {
             data.donorId = parseInt(data.donorId);
         }
@@ -1214,28 +1268,57 @@ const DonorsModule = {
         data.donorCode = donor.donorCode;
         data.monthName = this.getMonthName(data.monthIndex);
 
-        // Generate receipt number
-        data.receiptNo = 'DNR-' + data.year + '-' + Math.floor(10000 + Math.random() * 90000);
+        // Keep or generate receipt number
+        if (isEdit && data.existingReceiptNo && data.existingReceiptNo.trim() !== '') {
+            data.receiptNo = data.existingReceiptNo.trim();
+        } else if (!data.receiptNo) {
+            data.receiptNo = 'DNR-' + data.year + '-' + Math.floor(10000 + Math.random() * 90000);
+        }
+
+        if (isEdit && data.existingCreatedAt) {
+            data.createdAt = data.existingCreatedAt;
+        }
+        data.updatedAt = new Date().toISOString();
+
+        // Remove temporary helper fields
+        delete data.existingReceiptNo;
+        delete data.existingCreatedAt;
 
         try {
-            // Save Donation
+            // Save or Update Donation
             const donationId = await MadrassahDB.saveDonorDonation(data);
-            data.id = donationId;
+            if (!data.id) {
+                data.id = donationId;
+            }
 
             // Sync with Accounts (Bait-ul-Maal)
             if (data.syncToAccounts) {
                 try {
-                    await MadrassahDB.saveTransaction({
-                        type: 'Income',
-                        category: data.fundType || 'عطیات و صدقات',
-                        amount: data.amount,
-                        name: donor.name,
-                        phone: donor.phone || '',
-                        address: donor.address || donor.city || '',
-                        date: new Date(data.paymentDate || Date.now()).getTime(),
-                        receiptNo: data.receiptNo,
-                        description: `ماہانہ معاونت بابت ماہ ${data.monthName} ${data.year}ء [طریقہ: ${data.paymentMethod || 'نقد'}] (مستقل ڈونر: ${donor.donorCode || ''})`
-                    });
+                    const allTx = (await MadrassahDB.getAllTransactions()) || [];
+                    const existingTx = allTx.find(t => t.receiptNo === data.receiptNo);
+
+                    if (existingTx) {
+                        existingTx.amount = data.amount;
+                        existingTx.category = data.fundType || 'عطیات و صدقات';
+                        existingTx.name = donor.name;
+                        existingTx.phone = donor.phone || '';
+                        existingTx.address = donor.address || donor.city || '';
+                        existingTx.date = new Date(data.paymentDate || Date.now()).getTime();
+                        existingTx.description = `ماہانہ معاونت بابت ماہ ${data.monthName} ${data.year}ء [طریقہ: ${data.paymentMethod || 'نقد'}] (مستقل ڈونر: ${donor.donorCode || ''})`;
+                        await MadrassahDB.saveTransaction(existingTx);
+                    } else {
+                        await MadrassahDB.saveTransaction({
+                            type: 'Income',
+                            category: data.fundType || 'عطیات و صدقات',
+                            amount: data.amount,
+                            name: donor.name,
+                            phone: donor.phone || '',
+                            address: donor.address || donor.city || '',
+                            date: new Date(data.paymentDate || Date.now()).getTime(),
+                            receiptNo: data.receiptNo,
+                            description: `ماہانہ معاونت بابت ماہ ${data.monthName} ${data.year}ء [طریقہ: ${data.paymentMethod || 'نقد'}] (مستقل ڈونر: ${donor.donorCode || ''})`
+                        });
+                    }
                 } catch (accErr) {
                     console.warn('Could not auto-sync transaction to accounts:', accErr);
                 }
@@ -1260,6 +1343,15 @@ const DonorsModule = {
     async deleteDonation(id) {
         if (!confirm('کیا آپ واقعی یہ رسید حذف کرنا چاہتے ہیں؟')) return;
         try {
+            const allDons = await MadrassahDB.getAllDonorDonations();
+            const don = allDons.find(d => String(d.id) === String(id) || parseInt(d.id) === parseInt(id));
+            if (don && don.receiptNo) {
+                try {
+                    await MadrassahDB.deleteTransactionByReceipt(don.receiptNo);
+                } catch (e) {
+                    console.warn('Could not delete synced transaction:', e);
+                }
+            }
             await MadrassahDB.deleteDonorDonation(id);
             this.render();
         } catch (err) {
@@ -1282,71 +1374,91 @@ const DonorsModule = {
         const formattedWa = this.formatWhatsAppNumber(donor.whatsapp || donor.phone);
 
         const modalHtml = `
-            <div id="${modalId}" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:10000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(5px); padding:1rem;">
-                <div style="background:white; border-radius:20px; width:100%; max-width:540px; box-shadow:0 25px 50px rgba(0,0,0,0.35); border:2.5px solid #059669; overflow:hidden; text-align:center;">
-                    <!-- Top Green Banner -->
-                    <div style="background:linear-gradient(135deg, #064e3b, #059669); color:white; padding:1.8rem 1.5rem; position:relative;">
-                        <div style="width:64px; height:64px; background:#ecfdf5; color:#059669; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:2rem; margin-bottom:0.6rem; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
-                            <i class="fas fa-check"></i>
+            <div id="${modalId}" onclick="if(event.target===this) this.remove()" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:10000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px); padding:12px; box-sizing:border-box;">
+                <div style="background:white; border-radius:16px; width:100%; max-width:500px; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 20px 45px rgba(0,0,0,0.3); border:2px solid #059669; overflow:hidden;">
+                    <!-- Compact Top Green Banner -->
+                    <div style="background:linear-gradient(135deg, #065f46, #059669); color:white; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <div style="width:34px; height:34px; background:rgba(255,255,255,0.2); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.1rem; color:#fef08a;">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <div>
+                                <h3 style="margin:0; font-family:'Aref Ruqaa', 'Amiri', serif; font-size:1.35rem; color:#ffffff; line-height:1.2;">
+                                    بحمداللہ! رقم کامیابی سے وصول ہو گئی
+                                </h3>
+                                <p style="margin:2px 0 0 0; color:#a7f3d0; font-size:0.82rem;">
+                                    رسید کا باضابطہ اندراج اور کھاتہ اپ ڈیٹ ہو چکا ہے
+                                </p>
+                            </div>
                         </div>
-                        <h2 style="margin:0; font-family:'Aref Ruqaa', 'Amiri', serif; font-size:1.8rem; color:#ffffff;">
-                            بحمداللہ! رقم کامیابی سے وصول ہو گئی
-                        </h2>
-                        <p style="margin:4px 0 0 0; color:#a7f3d0; font-size:0.95rem;">
-                            رسید کا باضابطہ اندراج اور کھاتہ اپ ڈیٹ ہو چکا ہے
-                        </p>
+                        <button type="button" onclick="document.getElementById('${modalId}').remove()" style="background:rgba(255,255,255,0.2); border:none; color:white; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.1rem; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.35)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'" title="بند کریں (Close)">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
 
-                    <!-- Receipt Preview Card -->
-                    <div style="padding:1.5rem; background:#f8fafc;">
-                        <div style="background:white; border:1.5px dashed #cbd5e1; border-radius:12px; padding:1.2rem; text-align:right; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
-                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f1f5f9; padding-bottom:8px; margin-bottom:8px;">
-                                <span style="font-size:0.9rem; color:#64748b;">رسید نمبر:</span>
-                                <span style="font-weight:bold; font-family:monospace; color:#0369a1; font-size:1.05rem;">${donation.receiptNo}</span>
+                    <!-- Receipt Preview & Action Buttons (Scrollable if height constrained) -->
+                    <div style="padding:14px 16px; overflow-y:auto; background:#f8fafc; flex:1;">
+                        <!-- Receipt Summary Box -->
+                        <div style="background:white; border:1.5px dashed #cbd5e1; border-radius:12px; padding:10px 14px; text-align:right; box-shadow:0 1px 4px rgba(0,0,0,0.03);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f1f5f9; padding-bottom:5px; margin-bottom:5px;">
+                                <span style="font-size:0.85rem; color:#64748b;">رسید نمبر:</span>
+                                <span style="font-weight:bold; font-family:monospace; color:#0369a1; font-size:1rem;">${donation.receiptNo}</span>
                             </div>
 
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <span style="font-size:0.9rem; color:#64748b;">نامِ معاون:</span>
-                                <span style="font-weight:bold; color:#0f172a;">${donor.name}</span>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                                <span style="font-size:0.85rem; color:#64748b;">نامِ معاون:</span>
+                                <span style="font-weight:bold; color:#0f172a; font-size:0.95rem;">${donor.name}</span>
                             </div>
 
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <span style="font-size:0.9rem; color:#64748b;">بمد:</span>
-                                <span style="font-weight:bold; color:#065f46;">${donation.fundType || 'عام عطیہ'}</span>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                                <span style="font-size:0.85rem; color:#64748b;">بمد:</span>
+                                <span style="font-weight:bold; color:#065f46; font-size:0.9rem;">${donation.fundType || 'عام عطیہ'}</span>
                             </div>
 
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <span style="font-size:0.9rem; color:#64748b;">وصول شدہ رقم:</span>
-                                <span style="font-weight:bold; color:#15803d; font-size:1.25rem; font-family:monospace;">Rs. ${Number(donation.amount).toLocaleString('en-US')}</span>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                                <span style="font-size:0.85rem; color:#64748b;">وصول شدہ رقم:</span>
+                                <span style="font-weight:bold; color:#15803d; font-size:1.2rem; font-family:monospace;">Rs. ${Number(donation.amount).toLocaleString('en-US')}</span>
                             </div>
 
-                            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #e2e8f0; padding-top:6px; margin-top:6px; font-size:0.85rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #e2e8f0; padding-top:5px; margin-top:5px; font-size:0.82rem;">
                                 <span style="color:#64748b;">مبلغ:</span>
                                 <span style="font-weight:bold; color:#334155;">${amountWords}</span>
                             </div>
                         </div>
 
-                        <!-- Action Buttons -->
-                        <div style="margin-top:1.4rem; display:flex; flex-direction:column; gap:10px;">
-                            <button onclick="DonorsModule.printDonationReceipt('${donation.id}')" class="btn" style="background:#0284c7; color:white; font-size:1.1rem; font-weight:bold; padding:12px; border-radius:10px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 12px rgba(2,132,199,0.3);">
-                                <i class="fas fa-print"></i> باضابطہ رسید پرنٹ / PDF (Print / Save PDF)
-                            </button>
-                            <button onclick="DonorsModule.downloadDonationReceipt('${donation.id}')" class="btn" style="background:#059669; color:white; font-size:1.05rem; font-weight:bold; padding:12px; border-radius:10px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 12px rgba(5,150,105,0.3);">
-                                <i class="fas fa-file-arrow-down"></i> رسید کی تصویر ڈاؤن لوڈ کریں (Download PNG Image)
-                            </button>
-
-                            ${formattedWa ? `
-                                <button onclick="DonorsModule.shareReceiptWhatsApp('${donation.id}')" class="btn" style="background:#16a34a; color:white; font-size:1.05rem; font-weight:bold; padding:11px; border-radius:10px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 12px rgba(22,163,74,0.3);">
-                                    <i class="fab fa-whatsapp" style="font-size:1.25rem;"></i> واٹس ایپ پر رسید و شکریہ کا میسج بھیجیں
+                        <!-- Action Buttons Grid -->
+                        <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
+                            <!-- 2 Column Button Row 1: Print & Download -->
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <button onclick="DonorsModule.printDonationReceipt('${donation.id}')" class="btn" style="background:#0284c7; color:white; font-size:0.92rem; font-weight:bold; padding:10px 8px; border-radius:8px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 2px 6px rgba(2,132,199,0.25);">
+                                    <i class="fas fa-print"></i> رسید پرنٹ / PDF
                                 </button>
-                            ` : `
-                                <div style="font-size:0.85rem; color:#64748b; background:#f1f5f9; padding:6px; border-radius:6px;">
+                                <button onclick="DonorsModule.downloadDonationReceipt('${donation.id}')" class="btn" style="background:#059669; color:white; font-size:0.92rem; font-weight:bold; padding:10px 8px; border-radius:8px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 2px 6px rgba(5,150,105,0.25);">
+                                    <i class="fas fa-file-arrow-down"></i> تصویر ڈاؤن لوڈ
+                                </button>
+                            </div>
+
+                            <!-- 2 Column Button Row 2: WhatsApp & Edit -->
+                            <div style="display:grid; grid-template-columns:${formattedWa ? '1.2fr 1fr' : '1fr'}; gap:8px;">
+                                ${formattedWa ? `
+                                    <button onclick="DonorsModule.shareReceiptWhatsApp('${donation.id}')" class="btn" style="background:#16a34a; color:white; font-size:0.92rem; font-weight:bold; padding:10px 8px; border-radius:8px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 2px 6px rgba(22,163,74,0.25);">
+                                        <i class="fab fa-whatsapp" style="font-size:1.1rem;"></i> واٹس ایپ رسید
+                                    </button>
+                                ` : ''}
+                                <button type="button" onclick="document.getElementById('${modalId}').remove(); DonorsModule.editDonation('${donation.id}')" class="btn" style="background:#fef3c7; color:#92400e; font-size:0.9rem; font-weight:bold; padding:10px 8px; border-radius:8px; border:1px solid #fde68a; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                    <i class="fas fa-edit"></i> رقم تبدیل / ایڈٹ
+                                </button>
+                            </div>
+
+                            ${!formattedWa ? `
+                                <div style="font-size:0.8rem; color:#64748b; background:#f1f5f9; padding:5px 8px; border-radius:6px; text-align:center;">
                                     ڈونر کا واٹس ایپ نمبر موجود نہیں ہے (کوائف میں واٹس ایپ نمبر شامل فرما لیں)
                                 </div>
-                            `}
+                            ` : ''}
 
-                            <button type="button" onclick="document.getElementById('${modalId}').remove()" class="btn" style="background:#e2e8f0; color:#475569; font-weight:bold; padding:9px; border-radius:8px; border:none; cursor:pointer;">
-                                بند کریں (Close)
+                            <!-- Prominent Full-Width Close Button -->
+                            <button type="button" onclick="document.getElementById('${modalId}').remove()" class="btn" style="background:#e2e8f0; color:#1e293b; font-size:0.95rem; font-weight:bold; padding:10px; border-radius:8px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; margin-top:2px;" onmouseover="this.style.background='#cbd5e1'" onmouseout="this.style.background='#e2e8f0'">
+                                <i class="fas fa-check-circle" style="color:#059669;"></i> ونڈو بند کریں (Close)
                             </button>
                         </div>
                     </div>
@@ -1362,14 +1474,6 @@ const DonorsModule = {
     // ==========================================
 
     async downloadDonationReceipt(donationId) {
-        if (window.app && typeof window.app.hasReceiptTemplate === 'function' && !window.app.hasReceiptTemplate()) {
-            alert('توجہ فرمائیں! پرانی ڈیفالٹ رسید ختم کر دی گئی ہے۔ رسید ڈاؤنلوڈ یا پرنٹ کرنے کے لیے پہلے "سیٹنگز" (Settings) میں جا کر اپنی باضابطہ رسید اپلوڈ فرمائیں۔');
-            if (window.app && typeof window.app.navigate === 'function') {
-                window.app.navigate('settings');
-            }
-            return;
-        }
-
         const donations = await MadrassahDB.getAllDonorDonations();
         const d = donations.find(item => String(item.id) === String(donationId) || parseInt(item.id) === parseInt(donationId));
         if (!d) {
@@ -1406,14 +1510,6 @@ const DonorsModule = {
     },
 
     async printDonationReceipt(donationId) {
-        if (window.app && typeof window.app.hasReceiptTemplate === 'function' && !window.app.hasReceiptTemplate()) {
-            alert('توجہ فرمائیں! پرانی ڈیفالٹ رسید ختم کر دی گئی ہے۔ رسید ڈاؤنلوڈ یا پرنٹ کرنے کے لیے پہلے "سیٹنگز" (Settings) میں جا کر اپنی باضابطہ رسید اپلوڈ فرمائیں۔');
-            if (window.app && typeof window.app.navigate === 'function') {
-                window.app.navigate('settings');
-            }
-            return;
-        }
-
         const donations = await MadrassahDB.getAllDonorDonations();
         const d = donations.find(item => String(item.id) === String(donationId) || parseInt(item.id) === parseInt(donationId));
         if (!d) {
@@ -1498,7 +1594,7 @@ const DonorsModule = {
 `السلام علیکم ورحمۃ اللہ وبرکاتہ!
 محترم *${donor.name}* صاحب!
 
-مدرسہ عبد الرحمن بن عوف غفوریہ کی طرف سے آپ کا بے حد شکریہ۔
+مدرسہ عبد الرحمن ؓ بن عوف غفوریہ کی طرف سے آپ کا بے حد شکریہ۔
 بحمداللہ آپ کا ماہانہ تعاون وصول پا گیا ہے، تفصیل درج ذیل ہے:
 
 📋 *رسید نمبر:* ${d.receiptNo}
@@ -1510,8 +1606,9 @@ const DonorsModule = {
 
 اللہ تعالیٰ آپ کے مال، جان اور اہل و عیال میں بے پناہ برکتیں عطا فرمائے اور اس صدقہ جاریہ کو اپنی بارگاہ میں قبول فرمائے۔ آمین!
 
-*ادارہ:* مدرسہ عبد الرحمن بن عوف غفوریہ
-خانیوال، پاکستان`;
+*ادارہ:* مدرسہ عبد الرحمن ؓ بن عوف غفوریہ
+📍 پتہ: چک نمبر R/28-10 بوسال کالونی ضلع خانیوال
+📞 رابطہ: 0302 7440199`;
 
         this.openWhatsAppDirect(phone, message);
     },
@@ -1533,11 +1630,12 @@ const DonorsModule = {
 `السلام علیکم ورحمۃ اللہ وبرکاتہ!
 محترم *${donor.name}* صاحب!
 
-امید ہے آپ بخیر و عافیت ہوں گے۔ مدرسہ عبد الرحمن بن عوف غفوریہ کے جملہ اساتذہ و طلبہ آپ کی خیر و عافیت اور کاروبار میں برکت کے لیے دعا گو ہیں۔
+امید ہے آپ بخیر و عافیت ہوں گے۔ مدرسہ عبد الرحمن ؓ بن عوف غفوریہ کے جملہ اساتذہ و طلبہ آپ کی خیر و عافیت اور کاروبار میں برکت کے لیے دعا گو ہیں۔
 
 اللہ تعالیٰ آپ کے جان و مال میں برکتیں عطا فرمائے۔ آمین!
 
-*مدرسہ عبد الرحمن بن عوف غفوریہ*`;
+*مدرسہ عبد الرحمن ؓ بن عوف غفوریہ*
+📍 چک نمبر R/28-10 بوسال کالونی ضلع خانیوال | 📞 0302 7440199`;
 
         this.openWhatsAppDirect(phone, message);
     },
@@ -1594,7 +1692,7 @@ const DonorsModule = {
     </div>
 
     <div class="header">
-        <h1 class="title">مدرسہ عبد الرحمن بن عوف غفوریہ</h1>
+        <h1 class="title">مدرسہ عبد الرحمن ؓ بن عوف غفوریہ</h1>
         <div class="subtitle">سالانہ کھاتہ و اسٹیٹمنٹ برائے مستقل معاونین (سال ${year}ء)</div>
     </div>
 
@@ -1710,7 +1808,7 @@ const DonorsModule = {
     </div>
 
     <div class="header">
-        <h1 class="title">مدرسہ عبد الرحمن بن عوف غفوریہ</h1>
+        <h1 class="title">مدرسہ عبد الرحمن ؓ بن عوف غفوریہ</h1>
         <div class="subtitle">اجتماعی سالانہ ماسٹر شیٹ برائے مستقل معاونین و عطیات دہندگان (سال ${year}ء)</div>
     </div>
 
