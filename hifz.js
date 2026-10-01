@@ -733,7 +733,7 @@ const HifzModule = {
         const juzProgressMap = await MadrassahDB.getStudentJuzProgress(studentId);
         const dailyRecords = await MadrassahDB.getStudentDailyRecords(studentId);
         const revisions = await MadrassahDB.getStudentRevisions(studentId);
-        const examResults = await MadrassahDB.getStudentHifzResults(studentId);
+        const examResults = await MadrassahDB.getStudentHifzResults(studentId, student.name);
         const allExams = await MadrassahDB.getAllHifzExams();
         const examMap = new Map(allExams.map(e => [e.id, e]));
 
@@ -937,26 +937,47 @@ const HifzModule = {
                                 <tr>
                                     <th>امتحان کا عنوان</th>
                                     <th>تاریخ</th>
-                                    <th>حصہ</th>
+                                    <th>حصہ / مضامین</th>
                                     <th>کل نمبر</th>
                                     <th>حاصل کردہ</th>
+                                    <th>فیصد</th>
                                     <th>گریڈ</th>
+                                    <th>کارروائی</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${examResults.map(res => {
                                     const ex = examMap.get(res.examId) || {};
+                                    let portionsStr = '---';
+                                    if (res.subjectPortions && Array.isArray(res.subjectPortions) && res.subjectPortions.filter(Boolean).length > 0) {
+                                        portionsStr = res.subjectPortions.filter(Boolean).join(' | ');
+                                    } else if (res.portion) {
+                                        portionsStr = res.portion;
+                                    } else if (ex.portion) {
+                                        portionsStr = ex.portion;
+                                    }
+                                    const maxM = res.totalMarks || ex.maxMarks || 100;
+                                    const obtM = res.obtainedMarks !== undefined && res.obtainedMarks !== null ? res.obtainedMarks : (res.totalObtained !== undefined ? res.totalObtained : 0);
+                                    const pct = res.percentage || (maxM > 0 ? Math.round((obtM / maxM) * 100) : 0);
+                                    const gr = res.grade || res.gradeTitle || res.remarks || '---';
+
                                     return `
                                         <tr>
                                             <td style="font-weight:600;">${ex.title || 'امتحان'}</td>
-                                            <td>${ex.date || '---'}</td>
-                                            <td>${ex.portion || '---'}</td>
-                                            <td>${res.totalMarks || 100}</td>
-                                            <td style="font-weight:bold; color:var(--primary);">${res.obtainedMarks || 0}</td>
-                                            <td><span class="badge" style="background:${this.getGradeBg(res.grade)}; color:${this.getGradeColor(res.grade)};">${res.grade || '---'}</span></td>
+                                            <td>${ex.date || res.date || '---'}</td>
+                                            <td style="font-size:0.88rem; color:#475569;">${portionsStr}</td>
+                                            <td>${maxM}</td>
+                                            <td style="font-weight:bold; color:var(--primary);">${obtM}</td>
+                                            <td>${pct}%</td>
+                                            <td><span class="badge" style="background:${this.getGradeBg(gr)}; color:${this.getGradeColor(gr)}; font-weight:bold; padding:3px 10px; border-radius:10px;">${gr}</span></td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm" style="background:#047857; color:white; border:none; padding:3px 10px; border-radius:6px; font-size:0.82rem; cursor:pointer;" onclick="HifzModule.printExamResultCard(${student.id}, ${res.examId})" title="امتحانی رزلٹ کارڈ پرنٹ کریں">
+                                                    <i class="fas fa-print"></i> رزلٹ کارڈ
+                                                </button>
+                                            </td>
                                         </tr>
                                     `;
-                                }).join('') || '<tr><td colspan="6" style="text-align:center; padding:1.5rem;">کوئی امتحانی نتیجہ نہیں</td></tr>'}
+                                }).join('') || '<tr><td colspan="8" style="text-align:center; padding:1.5rem;">کوئی امتحانی نتیجہ نہیں</td></tr>'}
                             </tbody>
                         </table>
                     </div>
@@ -3698,37 +3719,62 @@ const HifzModule = {
 
 
     async printExamResultCard(studentId, examId) {
-        const student = await MadrassahDB.getStudentById(studentId);
-        const exam = await MadrassahDB.getHifzExamById(examId);
+        const student = await MadrassahDB.getStudentById(studentId) || { id: studentId, name: 'طالب علم' };
+        const exam = await MadrassahDB.getHifzExamById(examId) || {};
         const results = await MadrassahDB.getHifzExamResults(examId);
         const teachers = await MadrassahDB.getAllTeachers();
         const teacherMap = new Map(teachers.map(t => [t.id, t.name]));
-        const examinerName = teacherMap.get(exam.examinerTeacherId) || '---';
+        const examinerName = exam.examinerName || teacherMap.get(exam.examinerTeacherId) || '---';
 
-        const res = results.find(r => r.studentId === studentId) || {
-            hifzMarks: 50, tajweedMarks: 25, masailMarks: 5, duaMarks: 5,
-            obtainedMarks: 85, totalMarks: exam.maxMarks || 100, passingMarks: exam.passingMarks || 50, percentage: 85, grade: 'ممتاز', isPass: true, portion: exam.portion
+        const res = results.find(r => r.studentId == studentId || parseInt(r.studentId) === parseInt(studentId) || (r.studentName && student.name && r.studentName.trim() === student.name.trim())) || {
+            obtainedMarks: 0, totalMarks: exam.maxMarks || 100, passingMarks: exam.passingMarks || 50, percentage: 0, grade: '---', isPass: false, portion: exam.portion || ''
         };
 
-        const m1 = res.hifzMarks !== undefined ? res.hifzMarks : (res.memorizationMarks !== undefined ? Math.min(60, (res.memorizationMarks || 0) + (res.fluencyMarks || 0) + (res.mistakesMarks || 0) + (res.mutashabihatMarks || 0)) : 0);
-        const m2 = res.tajweedMarks !== undefined ? res.tajweedMarks : 0;
-        const m3 = res.masailMarks !== undefined ? res.masailMarks : 0;
+        const m1 = res.hifzMarks !== undefined ? res.hifzMarks : (res.memorizationMarks !== undefined ? Math.min(60, (res.memorizationMarks || 0) + (res.fluencyMarks || 0) + (res.mistakesMarks || 0) + (res.mutashabihatMarks || 0)) : (res.marksQuran !== undefined && res.marksQuran !== null ? res.marksQuran : 0));
+        const m2 = res.tajweedMarks !== undefined ? res.tajweedMarks : (res.marksNamaz !== undefined && res.marksNamaz !== null ? res.marksNamaz : 0);
+        const m3 = res.masailMarks !== undefined ? res.masailMarks : (res.marksQaida !== undefined && res.marksQaida !== null ? res.marksQaida : 0);
         const m4 = res.duaMarks !== undefined ? res.duaMarks : 0;
 
         const maxM = res.totalMarks || exam.maxMarks || 100;
-        const passM = res.passingMarks || exam.passingMarks || 50;
-        const tot = res.obtainedMarks !== undefined ? res.obtainedMarks : (m1 + m2 + m3 + m4);
-        const pct = res.percentage !== undefined ? res.percentage : (Math.round((tot / maxM) * 100 * 10) / 10);
+        const passM = res.passingMarks || exam.passingMarks || Math.round(maxM * 0.5);
+        const tot = res.obtainedMarks !== undefined && res.obtainedMarks !== null ? res.obtainedMarks : (res.totalObtained !== undefined && res.totalObtained !== null ? res.totalObtained : (m1 + m2 + m3 + m4));
+        const pct = (res.percentage !== undefined && res.percentage !== null && res.percentage !== '') ? res.percentage : (maxM > 0 ? (Math.round((tot / maxM) * 100 * 10) / 10) : 0);
         const isPass = res.isPass !== undefined ? res.isPass : (tot >= passM);
         const grObj = this.getHifzGrade(pct, isPass);
+        const grTitle = res.grade || res.gradeTitle || res.remarks || grObj.title;
 
         // Position
-        const passedSorted = results.filter(r => (r.obtainedMarks || 0) >= passM).sort((a, b) => (b.obtainedMarks || 0) - (a.obtainedMarks || 0));
+        const passedSorted = results.filter(r => (r.obtainedMarks !== undefined ? r.obtainedMarks : (r.totalObtained || 0)) >= passM).sort((a, b) => ((b.obtainedMarks !== undefined ? b.obtainedMarks : (b.totalObtained || 0)) - (a.obtainedMarks !== undefined ? a.obtainedMarks : (a.totalObtained || 0))));
         let myRank = '---';
         if (isPass) {
-            const idx = passedSorted.findIndex(r => r.studentId === studentId);
+            const idx = passedSorted.findIndex(r => r.studentId == studentId || parseInt(r.studentId) === parseInt(studentId) || (r.studentName && student.name && r.studentName.trim() === student.name.trim()));
             if (idx !== -1) myRank = this.getUrduPosition(idx + 1);
         }
+
+        // Subject Breakdown Rows
+        let tableRowsHtml = '';
+        if (exam.subjects && Array.isArray(exam.subjects) && exam.subjects.length > 0) {
+            tableRowsHtml = exam.subjects.map((s, idx) => {
+                const p = (res.subjectPortions && res.subjectPortions[idx]) ? ` (${res.subjectPortions[idx]})` : (s.subtitle ? ` (${s.subtitle})` : '');
+                const m = (res.subjectMarks && res.subjectMarks[idx] !== null && res.subjectMarks[idx] !== undefined) ? res.subjectMarks[idx] : (idx === 0 ? (res.marksQuran ?? res.hifzMarks ?? '---') : idx === 1 ? (res.marksNamaz ?? res.tajweedMarks ?? '---') : idx === 2 ? (res.marksQaida ?? res.masailMarks ?? '---') : '---');
+                return `<tr><td style="text-align:right;">${idx + 1}. ${s.name}${p}</td><td>${s.maxMarks || 100}</td><td style="font-weight:bold;">${m}</td></tr>`;
+            }).join('');
+        } else if (res.subjectMarks && Array.isArray(res.subjectMarks) && res.subjectMarks.length > 0) {
+            tableRowsHtml = res.subjectMarks.map((m, idx) => {
+                const sName = idx === 0 ? 'قرآن کریم' : idx === 1 ? 'نماز و دعائیں' : idx === 2 ? 'قاعدہ' : `مضمون ${idx + 1}`;
+                const p = (res.subjectPortions && res.subjectPortions[idx]) ? ` (${res.subjectPortions[idx]})` : '';
+                return `<tr><td style="text-align:right;">${idx + 1}. ${sName}${p}</td><td>---</td><td style="font-weight:bold;">${m !== null ? m : '---'}</td></tr>`;
+            }).join('');
+        } else {
+            tableRowsHtml = `
+                <tr><td style="text-align:right;">1. حفظِ قرآن مجید (پختگی، استحضار و روانی)</td><td>60</td><td style="font-weight:bold;">${m1}</td></tr>
+                <tr><td style="text-align:right;">2. تجوید و ترتیل (مخارج و صفات)</td><td>30</td><td style="font-weight:bold;">${m2}</td></tr>
+                <tr><td style="text-align:right;">3. دینی مسائل (نماز و طہارت)</td><td>5</td><td style="font-weight:bold;">${m3}</td></tr>
+                <tr><td style="text-align:right;">4. مسنون دعائیں (یومیہ اذکار)</td><td>5</td><td style="font-weight:bold;">${m4}</td></tr>
+            `;
+        }
+
+        const portionDisplay = res.portion || (res.subjectPortions ? res.subjectPortions.filter(Boolean).join(' | ') : '') || exam.portion || '---';
 
         const printWin = window.open('', '_blank');
         printWin.document.write(`
@@ -3759,13 +3805,13 @@ const HifzModule = {
             </head>
             <body>
                 <div class="card-border">
-                    <img src="logo.jpg" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:300px; max-width:85%; opacity:0.08; pointer-events:none; z-index:0;" alt="Watermark">
+                    <img src="logo.jpg" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:300px; max-width:85%; opacity:0.08; pointer-events:none; z-index:0;" alt="Watermark" onerror="this.style.display='none'">
                     <div style="position:relative; z-index:1;">
                         <div class="header">
                             <div style="font-size:1rem; color:#b45309; font-weight:bold;">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
                             <h1 class="title">مدرسہ عبد الرحمن بن عوف غفوریہ (خانیوال)</h1>
                             <div class="sub">شعبہ تحفیظ القرآن الکریم — امتحانی رزلٹ کارڈ و سندِ کارکردگی</div>
-                            <div style="font-size:0.95rem; color:#475569; margin-top:4px;">امتحان: <b>${exam.title}</b> | سیشن: <b>${exam.session || '1446-1447ھ'}</b> | تاریخ: <b>${exam.date}</b></div>
+                            <div style="font-size:0.95rem; color:#475569; margin-top:4px;">امتحان: <b>${exam.title || 'امتحان حفظ'}</b> | سیشن: <b>${exam.session || '1446-1447ھ'}</b> | تاریخ: <b>${exam.date || res.date || '---'}</b></div>
                         </div>
 
                         <div class="info-grid">
@@ -3774,29 +3820,26 @@ const HifzModule = {
                             <div><b>ولدیت:</b> ${student.fatherName || '---'}</div>
                             <div><b>حلقہ / درجہ:</b> ${student.className || exam.halaqa || 'عام'}</div>
                             <div><b>ممتحن استاد:</b> ${examinerName}</div>
-                            <div><b>امتحانی حصہ / سبق:</b> <span style="color:#065f46; font-weight:bold;">${res.portion || exam.portion}</span></div>
+                            <div><b>امتحانی حصہ / سبق:</b> <span style="color:#065f46; font-weight:bold;">${portionDisplay}</span></div>
                         </div>
 
                         <table>
                             <thead>
                                 <tr>
-                                    <th style="text-align:right;">معیار جائزہ و امتحان</th>
+                                    <th style="text-align:right;">معیار جائزہ و امتحان / مضامین</th>
                                     <th style="width:100px;">کل نمبر</th>
                                     <th style="width:120px;">حاصل کردہ نمبر</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><td style="text-align:right;">1. حفظِ قرآن مجید (پختگی، استحضار و روانی)</td><td>60</td><td style="font-weight:bold;">${m1}</td></tr>
-                                <tr><td style="text-align:right;">2. تجوید و ترتیل (مخارج و صفات)</td><td>30</td><td style="font-weight:bold;">${m2}</td></tr>
-                                <tr><td style="text-align:right;">3. دینی مسائل (نماز و طہارت)</td><td>5</td><td style="font-weight:bold;">${m3}</td></tr>
-                                <tr><td style="text-align:right;">4. مسنون دعائیں (یومیہ اذکار)</td><td>5</td><td style="font-weight:bold;">${m4}</td></tr>
+                                ${tableRowsHtml}
                             </tbody>
                         </table>
 
                         <div class="total-box">
                             <div>حاصل کردہ: ${tot} / ${maxM}</div>
                             <div>فیصد: ${pct}%</div>
-                            <div>تقدیر / گریڈ: ${grObj.title}</div>
+                            <div>تقدیر / گریڈ: ${grTitle}</div>
                             <div>نتیجہ: ${isPass ? 'کامیاب' : 'ناکام'}</div>
                             <div>پوزیشن: ${myRank}</div>
                         </div>
@@ -6291,25 +6334,25 @@ const HifzModule = {
     // UTILITY HELPERS
     // ==========================================
     getGradeBg(grade) {
-        switch (grade) {
-            case 'A+': return '#dcfce7';
-            case 'A': return '#dbeafe';
-            case 'B': return '#fef3c7';
-            case 'C': return '#ffedd5';
-            case 'D': return '#fee2e2';
-            default: return '#f1f5f9';
-        }
+        if (!grade) return '#f1f5f9';
+        const g = String(grade);
+        if (g.includes('ممتاز') || g === 'A+') return '#dcfce7';
+        if (g.includes('جید جداً') || g.includes('جیداََ') || g === 'A') return '#dbeafe';
+        if (g.includes('جید') || g === 'B') return '#e0e7ff';
+        if (g.includes('مقبول') || g === 'C') return '#fef3c7';
+        if (g.includes('راسب') || g.includes('Fail') || g === 'D') return '#fee2e2';
+        return '#f1f5f9';
     },
 
     getGradeColor(grade) {
-        switch (grade) {
-            case 'A+': return '#15803d';
-            case 'A': return '#1d4ed8';
-            case 'B': return '#b45309';
-            case 'C': return '#ea580c';
-            case 'D': return '#dc2626';
-            default: return '#475569';
-        }
+        if (!grade) return '#475569';
+        const g = String(grade);
+        if (g.includes('ممتاز') || g === 'A+') return '#15803d';
+        if (g.includes('جید جداً') || g.includes('جیداََ') || g === 'A') return '#1d4ed8';
+        if (g.includes('جید') || g === 'B') return '#4338ca';
+        if (g.includes('مقبول') || g === 'C') return '#b45309';
+        if (g.includes('راسب') || g.includes('Fail') || g === 'D') return '#dc2626';
+        return '#475569';
     },
 
     getStatusBg(status) {

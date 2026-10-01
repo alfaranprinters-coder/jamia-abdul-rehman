@@ -17374,8 +17374,12 @@ class MadrassahApp {
         const enrollment = await MadrassahDB.getHifzEnrollmentByStudentId(studentId);
         const fees = await MadrassahDB.getStudentFees(studentId) || [];
         const examResults = await MadrassahDB.getStudentResults(studentId) || [];
-        const allExams = await MadrassahDB.getAllExams();
+        const hifzExamResults = await MadrassahDB.getStudentHifzResults(studentId, student.name) || [];
+        const allExams = await MadrassahDB.getAllExams() || [];
+        const allHifzExams = await MadrassahDB.getAllHifzExams() || [];
         const examMap = new Map(allExams.map(e => [e.id, e]));
+        const hifzExamMap = new Map(allHifzExams.map(e => [e.id, e]));
+        const totalExamsCount = examResults.length + hifzExamResults.length;
 
         // Get teachers for name lookup
         const teachers = await MadrassahDB.getAllTeachers();
@@ -17391,6 +17395,169 @@ class MadrassahApp {
             }
         }
         const percent = ((completedJuzCount / 30) * 100).toFixed(1);
+
+        // Grade styling helper
+        const getGradeStyle = (gradeStr) => {
+            const g = String(gradeStr || '');
+            if (g.includes('راسب') || g.includes('Fail')) return { bg: '#fef2f2', color: '#dc2626' };
+            if (g.includes('ممتاز')) return { bg: '#ecfdf5', color: '#047857' };
+            if (g.includes('جید جداً') || g.includes('جیداََ')) return { bg: '#f0fdf4', color: '#15803d' };
+            if (g.includes('جید')) return { bg: '#eff6ff', color: '#1d4ed8' };
+            if (g.includes('مقبول')) return { bg: '#fffbeb', color: '#b45309' };
+            return { bg: '#f1f5f9', color: '#475569' };
+        };
+
+        // Build combined exam list for Tab 4 (both Hifz & General)
+        const combinedExamList = [
+            ...hifzExamResults.map(r => {
+                const ex = hifzExamMap.get(r.examId) || {};
+                let portionsStr = '---';
+                if (r.subjectPortions && Array.isArray(r.subjectPortions) && r.subjectPortions.filter(Boolean).length > 0) {
+                    portionsStr = r.subjectPortions.filter(Boolean).join(' | ');
+                } else if (r.portion) {
+                    portionsStr = r.portion;
+                } else if (ex.portion) {
+                    portionsStr = ex.portion;
+                }
+                const maxM = r.totalMarks || ex.maxMarks || 100;
+                const obtM = r.obtainedMarks !== undefined && r.obtainedMarks !== null ? r.obtainedMarks : (r.totalObtained !== undefined ? r.totalObtained : 0);
+                const pct = r.percentage || (maxM > 0 ? Math.round((obtM / maxM) * 100) : 0);
+                const gr = r.grade || r.gradeTitle || r.remarks || '---';
+                return {
+                    type: 'hifz',
+                    typeName: 'شعبہ حفظ',
+                    title: ex.title || 'امتحان حفظ',
+                    date: ex.date || r.date || '---',
+                    portion: portionsStr,
+                    totalMarks: maxM,
+                    obtainedMarks: obtM,
+                    percentage: pct,
+                    grade: gr,
+                    examId: r.examId
+                };
+            }),
+            ...examResults.map(r => {
+                const ex = examMap.get(r.examId) || {};
+                return {
+                    type: 'general',
+                    typeName: 'عام تعلیمی',
+                    title: ex.title || 'امتحان',
+                    date: ex.date || r.date || '---',
+                    portion: ex.class || '---',
+                    totalMarks: r.totalPossible || 100,
+                    obtainedMarks: r.obtainedTotal !== undefined ? r.obtainedTotal : (r.obtainedMarks || 0),
+                    percentage: r.percentage || 0,
+                    grade: r.grade || '---',
+                    examId: r.examId
+                };
+            })
+        ];
+
+        // Precompute Hifz exam table rows for Tab 2
+        let hifzRowsHtml = '';
+        if (hifzExamResults.length > 0) {
+            hifzRowsHtml = hifzExamResults.map(r => {
+                const ex = hifzExamMap.get(r.examId) || {};
+                const title = ex.title || 'امتحان حفظ';
+                const date = ex.date || r.date || '---';
+                let portionsStr = '---';
+                if (r.subjectPortions && Array.isArray(r.subjectPortions) && r.subjectPortions.filter(Boolean).length > 0) {
+                    portionsStr = r.subjectPortions.filter(Boolean).join(' | ');
+                } else if (r.portion) {
+                    portionsStr = r.portion;
+                } else if (ex.portion) {
+                    portionsStr = ex.portion;
+                }
+                const maxM = r.totalMarks || ex.maxMarks || 100;
+                const obtM = r.obtainedMarks !== undefined && r.obtainedMarks !== null ? r.obtainedMarks : (r.totalObtained !== undefined ? r.totalObtained : 0);
+                const pct = r.percentage || (maxM > 0 ? Math.round((obtM / maxM) * 100) : 0);
+                const gr = r.grade || r.gradeTitle || r.remarks || '---';
+                const st = getGradeStyle(gr);
+
+                return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+                    '<td style="padding:8px 10px; font-weight:bold; color:#1e293b;">' + title + '</td>' +
+                    '<td style="padding:8px 10px; text-align:center; color:#64748b;">' + date + '</td>' +
+                    '<td style="padding:8px 10px; color:#475569; font-size:0.88rem;">' + portionsStr + '</td>' +
+                    '<td style="padding:8px 10px; text-align:center;">' + maxM + '</td>' +
+                    '<td style="padding:8px 10px; text-align:center; font-weight:bold; color:var(--primary);">' + obtM + '</td>' +
+                    '<td style="padding:8px 10px; text-align:center;">' + pct + '%</td>' +
+                    '<td style="padding:8px 10px; text-align:center;"><span class="badge" style="background:' + st.bg + '; color:' + st.color + '; font-weight:bold; padding:3px 10px; border-radius:10px;">' + gr + '</span></td>' +
+                    '<td style="padding:8px 10px; text-align:center;">' +
+                        '<button type="button" class="btn btn-sm" style="background:#047857; color:white; border:none; padding:4px 10px; border-radius:6px; font-size:0.82rem; cursor:pointer;" onclick="HifzModule.printExamResultCard(' + student.id + ', ' + r.examId + ')" title="امتحانی رزلٹ کارڈ پرنٹ کریں">' +
+                            '<i class="fas fa-print"></i> رزلٹ کارڈ' +
+                        '</button>' +
+                    '</td>' +
+                '</tr>';
+            }).join('');
+        }
+
+        const hifzExamTableHtml = '<div style="background:#ffffff; border:1.5px solid #86efac; border-radius:14px; padding:1.2rem; margin-bottom:1.2rem; box-shadow:0 2px 6px rgba(0,0,0,0.03);">' +
+            '<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1.5px solid #dcfce7; padding-bottom:0.6rem; margin-bottom:0.8rem;">' +
+                '<h4 style="margin:0; color:#166534; font-size:1.1rem; display:flex; align-items:center; gap:8px;">' +
+                    '<i class="fas fa-award"></i> امتحانی نتائج و کارکردگی حفظ القرآن (' + hifzExamResults.length + ')' +
+                '</h4>' +
+                (hifzExamResults.length > 0 ? '<span style="background:#16a34a; color:white; font-size:0.8rem; padding:2px 10px; border-radius:12px; font-weight:bold;">' + hifzExamResults.length + ' امتحان ریکارڈ</span>' : '') +
+            '</div>' +
+            (hifzExamResults.length > 0 ? (
+                '<div style="overflow-x:auto;">' +
+                    '<table style="width:100%; font-size:0.92rem; border-collapse:collapse;">' +
+                        '<thead>' +
+                            '<tr style="background:#f0fdf4; border-bottom:2px solid #86efac;">' +
+                                '<th style="padding:8px 10px; text-align:right;">امتحان</th>' +
+                                '<th style="padding:8px 10px; text-align:center;">تاریخ</th>' +
+                                '<th style="padding:8px 10px; text-align:right;">حصہ / مضامین</th>' +
+                                '<th style="padding:8px 10px; text-align:center;">کل نمبر</th>' +
+                                '<th style="padding:8px 10px; text-align:center;">حاصل کردہ</th>' +
+                                '<th style="padding:8px 10px; text-align:center;">فیصد</th>' +
+                                '<th style="padding:8px 10px; text-align:center;">تقدیر / گریڈ</th>' +
+                                '<th style="padding:8px 10px; text-align:center;">کارروائی</th>' +
+                            '</tr>' +
+                        '</thead>' +
+                        '<tbody>' +
+                            hifzRowsHtml +
+                        '</tbody>' +
+                    '</table>' +
+                '</div>'
+            ) : (
+                '<div style="text-align:center; padding:1rem; color:#64748b; font-size:0.92rem;">' +
+                    '<i class="fas fa-file-circle-question" style="color:#94a3b8; font-size:1.4rem; margin-bottom:4px; display:block;"></i>' +
+                    'فی الحال اس طالب علم کا شعبہ حفظ میں کوئی امتحانی ریکارڈ محفوظ نہیں ہے۔' +
+                '</div>'
+            )) +
+        '</div>';
+
+        // Precompute Tab 4 combined exam rows
+        let combinedRowsHtml = '';
+        if (combinedExamList.length > 0) {
+            combinedRowsHtml = combinedExamList.map(item => {
+                const st = getGradeStyle(item.grade);
+                const actionBtn = item.type === 'hifz'
+                    ? '<button type="button" class="btn btn-sm" style="background:#047857; color:white; border:none; padding:4px 10px; border-radius:6px; font-size:0.82rem; cursor:pointer;" onclick="HifzModule.printExamResultCard(' + student.id + ', ' + item.examId + ')" title="امتحانی رزلٹ کارڈ پرنٹ کریں"><i class="fas fa-print"></i> رزلٹ کارڈ</button>'
+                    : '<button type="button" class="btn btn-sm" style="background:#2563eb; color:white; border:none; padding:4px 10px; border-radius:6px; font-size:0.82rem; cursor:pointer;" onclick="app.printResultCard(' + student.id + ', ' + item.examId + ')" title="رزلٹ کارڈ پرنٹ کریں"><i class="fas fa-print"></i> رزلٹ کارڈ</button>';
+
+                return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+                    '<td style="padding:9px 12px; font-weight:bold; color:#1e293b;">' + item.title + '</td>' +
+                    '<td style="padding:9px 12px; text-align:center;">' +
+                        '<span class="badge" style="background:' + (item.type === 'hifz' ? '#ecfdf5' : '#eff6ff') + '; color:' + (item.type === 'hifz' ? '#047857' : '#1d4ed8') + '; font-weight:600; padding:3px 8px; border-radius:6px; font-size:0.8rem;">' +
+                            item.typeName +
+                        '</span>' +
+                    '</td>' +
+                    '<td style="padding:9px 12px; text-align:center; color:#64748b;">' + item.date + '</td>' +
+                    '<td style="padding:9px 12px; font-size:0.88rem; color:#475569;">' + item.portion + '</td>' +
+                    '<td style="padding:9px 12px; text-align:center;">' + item.totalMarks + '</td>' +
+                    '<td style="padding:9px 12px; text-align:center; font-weight:bold; color:var(--primary);">' + item.obtainedMarks + '</td>' +
+                    '<td style="padding:9px 12px; text-align:center;">' + item.percentage + '%</td>' +
+                    '<td style="padding:9px 12px; text-align:center;">' +
+                        '<span class="badge" style="background:' + st.bg + '; color:' + st.color + '; font-weight:bold; padding:3px 10px; border-radius:10px;">' + item.grade + '</span>' +
+                    '</td>' +
+                    '<td style="padding:9px 12px; text-align:center;">' +
+                        actionBtn +
+                    '</td>' +
+                '</tr>';
+            }).join('');
+        } else {
+            combinedRowsHtml = '<tr><td colspan="9" style="text-align:center; padding:2.5rem; color:#64748b;"><i class="fas fa-file-circle-question" style="font-size:2rem; color:#cbd5e1; display:block; margin-bottom:8px;"></i>کوئی امتحانی نتیجہ نہیں ملا</td></tr>';
+        }
 
         const modalDiv = document.createElement('div');
         modalDiv.id = 'mainStudentProfileModal';
@@ -17441,13 +17608,13 @@ class MadrassahApp {
                         <i class="fas fa-user"></i> بنیادی کوائف
                     </button>
                     <button class="tab-btn" onclick="app.switchStudentModalTab('st_hifz_tab', this)" style="color:var(--primary);">
-                        <i class="fas fa-book-quran"></i> حفظ القرآن ${enrollment ? '✅' : ''}
+                        <i class="fas fa-book-quran"></i> حفظ القرآن ${(enrollment || hifzExamResults.length > 0) ? '✅' : ''}
                     </button>
                     <button class="tab-btn" onclick="app.switchStudentModalTab('st_fees_tab', this)">
                         <i class="fas fa-money-bill-wave"></i> فیس ریکارڈ (${fees.length})
                     </button>
                     <button class="tab-btn" onclick="app.switchStudentModalTab('st_exams_tab', this)">
-                        <i class="fas fa-file-signature"></i> امتحانات (${examResults.length})
+                        <i class="fas fa-file-signature"></i> امتحانات (${totalExamsCount})
                     </button>
                 </div>
 
@@ -17554,6 +17721,8 @@ class MadrassahApp {
                             <div class="hifz-stat-box"><span class="label">شروع تاریخ</span><span class="val" style="font-size:0.95rem;">${enrollment.startDate || '---'}</span></div>
                         </div>
 
+                        ${hifzExamTableHtml}
+
                         <!-- 30 Juz Progress Grid -->
                         <h4 style="margin:1rem 0 0.5rem 0; color:var(--primary);"><i class="fas fa-book-open"></i> 30 پارے تصویری بورڈ:</h4>
                         <div class="hifz-30-grid">
@@ -17581,6 +17750,7 @@ class MadrassahApp {
                             </button>
                         </div>
                     ` : `
+                        ${hifzExamResults.length > 0 ? hifzExamTableHtml : ''}
                         <div style="text-align:center; padding:3rem; background:#f8fafc; border-radius:16px; border:2px dashed #cbd5e1;">
                             <i class="fas fa-book-quran" style="font-size:3rem; color:#94a3b8; margin-bottom:12px; display:block;"></i>
                             <h3 style="color:#475569; margin:0 0 6px 0;">یہ طالب علم فی الوقت شعبہ حفظ القرآن میں انرول نہیں ہے۔</h3>
@@ -17620,31 +17790,26 @@ class MadrassahApp {
 
                 <!-- Tab 4: Exams -->
                 <div id="st_exams_tab" class="student-modal-tab-pane" style="display:none; margin-top:1.2rem;">
-                    <table style="width:100%; font-size:0.95rem;">
-                        <thead>
-                            <tr>
-                                <th>امتحان</th>
-                                <th>کل نمبر</th>
-                                <th>حاصل کردہ</th>
-                                <th>فیصد</th>
-                                <th>تقدیر / گریڈ</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${examResults.map(r => {
-                                const ex = examMap.get(r.examId) || {};
-                                return `
-                                    <tr>
-                                        <td style="font-weight:bold;">${ex.title || 'امتحان'}</td>
-                                        <td>${r.totalPossible || 100}</td>
-                                        <td style="font-weight:bold; color:var(--primary);">${r.obtainedTotal || 0}</td>
-                                        <td>${r.percentage || 0}%</td>
-                                        <td><span class="badge" style="background:#ecfdf5; color:#065f46; font-weight:bold;">${r.grade || '---'}</span></td>
-                                    </tr>
-                                `;
-                            }).join('') || '<tr><td colspan="5" style="text-align:center; padding:2rem;">کوئی امتحانی نتیجہ نہیں ملا</td></tr>'}
-                        </tbody>
-                    </table>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; font-size:0.92rem; border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                                    <th style="padding:9px 12px; text-align:right;">امتحان کا عنوان</th>
+                                    <th style="padding:9px 12px; text-align:center;">شعبہ / نوعیت</th>
+                                    <th style="padding:9px 12px; text-align:center;">تاریخ</th>
+                                    <th style="padding:9px 12px; text-align:right;">حصہ / مضامین</th>
+                                    <th style="padding:9px 12px; text-align:center;">کل نمبر</th>
+                                    <th style="padding:9px 12px; text-align:center;">حاصل کردہ</th>
+                                    <th style="padding:9px 12px; text-align:center;">فیصد</th>
+                                    <th style="padding:9px 12px; text-align:center;">تقدیر / گریڈ</th>
+                                    <th style="padding:9px 12px; text-align:center;">کارروائی</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${combinedRowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div style="margin-top:1.5rem; text-align:center;">

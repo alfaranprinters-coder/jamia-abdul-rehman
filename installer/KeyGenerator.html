@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>کی-جنریٹر (Key Generator) - مدرسہ عبد الرحمن ؓ بن عوف غفوریہ</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #065f46;
+            --primary-dark: #044e39;
+            --accent: #0284c7;
+            --bg: #0f172a;
+            --card-bg: #ffffff;
+            --text-dark: #1e293b;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, 'Amiri', 'Noto Nastaliq Urdu', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #064e3b 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            direction: rtl;
+        }
+
+        .generator-card {
+            background: var(--card-bg);
+            color: var(--text-dark);
+            max-width: 620px;
+            width: 100%;
+            border-radius: 24px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #065f46 0%, #047857 100%);
+            color: white;
+            padding: 2rem 2rem 1.6rem 2rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .header .logo-circle {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 50%;
+            margin: 0 auto 12px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header .logo-circle img {
+            width: 72px;
+            height: 72px;
+            object-fit: contain;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.6rem;
+            font-weight: bold;
+        }
+
+        .header p {
+            margin: 6px 0 0 0;
+            color: #a7f3d0;
+            font-size: 0.95rem;
+        }
+
+        .card-body {
+            padding: 2rem;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-group label {
+            display: block;
+            font-weight: bold;
+            font-size: 1rem;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .input-wrap {
+            position: relative;
+        }
+
+        .input-wrap input {
+            width: 100%;
+            padding: 13px 14px;
+            font-size: 1.2rem;
+            border: 2px solid #cbd5e1;
+            border-radius: 12px;
+            outline: none;
+            transition: all 0.2s;
+            font-family: 'Consolas', monospace;
+            text-align: center;
+            letter-spacing: 1.5px;
+            font-weight: bold;
+            color: #0f172a;
+            background: #f8fafc;
+        }
+
+        .input-wrap input:focus {
+            border-color: #059669;
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.15);
+        }
+
+        .btn-generate {
+            width: 100%;
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 1.15rem;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(5, 150, 105, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .btn-generate:hover {
+            box-shadow: 0 6px 20px rgba(5, 150, 105, 0.45);
+        }
+
+        .btn-generate:active {
+            transform: scale(0.98);
+        }
+
+        .result-box {
+            display: none;
+            margin-top: 1.8rem;
+            background: #f0fdf4;
+            border: 2px dashed #86efac;
+            border-radius: 16px;
+            padding: 1.4rem;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-title {
+            color: #166534;
+            font-size: 0.98rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .key-display {
+            background: #ffffff;
+            border: 2px solid #bbf7d0;
+            padding: 14px;
+            border-radius: 12px;
+            font-family: 'Consolas', monospace;
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #065f46;
+            text-align: center;
+            letter-spacing: 2px;
+            user-select: all;
+            margin-bottom: 14px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        }
+
+        .action-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-action {
+            flex: 1;
+            padding: 11px 14px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-copy {
+            background: #0284c7;
+            color: white;
+        }
+        .btn-copy:hover {
+            background: #0369a1;
+        }
+
+        .btn-whatsapp {
+            background: #25d366;
+            color: white;
+        }
+        .btn-whatsapp:hover {
+            background: #1eb857;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: #f8fafc;
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            display: none;
+            z-index: 1000;
+        }
+
+        .footer-note {
+            padding: 12px 20px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="generator-card">
+        <div class="header">
+            <div class="logo-circle">
+                <img src="../logo.png" alt="Logo" onerror="this.src='logo.png'">
+            </div>
+            <h1>مدرسہ عبد الرحمن ؓ بن عوف غفوریہ</h1>
+            <p>ایڈمن ایکٹیویشن کی جنریٹر (Activation Key Generator)</p>
+        </div>
+
+        <div class="card-body">
+            <form onsubmit="generateKey(event)">
+                <div class="input-group">
+                    <label for="hwid-input">
+                        <i class="fas fa-laptop" style="color: #059669; margin-left: 6px;"></i> کلائنٹ کمپیوٹر کی ہارڈویئر آئی ڈی (Hardware ID):
+                    </label>
+                    <div class="input-wrap">
+                        <input type="text" id="hwid-input" placeholder="مثال: MAB-8F4D-9A2E-7C1B" required autofocus>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-generate">
+                    <i class="fas fa-key"></i> ایکٹیویشن کی جنریٹ کریں (Generate Key)
+                </button>
+            </form>
+
+            <div id="result-box" class="result-box">
+                <div class="result-title">
+                    <i class="fas fa-check-circle" style="color: #16a34a;"></i> مبارک ہو! تصدیق شدہ ایکٹیویشن کی تیار ہے:
+                </div>
+                <div id="key-display" class="key-display">
+                    AK-XXXX-XXXX-XXXX-XXXX
+                </div>
+                <div class="action-row">
+                    <button class="btn-action btn-copy" onclick="copyKey()">
+                        <i class="fas fa-copy"></i> کی کاپی کریں (Copy)
+                    </button>
+                    <button class="btn-action btn-whatsapp" onclick="shareWhatsApp()">
+                        <i class="fab fa-whatsapp"></i> واٹس ایپ پر بھیجیں
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-note">
+            <i class="fas fa-lock"></i> یہ کی-جنریٹر صرف ایڈمن کے لیے ہے۔ کلائنٹ کمپیوٹر پر ایکٹیویشن لگنے کے بعد کوئی بھی سافٹ ویئر دوسرے کمپیوٹر پر کاپی کر کے نہیں چلا سکتا۔
+        </div>
+    </div>
+
+    <div id="toast" class="toast">کاپی ہو گئی!</div>
+
+    <script>
+        // 100% وہی خفیہ کوڈ جو Inno Setup اور C# لاؤنچر میں موجود ہے
+        const ACTIVATION_SALT = "MADRASAH_PRO_SECRET_KEY_2026";
+        const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+        function cleanString(str) {
+            return (str || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        }
+
+        function calculateActivationKey(rawHwid) {
+            const hwid = cleanString(rawHwid);
+            if (!hwid) return "";
+
+            let blocks = [];
+            for (let b = 1; b <= 4; b++) {
+                let sumVal = b * 7919;
+                for (let i = 0; i < hwid.length; i++) {
+                    let hwidChar = hwid.charCodeAt(i);
+                    let saltIndex = (i + b * 5) % ACTIVATION_SALT.length;
+                    let saltChar = ACTIVATION_SALT.charCodeAt(saltIndex);
+                    sumVal = (sumVal * 33 + hwidChar * 17 + saltChar * 13) % 1048573;
+                }
+
+                let blockStr = "";
+                for (let k = 0; k < 4; k++) {
+                    let idx = sumVal % 32;
+                    blockStr += ALPHABET.charAt(idx);
+                    sumVal = Math.floor(sumVal / 32);
+                }
+                blocks.push(blockStr);
+            }
+
+            return "AK-" + blocks.join("-");
+        }
+
+        let currentGeneratedKey = "";
+        let currentHwid = "";
+
+        function generateKey(e) {
+            if (e) e.preventDefault();
+            const input = document.getElementById('hwid-input');
+            const val = input.value.trim();
+            if (!val) return;
+
+            currentHwid = val;
+            currentGeneratedKey = calculateActivationKey(val);
+
+            const resultBox = document.getElementById('result-box');
+            const keyDisplay = document.getElementById('key-display');
+
+            keyDisplay.innerText = currentGeneratedKey;
+            resultBox.style.display = 'block';
+        }
+
+        function copyKey() {
+            if (!currentGeneratedKey) return;
+            navigator.clipboard.writeText(currentGeneratedKey).then(() => {
+                showToast("ایکٹیویشن کی کامیابی سے کاپی ہو گئی!");
+            }).catch(() => {
+                const el = document.createElement('textarea');
+                el.value = currentGeneratedKey;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                showToast("ایکٹیویشن کی کاپی ہو گئی!");
+            });
+        }
+
+        function shareWhatsApp() {
+            if (!currentGeneratedKey) return;
+            const message = `محترم صارف!\nجامعہ عبد الرحمن ؓ بن عوف غفوریہ سافٹ ویئر کی ایکٹیویشن کی درج ذیل ہے:\n\n💻 ہارڈویئر آئی ڈی: ${currentHwid}\n🔑 ایکٹیویشن کی: ${currentGeneratedKey}\n\nیہ کی انسٹالر یا سافٹ ویئر میں درج کر کے ایکٹیویشن مکمل فرمائیں۔ جزاک اللہ!`;
+            const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+            window.open(url, '_blank');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

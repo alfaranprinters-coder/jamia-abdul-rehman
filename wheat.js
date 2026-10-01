@@ -1070,6 +1070,9 @@ const WheatModule = {
 
     renderUsageFormModal(data, isEdit) {
         this.closeModal();
+        const totalKg = data.totalKg !== undefined ? parseFloat(data.totalKg) : Math.round((parseFloat(data.maunds || 2.5)) * 40);
+        const maundsPart = Math.floor(totalKg / 40);
+        const kgPart = Math.round((totalKg % 40) * 10) / 10;
 
         const modalHtml = `
             <div id="wheat-modal-overlay" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,23,42,0.65); backdrop-filter:blur(4px); z-index:9999; display:flex; align-items:center; justify-content:center; padding:1rem; direction:rtl; text-align:right; font-family:'Jameel Noori Nastaleeq', Arial;">
@@ -1259,6 +1262,9 @@ const WheatModule = {
             date,
             bags,
             maunds,
+            maundsPart: mPart,
+            kg: kgPart,
+            totalKg,
             purpose,
             millName,
             grindingCost,

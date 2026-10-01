@@ -1257,14 +1257,20 @@ const MadrassahDB = {
         });
     },
 
-    getStudentHifzResults(studentId) {
+    getStudentHifzResults(studentId, studentName) {
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction(['hifz_exam_results'], 'readonly');
             const store = transaction.objectStore('hifz_exam_results');
             const targetId = parseInt(studentId);
+            const cleanName = studentName ? String(studentName).trim().toLowerCase() : null;
             const request = store.getAll();
             request.onsuccess = () => {
-                const list = (request.result || []).filter(r => parseInt(r.studentId) === targetId || String(r.studentId) === String(studentId));
+                const list = (request.result || []).filter(r => {
+                    if (targetId && parseInt(r.studentId) === targetId) return true;
+                    if (studentId && String(r.studentId) === String(studentId)) return true;
+                    if (cleanName && r.studentName && String(r.studentName).trim().toLowerCase() === cleanName) return true;
+                    return false;
+                });
                 resolve(list);
             };
             request.onerror = () => reject(request.target.error);
